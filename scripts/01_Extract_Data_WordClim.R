@@ -55,7 +55,7 @@ tmax.jan
 # -----------------------------------------
 # Looping through Cities
 # -----------------------------------------
-path.save <- "../data_processed/cities_full"
+path.save <- "../data_processed/cities_full_WorldClim"
 pb <- txtProgressBar(min=0, max=nrow(cities.1mill), style=3)
 for(i in 1:nrow(cities.1mill)){
   setTxtProgressBar(pb, i)
