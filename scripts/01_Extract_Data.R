@@ -53,7 +53,9 @@ tmax.july
 # Looping through Cities
 # -----------------------------------------
 path.save <- "../data_processed/cities_full"
+pb <- txtProgressBar(min=0, max=nrow(cities.1mill), style=3)
 for(i in 1:nrow(cities.1mill)){
+  setTxtProgressBar(pb, i)
   # Subset our shapefile
   city.sp <- cities[i,]
   city.name <- city.sp$name_conve
@@ -73,8 +75,8 @@ for(i in 1:nrow(cities.1mill)){
   temp.city <- crop(tmax.july, city.sp)
   temp.city2 <- mask(temp.city, city.sp)
   # temp.city <- crop(tmax.july, chi.2)
-  plot(temp.city); plot(city.sp, add=T)
-  plot(temp.city2); plot(city.sp, add=T)
+  # plot(temp.city); plot(city.sp, add=T)
+  # plot(temp.city2); plot(city.sp, add=T)
   # ---------------
   
   # ---------------
@@ -82,9 +84,16 @@ for(i in 1:nrow(cities.1mill)){
   # ---------------
   bb.city <- bbox(city.sp)
   
-  f.city <- which(ftree.df$lat-11<=bb.city[2,1] & ftree.df$lat>=bb.city[2,2] &
-                       ftree.df$lon<=bb.city[1,1] & ftree.df$lon+11>=bb.city[1,2])
+  f.city <- which(ftree.df$lat-10<=bb.city[2,1] & ftree.df$lat>=bb.city[2,2] &
+                       ftree.df$lon<=bb.city[1,1] & ftree.df$lon+10>=bb.city[1,2])
   # ftree.df$file[f.city]
+  if(length(f.city)==0){
+    f.city <- which(ftree.df$lat-11<=bb.city[2,1] & ftree.df$lat>=bb.city[2,2] &
+                      ftree.df$lon<=bb.city[1,1] & ftree.df$lon+11>=bb.city[1,2])
+    
+  }
+  
+  if(length(f.city)!=0) next
   tree.city <- raster(file.path(path.trees, ftree.df$file[f.city]))
   tree.city
   
@@ -93,13 +102,13 @@ for(i in 1:nrow(cities.1mill)){
   if(any(bb.tree[,1] > bb.city[,1] | bb.tree[,2] < bb.city[,2])) warning(paste0("Warning: city crosses tree tiles -- ", city.name))
   
   tree.city.raw <- crop(tree.city, city.sp)
-  plot(tree.city.raw)
+  # plot(tree.city.raw)
   
   tree.city <- resample(tree.city.raw, temp.city)
-  plot(tree.city); plot(chi.2, add=T)
+  # plot(tree.city); plot(city.sp, add=T)
   
   tree.city2 <- mask(tree.city, city.sp)
-  plot(tree.city2); plot(city.sp, add=T)
+  # plot(tree.city2); plot(city.sp, add=T)
   
   png(file.path(path.save, paste0(city.name, "_Temp_Tree.png")), height=8, width=10, unit="in", res=180)
   par(mfrow=c(1,2))
@@ -111,17 +120,18 @@ for(i in 1:nrow(cities.1mill)){
   # test <- coordinates(tree.city2)
   
   df.city <- data.frame(Name=city.name, coordinates(temp.city2), cover.tree=getValues(tree.city2), temp.july = getValues(temp.city2))
-  write.csv(file.path(path.save, paste0(city.name, "_data_full.csv")), row.names=F)
-  summary(df.city)
+  write.csv(df.city, file.path(path.save, paste0(city.name, "_data_full.csv")), row.names=F)
+  # summary(df.city)
   
-  cities[i,"tree.mean"] <- mean(df.city$cover.tree, na.rm=T)
-  cities[i,"tree.sd"  ] <- sd(df.city$cover.tree, na.rm=T)
-  cities[i,"tree.max" ] <- max(df.city$cover.tree, 0.90, na.rm=T)
-  cities[i,"tree.min" ] <- min(df.city$cover.tree, 0.90, na.rm=T)
-  cities[i,"july.mean"] <- mean(df.city$temp.july, na.rm=T)
-  cities[i,"july.sd"  ] <- sd(df.city$temp.july, na.rm=T)
-  cities[i,"july.max" ] <- max(df.city$temp.july, na.rm=T)
-  cities[i,"july.min" ] <- min(df.city$temp.july, na.rm=T)
+  cities.1mill[i,"tree.mean"] <- mean(df.city$cover.tree, na.rm=T)
+  cities.1mill[i,"tree.sd"  ] <- sd(df.city$cover.tree, na.rm=T)
+  cities.1mill[i,"tree.max" ] <- max(df.city$cover.tree, 0.90, na.rm=T)
+  cities.1mill[i,"tree.min" ] <- min(df.city$cover.tree, 0.90, na.rm=T)
+  cities.1mill[i,"july.mean"] <- mean(df.city$temp.july, na.rm=T)
+  cities.1mill[i,"july.sd"  ] <- sd(df.city$temp.july, na.rm=T)
+  cities.1mill[i,"july.max" ] <- max(df.city$temp.july, na.rm=T)
+  cities.1mill[i,"july.min" ] <- min(df.city$temp.july, na.rm=T)
 }
-
+summary(cities.1mill)
+write.csv(data.frame(cities.1mill), "../data_processed/cities_summary.csv", row.names=F)
 # ---------------
