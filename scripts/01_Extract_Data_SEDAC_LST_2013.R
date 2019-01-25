@@ -26,29 +26,47 @@
 #         - Temporal Extent: mean 1970-2000
 
 
-library(sp); library(rgdal); library(raster)
+library(sp); library(rgdal); library(raster); library(rgeos)
 
 # Using the SDEI urban database since it has additional info
 sdei.urb <- readOGR("/Volumes/Morton_SDM/sdei-global-uhi-2013-shp/shp/sdei-global-uhi-2013.shp")
 summary(sdei.urb)
 
-cities.1mill <- sdei.urb[sdei.urb$ES00POP>1e6 &  !is.na(sdei.urb$NAME),]
-summary(cities.1mill)
-dim(cities.1mill)
-plot(cities.1mill[cities.1mill$NAME=="Chicago",])
-# plot(cities.1mill)
+# data.frame(sdei.urb[sdei.urb$NAME=="Chicago",])
+
+# These are now population estimates for the metropolitan areas (designated "Urban") -- we can scale back a bit
+cities.use <- sdei.urb[sdei.urb$ES00POP>5e6 &  !is.na(sdei.urb$NAME),]
+summary(cities.use)
+dim(cities.use)
+
+# Cleaning up some names
+cities.use$NAME <- as.character(cities.use$NAME)
+cities.use[cities.use$NAME=="Xi'an", "NAME"] <- "Xian" # because syntax won't work with recode
+cities.use$NAME <- car::recode(cities.use$NAME, "'?stanbul'='Istanbul'; 'S?o Paulo'='Sao Paulo'")
+cities.use$NAME <- gsub(" ", "", cities.use$NAME)
+# cities.use$NAME <- gsub("  ", "", cities.use$NAME)
+
+cities.use <- cities.use[order(cities.use$NAME), ]
+
+# plot(cities.use[cities.use$NAME=="Chicago",])
+# plot(cities.use)
 
 # Going to need to mask out water, so lets load a layer
 # water <- readOGR("/Volumes/Morton_SDM/water-polygons-split-4326/water_polygons.shp")
 # summary(water)
 # water <- readOGR("~/Desktop/occurrence.tif.lyr")
-oceans <- readOGR("~/Desktop/ocean-polygons-reduced-3857/ocean_reduced_z6.shp")
-lakes  <- readOGR("~/Desktop/lakes-polygons-reduced-3857/lakes_reduced_z6.shp")
-rivers <- readOGR("~/Desktop/river-polygons-reduced-3857/river_reduced_z6.shp")
+oceans <- readOGR("~/Desktop/ocean-polygons-reduced-3857/ocean_reduced_z5.shp")
+lakes  <- readOGR("~/Desktop/lakes-polygons-reduced-3857/lakes_reduced_z5.shp")
+rivers <- readOGR("~/Desktop/river-polygons-reduced-3857/river_reduced_z5.shp")
 
-oceans <- spTransform(oceans, projection(cities.1mill))
-lakes <- spTransform(lakes, projection(cities.1mill))
-rivers <- spTransform(rivers, projection(cities.1mill))
+oceans <- gBuffer(oceans, byid=T, width=0)
+lakes  <- gBuffer(lakes, byid=T, width=0)
+rivers <- gBuffer(rivers, byid=T, width=0)
+
+oceans <- spTransform(oceans, projection(cities.use))
+lakes <- spTransform(lakes, projection(cities.use))
+rivers <- spTransform(rivers, projection(cities.use))
+
 
 # Doing some indexing of tree cover data
 path.trees <- "/Volumes/Morton_SDM/TreeCover/"
@@ -71,38 +89,37 @@ tmax <- raster("/Volumes/Morton_SDM/sdei-global-summer-lst-2013-global/sdei-glob
 # -----------------------------------------
 # Looping through Cities
 # -----------------------------------------
-path.save <- "../data_processed/cities_full"
-pb <- txtProgressBar(min=0, max=nrow(cities.1mill), style=3)
-for(i in 1:nrow(cities.1mill)){
+path.save <- "../data_processed/cities_full_sdei"
+dir.create(path.save, recursive=T, showWarnings = F)
+pb <- txtProgressBar(min=0, max=nrow(cities.use), style=3)
+for(i in 1:nrow(cities.use)){
+  # i=which(cities.use$NAME=="Chicago")
+  
   setTxtProgressBar(pb, i)
   # Subset our shapefile
-  # i=which(cities.1mill$NAME=="Chicago")
-  city.sp <- cities.1mill[i,]
+  city.sp <- cities.use[i,]
+  # data.frame(city.sp)
   city.name <- city.sp$NAME
   city.name <- sub(c("[?]"), "X", city.name) # Getting rid of the ? infront of some cities
   city.name <- sub(c("[?]"), "X", city.name) # Being lazy and doing this twice just in case to get rid of the rare ??
   bb.city <- bbox(city.sp)
   
+  ocean.city <- lakes.city <- river.city <- NULL
   ocean.city <- crop(oceans, extent(city.sp))
   lakes.city <- crop(lakes, extent(city.sp))
   river.city <- crop(rivers, extent(city.sp))
   
-  plot(city.sp);
-  # if(length(ocean.city)>0) plot(ocean.city, add=T, col="blue3"); 
-  # if(length(lakes.city)>0) plot(lakes.city, add=T, col="cadetblue2"); 
+  # plot(city.sp);
+  # if(length(ocean.city)>0) plot(ocean.city, add=T, col="blue3");
+  # if(length(lakes.city)>0) plot(lakes.city, add=T, col="cadetblue2");
   # if(length(river.city)>0) plot(river.city, add=T, col="dodgerblue2")
-  
-  # Simplifying to try and remove some edge effects
-  # city.simple <- rgeos::gSimplify(city, tol=0.01, topologyPreserve=T)
-  # plot(city.simple)
-  # projection(city.simple) <- projection(city.sp)
   
   # ---------------
   # Extract the climate data
   # ---------------
   # -- transform the projection of the city --> not actulaly necessary
-  # chi.2 <- spTransform(city, projection(tmax.july))
-  
+
+  # Cut down the dataset to a city-scale
   temp.city <- crop(tmax, city.sp)
   
   # Mask out water bodies
@@ -126,6 +143,7 @@ for(i in 1:nrow(cities.1mill)){
     test.lat <- which(ftree.df$lat-10<=bb.city[2,1] & ftree.df$lat>=bb.city[2,2])
     test.lon <- which(ftree.df$lon<=bb.city[1,1] & ftree.df$lon+10>=bb.city[1,2])
     
+    # Note: this may bonk, but we'll try it for now
     if(length(test.lon)==0){
       test.lon <- which(ftree.df$lon<=bb.city[1,1]+10 & ftree.df$lon+10>=bb.city[1,2]-10)
       f.city <- test.lat[test.lat %in% test.lon]
@@ -137,35 +155,52 @@ for(i in 1:nrow(cities.1mill)){
     
   }
   
-  # if(length(f.city)==0) next
+  if(length(f.city)==0) next
   if(length(f.city)==1){
     tree.city <- raster(file.path(path.trees, ftree.df$file[f.city]))
     tree.city
-  } else if(length(f.city)==2) {
-    tree1 <- raster(file.path(path.trees, ftree.df$file[f.city[1]]))
-    tree2 <- raster(file.path(path.trees, ftree.df$file[f.city[2]]))
+  } else if(length(f.city)>=2) {
+    tree.city <- raster(file.path(path.trees, ftree.df$file[f.city[1]]))
     
-    ext1 <- extent(tree1)
-    ext2 <- extent(tree2)
     ext.city <- extent(city.sp)
-    tree1 <- crop(tree1, extent(c(max(ext1[1], ext.city[1]),
-                                  min(ext1[2], ext.city[2]),
-                                  max(ext1[3], ext.city[3]),
-                                  min(ext1[4], ext.city[4]))))
-    tree2 <- crop(tree2, extent(c(max(ext2[1], ext.city[1]),
-                                  min(ext2[2], ext.city[2]),
-                                  max(ext2[3], ext.city[3]),
-                                  min(ext2[4], ext.city[4]))))
     
-    tree.city <- mosaic(tree1, tree2, fun=mean)
-  } else next
+    # Setting up the temporary extent
+    ext1 <- extent(tree.city)
+    ext.temp <- c(max(ext1[1], ext.city[1]),
+                  min(ext1[2], ext.city[2]),
+                  max(ext1[3], ext.city[3]),
+                  min(ext1[4], ext.city[4]))
+    
+    # If we end up with bounding issues, just take the full range of the raster
+    # -- this will be slower, but more reliable for now
+    if(ext.temp[1]>=ext.temp[2]) ext.temp[1:2] <- ext1[1:2]
+    if(ext.temp[3]>=ext.temp[4]) ext.temp[3:4] <- ext1[3:4]
+    
+    tree.city <- crop(tree.city, extent(ext.temp))
+    
+    for(j in 2:length(f.city)){
+      tree2 <- raster(file.path(path.trees, ftree.df$file[f.city[j]]))
+      ext2 <- extent(tree2)
+      
+      # Setting up the temporary extent
+      ext.temp <- c(max(ext2[1], ext.city[1]),
+                    min(ext2[2], ext.city[2]),
+                    max(ext2[3], ext.city[3]),
+                    min(ext2[4], ext.city[4]))
+      
+      if(ext.temp[1]>=ext.temp[2]) ext.temp[1:2] <- ext2[1:2]
+      if(ext.temp[3]>=ext.temp[4]) ext.temp[3:4] <- ext2[3:4]
+      
+      tree2 <- crop(tree2, extent(ext.temp))
+      
+      tree.city <- mosaic(tree.city, tree2, fun=mean)
+    }
+  } 
   
-  # if(any(bb.tree[,1] > bb.city[,1] | bb.tree[,2] < bb.city[,2])) warning(paste0("Warning: city crosses tree tiles -- ", city.name))
+  tree.city <- crop(tree.city, city.sp)
+  # plot(tree.city)
   
-  tree.city.raw <- crop(tree.city, city.sp)
-  # plot(tree.city.raw)
-  
-  tree.city <- resample(tree.city.raw, temp.city)
+  tree.city <- resample(tree.city, temp.city)
   # plot(tree.city); plot(city.sp, add=T)
   
   # Mask out water bodies
@@ -201,15 +236,19 @@ for(i in 1:nrow(cities.1mill)){
   dev.off()
   
   
-  cities.1mill[i,"tree.mean"] <- mean(df.city$cover.tree, na.rm=T)
-  cities.1mill[i,"tree.sd"  ] <- sd(df.city$cover.tree, na.rm=T)
-  cities.1mill[i,"tree.max" ] <- max(df.city$cover.tree, 0.90, na.rm=T)
-  cities.1mill[i,"tree.min" ] <- min(df.city$cover.tree, 0.90, na.rm=T)
-  cities.1mill[i,"july.mean"] <- mean(df.city$temp.july, na.rm=T)
-  cities.1mill[i,"july.sd"  ] <- sd(df.city$temp.july, na.rm=T)
-  cities.1mill[i,"july.max" ] <- max(df.city$temp.july, na.rm=T)
-  cities.1mill[i,"july.min" ] <- min(df.city$temp.july, na.rm=T)
+  cities.use[i,"tree.mean"] <- mean(df.city$cover.tree, na.rm=T)
+  cities.use[i,"tree.sd"  ] <- sd(df.city$cover.tree, na.rm=T)
+  cities.use[i,"tree.max" ] <- max(df.city$cover.tree, 0.90, na.rm=T)
+  cities.use[i,"tree.min" ] <- min(df.city$cover.tree, 0.90, na.rm=T)
+  cities.use[i,"temp.mean"] <- mean(df.city$temp.summer, na.rm=T)
+  cities.use[i,"temp.sd"  ] <- sd(df.city$temp.summer, na.rm=T)
+  cities.use[i,"temp.max" ] <- max(df.city$temp.summer, na.rm=T)
+  cities.use[i,"temp.min" ] <- min(df.city$temp.summer, na.rm=T)
+  cities.use[i,"correlation"] <- sum.lm$r.squared
+  cities.use[i,"slope"] <- sum.lm$coefficients[2,1] 
+  
+  rm(ocean.city, lakes.city, river.city)
 }
-summary(cities.1mill)
-write.csv(data.frame(cities.1mill), "../data_processed/cities_summary.csv", row.names=F)
+summary(cities.use)
+write.csv(data.frame(cities.use), "../data_processed/cities_summary_sdei.csv", row.names=F)
 # ---------------
