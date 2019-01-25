@@ -49,6 +49,9 @@ summary(ftree.df)
 tmax.july <- raster("/Volumes/Morton_SDM/wc2/wc2.0_30s_tmax_07.tif")
 tmax.july
 
+tmax.jan <- raster("/Volumes/Morton_SDM/wc2/wc2.0_30s_tmax_01.tif")
+tmax.jan
+
 # -----------------------------------------
 # Looping through Cities
 # -----------------------------------------
@@ -57,8 +60,12 @@ pb <- txtProgressBar(min=0, max=nrow(cities.1mill), style=3)
 for(i in 1:nrow(cities.1mill)){
   setTxtProgressBar(pb, i)
   # Subset our shapefile
-  city.sp <- cities[i,]
-  city.name <- city.sp$name_conve
+  city.sp <- cities.1mill[i,]
+  i <- city.sp$name_conve
+  
+  bb.city <- bbox(city.sp)
+  
+  
   # plot(city.sp)
   
   # Simplifying to try and remove some edge effects
@@ -72,9 +79,14 @@ for(i in 1:nrow(cities.1mill)){
   # -- transform the projection of the city --> not actulaly necessary
   # chi.2 <- spTransform(city, projection(tmax.july))
   
-  temp.city <- crop(tmax.july, city.sp)
+  if(mean(bb.city[2,])>=0) {
+    # If in northern hemisphere, pull July temperature
+    temp.city <- crop(tmax.july, city.sp)
+  } else {
+    # If in southern hemisphere, pull January temperature 
+    temp.city <- crop(tmax.jan, city.sp)
+  }
   temp.city2 <- mask(temp.city, city.sp)
-  # temp.city <- crop(tmax.july, chi.2)
   # plot(temp.city); plot(city.sp, add=T)
   # plot(temp.city2); plot(city.sp, add=T)
   # ---------------
@@ -82,24 +94,51 @@ for(i in 1:nrow(cities.1mill)){
   # ---------------
   # Find our tree canopy file
   # ---------------
-  bb.city <- bbox(city.sp)
-  
   f.city <- which(ftree.df$lat-10<=bb.city[2,1] & ftree.df$lat>=bb.city[2,2] &
                        ftree.df$lon<=bb.city[1,1] & ftree.df$lon+10>=bb.city[1,2])
   # ftree.df$file[f.city]
   if(length(f.city)==0){
-    f.city <- which(ftree.df$lat-11<=bb.city[2,1] & ftree.df$lat>=bb.city[2,2] &
-                      ftree.df$lon<=bb.city[1,1] & ftree.df$lon+11>=bb.city[1,2])
+    # Figure out which dimension fails
+    test.lat <- which(ftree.df$lat-10<=bb.city[2,1] & ftree.df$lat>=bb.city[2,2])
+    test.lon <- which(ftree.df$lon<=bb.city[1,1] & ftree.df$lon+10>=bb.city[1,2])
+    
+    if(length(test.lon)==0){
+      test.lon <- which(ftree.df$lon<=bb.city[1,1]+10 & ftree.df$lon+10>=bb.city[1,2]-10)
+      f.city <- test.lat[test.lat %in% test.lon]
+    }
+    if(length(test.lat)==0){
+      test.lat <- which(ftree.df$lat-10<=bb.city[2,1]+10 & ftree.df$lat+10>=bb.city[2,2]-10)
+      f.city <- test.lat[test.lat %in% test.lon]
+    }
     
   }
   
-  if(length(f.city)!=0) next
-  tree.city <- raster(file.path(path.trees, ftree.df$file[f.city]))
-  tree.city
+  # if(length(f.city)==0) next
+  if(length(f.city)==1){
+    tree.city <- raster(file.path(path.trees, ftree.df$file[f.city]))
+    tree.city
+  } else if(length(f.city)==2) {
+    tree1 <- raster(file.path(path.trees, ftree.df$file[f.city[1]]))
+    tree2 <- raster(file.path(path.trees, ftree.df$file[f.city[2]]))
+    
+    ext1 <- extent(tree1)
+    ext2 <- extent(tree2)
+    ext.city <- extent(city.sp)
+    tree1 <- crop(tree1, extent(c(max(ext1[1], ext.city[1]),
+                                  min(ext1[2], ext.city[2]),
+                                  max(ext1[3], ext.city[3]),
+                                  min(ext1[4], ext.city[4]))))
+    tree2 <- crop(tree2, extent(c(max(ext2[1], ext.city[1]),
+                                  min(ext2[2], ext.city[2]),
+                                  max(ext2[3], ext.city[3]),
+                                  min(ext2[4], ext.city[4]))))
+    
+    tree.city <- mosaic(tree1, tree2, fun=mean)
+  } else next
   
   bb.tree <- bbox(tree.city)
   bb.city
-  if(any(bb.tree[,1] > bb.city[,1] | bb.tree[,2] < bb.city[,2])) warning(paste0("Warning: city crosses tree tiles -- ", city.name))
+  # if(any(bb.tree[,1] > bb.city[,1] | bb.tree[,2] < bb.city[,2])) warning(paste0("Warning: city crosses tree tiles -- ", city.name))
   
   tree.city.raw <- crop(tree.city, city.sp)
   # plot(tree.city.raw)
