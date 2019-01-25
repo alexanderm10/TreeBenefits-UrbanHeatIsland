@@ -28,7 +28,7 @@ dim(cities.1mill)
 plot(cities[cities$name_conve=="Chicago",])
 summary(cities[cities$name_conve=="Chicago",])
 
-plot(cities.1mill)
+# plot(cities.1mill)
 
 # Doing some indexing of tree cover data
 path.trees <- "/Volumes/Morton_SDM/TreeCover/"
@@ -50,81 +50,78 @@ tmax.july <- raster("/Volumes/Morton_SDM/wc2/wc2.0_30s_tmax_07.tif")
 tmax.july
 
 # -----------------------------------------
-# Testing for Chicago
+# Looping through Cities
 # -----------------------------------------
-# Subset our shapefile
-chicago <- cities[cities$name_conve=="Chicago",]
-plot(chicago)
+path.save <- "../data_processed/cities_full"
+for(i in 1:nrow(cities.1mill)){
+  # Subset our shapefile
+  city.sp <- cities[i,]
+  city.name <- city.sp$name_conve
+  # plot(city.sp)
+  
+  # Simplifying to try and remove some edge effects
+  # city.simple <- rgeos::gSimplify(city, tol=0.01, topologyPreserve=T)
+  # plot(city.simple)
+  # projection(city.simple) <- projection(city.sp)
+  
+  # ---------------
+  # Extract the climate data
+  # ---------------
+  # -- transform the projection of the city --> not actulaly necessary
+  # chi.2 <- spTransform(city, projection(tmax.july))
+  
+  temp.city <- crop(tmax.july, city.sp)
+  temp.city2 <- mask(temp.city, city.sp)
+  # temp.city <- crop(tmax.july, chi.2)
+  plot(temp.city); plot(city.sp, add=T)
+  plot(temp.city2); plot(city.sp, add=T)
+  # ---------------
+  
+  # ---------------
+  # Find our tree canopy file
+  # ---------------
+  bb.city <- bbox(city.sp)
+  
+  f.city <- which(ftree.df$lat-11<=bb.city[2,1] & ftree.df$lat>=bb.city[2,2] &
+                       ftree.df$lon<=bb.city[1,1] & ftree.df$lon+11>=bb.city[1,2])
+  # ftree.df$file[f.city]
+  tree.city <- raster(file.path(path.trees, ftree.df$file[f.city]))
+  tree.city
+  
+  bb.tree <- bbox(tree.city)
+  bb.city
+  if(any(bb.tree[,1] > bb.city[,1] | bb.tree[,2] < bb.city[,2])) warning(paste0("Warning: city crosses tree tiles -- ", city.name))
+  
+  tree.city.raw <- crop(tree.city, city.sp)
+  plot(tree.city.raw)
+  
+  tree.city <- resample(tree.city.raw, temp.city)
+  plot(tree.city); plot(chi.2, add=T)
+  
+  tree.city2 <- mask(tree.city, city.sp)
+  plot(tree.city2); plot(city.sp, add=T)
+  
+  png(file.path(path.save, paste0(city.name, "_Temp_Tree.png")), height=8, width=10, unit="in", res=180)
+  par(mfrow=c(1,2))
+  plot(temp.city2, main="WorldClim July Tmax\n1970-2000, deg.C"); plot(city.sp, add=T)
+  plot(tree.city2, main="Tree Cover\n 2000, perc. cover"); plot(city.sp, add=T)
+  par(mfrow=c(1,1))
+  dev.off()
+  
+  # test <- coordinates(tree.city2)
+  
+  df.city <- data.frame(Name=city.name, coordinates(temp.city2), cover.tree=getValues(tree.city2), temp.july = getValues(temp.city2))
+  write.csv(file.path(path.save, paste0(city.name, "_data_full.csv")), row.names=F)
+  summary(df.city)
+  
+  cities[i,"tree.mean"] <- mean(df.city$cover.tree, na.rm=T)
+  cities[i,"tree.sd"  ] <- sd(df.city$cover.tree, na.rm=T)
+  cities[i,"tree.max" ] <- max(df.city$cover.tree, 0.90, na.rm=T)
+  cities[i,"tree.min" ] <- min(df.city$cover.tree, 0.90, na.rm=T)
+  cities[i,"july.mean"] <- mean(df.city$temp.july, na.rm=T)
+  cities[i,"july.sd"  ] <- sd(df.city$temp.july, na.rm=T)
+  cities[i,"july.max" ] <- max(df.city$temp.july, na.rm=T)
+  cities[i,"july.min" ] <- min(df.city$temp.july, na.rm=T)
+}
 
-# Remove holes and try to genearlize a bit:
-featureNumber=1 ; ringNumber=1
-ring = SpatialPolygons(
-  list(
-    Polygons(
-      list(
-        chicago@polygons[[featureNumber]]@Polygons[[ringNumber]]),ID=1
-      )
-    )
-  )
-unholed = SpatialPolygonsDataFrame(ring,data=chicago@data,match.ID=FALSE)
-plot(unholed)
-
-# Simplifying to try and remove some edge effects
-chi.simple <- rgeos::gSimplify(unholed, tol=0.01, topologyPreserve=T)
-plot(chi.simple)
-projection(chi.simple) <- projection(chicago)
-bb.chicago <- bbox(chi.simple)
-
-# ---------------
-# Extract the climate data
-# ---------------
-# -- transform the projection of the city
-chi.2 <- spTransform(chicago, projection(tmax.july))
-
-temp.chicago <- crop(tmax.july, chi.2)
-temp.chicago2 <- mask(temp.chicago, chi.2)
-# temp.chicago <- crop(tmax.july, chi.2)
-plot(temp.chicago); plot(chi.2, add=T)
-plot(temp.chicago2); plot(chi.2, add=T)
-# ---------------
-
-# ---------------
-# Find our tree canopy file
-# ---------------
-f.chicago <- which(ftree.df$lat-10<=bb.chicago[2,1] & ftree.df$lat>=bb.chicago[2,2] &
-                     ftree.df$lon<=bb.chicago[1,1] & ftree.df$lon+10>=bb.chicago[1,2])
-# ftree.df$file[f.chicago]
-tree.chicago <- raster(file.path(path.trees, ftree.df$file[f.chicago]))
-tree.chicago
-
-tree.chicago.raw <- crop(tree.chicago, chi.2)
-plot(tree.chicago.raw)
-
-tree.chicago <- resample(tree.chicago.raw, temp.chicago)
-plot(tree.chicago); plot(chi.2, add=T)
-
-tree.chicago2 <- mask(tree.chicago, chi.3)
-plot(tree.chicago2); plot(chi.2, add=T)
-
-png("QuickChicago.png", height=8, width=10, unit="in", res=180)
-par(mfrow=c(1,2))
-plot(temp.chicago2, main="WorldClim\nMax Temp"); plot(chi.2, add=T)
-plot(tree.chicago2, main="Tree Cover"); plot(chi.2, add=T)
-par(mfrow=c(1,1))
-dev.off()
-
-values.tree <- getValues(tree.chicago2)
-values.temp <- getValues(temp.chicago2)
-
-tree.90 <- quantile(values.tree, 0.90, na.rm=T)
-tree.10 <- quantile(values.tree, 0.10, na.rm=T)
-temps.tree90 <- values.temp[which(values.tree>=tree.90)]
-temps.tree10 <- values.temp[which(values.tree<=tree.10)]
-
-summary(temps.tree90)
-t.test(temps.tree90, temps.tree10)
-
-plot(getValues(temp.chicago2) ~ getValues(tree.chicago2))
-lm.tree <- lm(getValues(temp.chicago2) ~ getValues(tree.chicago2))
-summary(lm.tree)
 # ---------------
