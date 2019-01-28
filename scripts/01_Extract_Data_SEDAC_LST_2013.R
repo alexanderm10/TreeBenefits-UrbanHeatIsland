@@ -255,6 +255,30 @@ for(i in 1:nrow(cities.use)){
   
   rm(ocean.city, lakes.city, river.city)
 }
+# cities.use <- cities.use[,!names(cities.use) %in% c("july.mean", "july.sd", "july.max", "july.min")]
 summary(cities.use)
 write.csv(data.frame(cities.use), "../data_processed/cities_summary_sdei.csv", row.names=F)
 # ---------------
+# -----------------------------------------
+
+
+# -----------------------------------------
+# Looking at some quick summary stats
+# -----------------------------------------
+cities.use <- data.frame(cities.use)
+summary(cities.use)
+
+cities.use[cities.use$temp.min<0,] # Clearly some sites where we need to filter the data better
+cities.use[cities.use$correlation<0.01,]
+
+hist(cities.use$correlation)
+hist(cities.use$slope)
+
+summary(cities.use)
+
+summary(cities.use[cities.use$correlation>=0.3,])
+cities.use[cities.use$correlation>=0.3,"NAME"]
+
+summary(cities.use[cities.use$correlation<0.01,])
+cities.use[cities.use$correlation<0.01,"NAME"]
+# -----------------------------------------
