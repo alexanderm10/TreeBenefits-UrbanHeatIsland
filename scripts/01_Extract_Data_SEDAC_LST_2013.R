@@ -39,6 +39,12 @@ cities.use <- sdei.urb[sdei.urb$ES00POP>5e6 &  !is.na(sdei.urb$NAME),]
 summary(cities.use)
 dim(cities.use)
 
+# Plot the map to get a better feel for geographic distribution
+png("../data_processed/cities_used_spdei.png", height=4, width=8, units="in", res=120)
+map(col="red", lwd=0.5)
+plot(cities.use, add=T)
+dev.off()
+
 # Cleaning up some names
 cities.use$NAME <- as.character(cities.use$NAME)
 cities.use[cities.use$NAME=="Xi'an", "NAME"] <- "Xian" # because syntax won't work with recode
