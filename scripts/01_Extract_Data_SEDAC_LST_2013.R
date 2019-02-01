@@ -31,16 +31,21 @@ library(sp); library(rgdal); library(raster); library(rgeos)
 # Using the SDEI urban database since it has additional info
 sdei.urb <- readOGR("/Volumes/Morton_SDM/sdei-global-uhi-2013-shp/shp/sdei-global-uhi-2013.shp")
 summary(sdei.urb)
+dim(sdei.urb)
+summary(sdei.urb$SQKM_FINAL)
 
 # data.frame(sdei.urb[sdei.urb$NAME=="Chicago",])
 
 # These are now population estimates for the metropolitan areas (designated "Urban") -- we can scale back a bit
-cities.use <- sdei.urb[sdei.urb$ES00POP>5e6 &  !is.na(sdei.urb$NAME),]
-summary(cities.use)
+cities.use <- sdei.urb[sdei.urb$ES00POP>2e6 &  !is.na(sdei.urb$NAME) & sdei.urb$SQKM_FINAL>1e3 & sdei.urb$D_T_DIFF>1,]
 dim(cities.use)
+summary(cities.use)
+summary(droplevels(cities.use$ISO3))
+hist(cities.use$URB_N_MEAN)
+data.frame(cities.use[cities.use$URB_N_MEAN<10,])
 
 # Plot the map to get a better feel for geographic distribution
-png("../data_processed/cities_used_spdei.png", height=4, width=8, units="in", res=120)
+png("../data_processed/cities_used_spdei_v2.png", height=4, width=8, units="in", res=120)
 map(col="red", lwd=0.5)
 plot(cities.use, add=T)
 dev.off()
@@ -48,7 +53,7 @@ dev.off()
 # Cleaning up some names
 cities.use$NAME <- as.character(cities.use$NAME)
 cities.use[cities.use$NAME=="Xi'an", "NAME"] <- "Xian" # because syntax won't work with recode
-cities.use$NAME <- car::recode(cities.use$NAME, "'?stanbul'='Istanbul'; 'S?o Paulo'='Sao Paulo'")
+cities.use$NAME <- car::recode(cities.use$NAME, "'?stanbul'='Istanbul'; 'S?o Paulo'='Sao Paulo'; '?zmir'='Izmir'")
 cities.use$NAME <- gsub(" ", "", cities.use$NAME)
 # cities.use$NAME <- gsub("  ", "", cities.use$NAME)
 
@@ -95,7 +100,8 @@ tmax <- raster("/Volumes/Morton_SDM/sdei-global-summer-lst-2013-global/sdei-glob
 # -----------------------------------------
 # Looping through Cities
 # -----------------------------------------
-path.save <- "../data_processed/cities_full_sdei"
+# cities.use$NAME
+path.save <- "../data_processed/cities_full_sdei_v2"
 dir.create(path.save, recursive=T, showWarnings = F)
 pb <- txtProgressBar(min=0, max=nrow(cities.use), style=3)
 for(i in 1:nrow(cities.use)){
@@ -134,6 +140,16 @@ for(i in 1:nrow(cities.use)){
   if(length(river.city)>0) temp.city <- mask(temp.city, river.city, inverse=T)
   
   temp.city2 <- mask(temp.city, city.sp)
+  temp.city2[temp.city2<=0] <- NA
+  
+  # Filter out things beyond 6 sigma
+  vals.tmax <- getValues(temp.city2)
+  tmax.mean <- mean(vals.tmax, na.rm=T)
+  tmax.sd   <- sd(vals.tmax, na.rm=T)
+  temp.city2[temp.city2>tmax.mean + 6*tmax.sd] <- NA
+  temp.city2[temp.city2<tmax.mean - 6*tmax.sd] <- NA
+  vals.tmax <- getValues(temp.city2)
+  
   # plot(temp.city); plot(city.sp, add=T)
   # plot(temp.city2); plot(city.sp, add=T)
   # ---------------
@@ -204,6 +220,8 @@ for(i in 1:nrow(cities.use)){
   } 
   
   tree.city <- crop(tree.city, city.sp)
+  tree.city[tree.city<0] <- NA
+  tree.city[tree.city>100] <- NA
   # plot(tree.city)
   
   tree.city <- resample(tree.city, temp.city)
@@ -219,6 +237,8 @@ for(i in 1:nrow(cities.use)){
   tree.city2 <- mask(tree.city, city.sp)
   # plot(tree.city2); plot(city.sp, add=T)
   
+  vals.tree <- getValues(tree.city2)
+  
   png(file.path(path.save, paste0(city.name, "_maps.png")), height=4, width=6, unit="in", res=180)
   par(mfrow=c(1,2))
   plot(temp.city2, main="Summer Day Max Temp\n2013, deg.C"); plot(city.sp, add=T)
@@ -228,7 +248,7 @@ for(i in 1:nrow(cities.use)){
   
   # test <- coordinates(tree.city2)
   
-  df.city <- data.frame(Name=city.name, coordinates(temp.city2), cover.tree=getValues(tree.city2), temp.summer = getValues(temp.city2))
+  df.city <- data.frame(Name=city.name, coordinates(temp.city2), cover.tree=vals.tree, temp.summer=vals.tmax)
   df.city <- df.city[complete.cases(df.city),]
   write.csv(df.city, file.path(path.save, paste0(city.name, "_data_full.csv")), row.names=F)
   # summary(df.city)
@@ -257,7 +277,7 @@ for(i in 1:nrow(cities.use)){
 }
 # cities.use <- cities.use[,!names(cities.use) %in% c("july.mean", "july.sd", "july.max", "july.min")]
 summary(cities.use)
-write.csv(data.frame(cities.use), "../data_processed/cities_summary_sdei.csv", row.names=F)
+write.csv(data.frame(cities.use), "../data_processed/cities_summary_sdei_v2.csv", row.names=F)
 # ---------------
 # -----------------------------------------
 
