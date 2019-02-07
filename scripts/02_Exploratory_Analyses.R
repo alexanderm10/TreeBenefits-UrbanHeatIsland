@@ -1,7 +1,7 @@
 # Doing some quick EDA for geography of Urban Heat island
 library(ggplot2)
 
-dat.uhi <- read.csv("../data_processed/cities_summary_sdei.csv")
+dat.uhi <- read.csv("../data_processed/cities_summary_sdei_v2.csv")
 dat.uhi <- dat.uhi[dat.uhi$tree.min>=0 & dat.uhi$D_T_DIFF>=0,]
 dat.uhi$temp.diff <- dat.uhi$temp.max - dat.uhi$temp.min
 dat.uhi$tree.diff <- dat.uhi$tree.max - dat.uhi$tree.min
@@ -63,12 +63,13 @@ ggplot(data=dat.uhi) +
   coord_equal(expand=0) +
   geom_path(data=world, aes(x=long, y=lat, group=group)) +
   geom_point(aes(x=LONGITUDE, y=LATITUDE, color=correlation), size=5) +
-  # scale_color_gradient2(low="gray50", high="green3", midpoint=0.25) +
+  scale_color_gradient(low="gray50", high="green3") +
   theme_bw()
   
-ggplot(data=dat.uhi) +
+ggplot(data=dat.uhi[dat.uhi$correlation>0.3,]) +
   coord_equal(expand=0) +
-  geom_path(data=world, aes(x=long, y=lat, group=group)) +
+  geom_path(data=world, aes(x=long, y=lat, group=group), color="gray80") +
+  geom_point(data=dat.uhi, aes(x=LONGITUDE, y=LATITUDE), size=3, color="gray15") +
   geom_point(aes(x=LONGITUDE, y=LATITUDE, color=slope), size=5) +
   scale_color_gradient(low="green4", high="gray50") +
   theme_bw()

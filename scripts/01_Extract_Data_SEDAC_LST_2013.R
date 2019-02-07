@@ -288,7 +288,7 @@ write.csv(data.frame(cities.use), "../data_processed/cities_summary_sdei_v2.csv"
 cities.use <- data.frame(cities.use)
 summary(cities.use)
 
-cities.use[cities.use$temp.min<0,] # Clearly some sites where we need to filter the data better
+# cities.use[cities.use$temp.min<0,] # Clearly some sites where we need to filter the data better
 cities.use[cities.use$correlation<0.01,]
 
 hist(cities.use$correlation)
