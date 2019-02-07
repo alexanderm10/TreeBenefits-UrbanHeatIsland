@@ -8,7 +8,51 @@ dat.uhi$tree.diff <- dat.uhi$tree.max - dat.uhi$tree.min
 summary(dat.uhi)
 dim(dat.uhi)
 
+# New plan for quantifying effects of trees on UHI: 
+# apply mean temperature of treeless area to whole area and calculate the difference
+pb <- txtProgressBar(min=0, max=nrow(dat.uhi), style=3)
+for(i in 1:nrow(dat.uhi)){
+  setTxtProgressBar(pb, i)
+  dat.city <- read.csv(paste0("../data_processed/cities_full_sdei_v2/", dat.uhi$NAME[i], "_data_full.csv"))
+  summary(dat.city)
+  
+  # Not necessarily the best, but using the mean treeless temperature as a baseline
+  temp.notree <- mean(dat.city[dat.city$cover.tree<0.5, "temp.summer"], na.rm=T)
+  
+  dat.uhi[i,"temp.diff.notree"] <- mean(dat.city$temp.summer-temp.notree, na.rm=T)
+  
+  rm(dat.city)
+}
+summary(dat.uhi)
+summary(dat.uhi[dat.uhi$temp.diff.notree>0,])
+dim(dat.uhi[dat.uhi$temp.diff.notree>0,])
+summary(dat.uhi[dat.uhi$temp.diff.notree< -10,])
+
+hist(dat.uhi$temp.diff.notree)
 world <- map_data("world")
+
+dat.uhi <- dat.uhi[dat.uhi$temp.diff.notree>-10,]
+
+mean(dat.uhi$temp.diff.notree); sd(dat.uhi$temp.diff.notree)
+
+png("TreeBenefits_UrbanHeatIsland_TreeCooling_histogram.png", height=4, width=8, units="in", res=220)
+ggplot(data=dat.uhi) +
+  geom_histogram(aes(x=temp.diff.notree), binwidth=1) +
+  labs(x="Tree Effect on Temperature (deg. C)") +
+  theme_bw()
+dev.off()
+
+png("TreeBenefits_UrbanHeatIsland_TreeCooling_Map.png", height=4, width=8, units="in", res=220)
+ggplot(data=dat.uhi) +
+  coord_equal(expand=0, ylim=c(-65,80)) +
+  geom_path(data=world, aes(x=long, y=lat, group=group)) +
+  geom_point(aes(x=LONGITUDE, y=LATITUDE, color=temp.diff.notree), size=5) +
+  scale_colour_distiller(name="Tree Effect\non Temperature\n(deg. C)", palette=rev("BrBG"), limits=c(-1,1)*max(abs(dat.uhi$temp.diff.notree))) +
+  # scale_color_gradient2(low="turquoise4", mid="wheat", high="sienna3", midpoint=0) +
+  # scale_color_gradient(low="003333", high="brown", midpoint=0) +
+  theme_bw() +
+  theme(legend.position="top")
+dev.off()
 
 ggplot(data=dat.uhi) +
   coord_equal(expand=0) +
