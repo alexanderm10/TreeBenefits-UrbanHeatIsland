@@ -13,7 +13,7 @@
 # Datasets to use:
 # 1. Urban Areas: LandScan https://landscan.ornl.gov
 #     - Filter to areas >= 1,000,000 people (698 regions)
-# 2. Tree Cover Data: UMD Global Forest Changehttp://earthenginepartners.appspot.com/science-2013-global-forest/download_v1.5.html
+# 2. Tree Cover Data: UMD Global Forest Change: http://earthenginepartners.appspot.com/science-2013-global-forest/download_v1.5.html
 #     - Spatial Resolution: 30 m
 #     - Temporal Extent: 2010
 # 3. Climate Data:
