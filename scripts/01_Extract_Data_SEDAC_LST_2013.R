@@ -1,4 +1,4 @@
-# Exploring new dataset options thanks to NASA's Socioeconomic Data and Applicaitons Center (Hosted by CIESIN at Columbia)
+2# Exploring new dataset options thanks to NASA's Socioeconomic Data and Applicaitons Center (Hosted by CIESIN at Columbia)
 # http://sedac.ciesin.columbia.edu/data/set/sdei-global-summer-lst-2013
 # http://sedac.ciesin.columbia.edu/data/set/sdei-global-uhi-2013
 

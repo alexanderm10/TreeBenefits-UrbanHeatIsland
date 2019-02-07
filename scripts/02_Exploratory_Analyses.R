@@ -33,13 +33,34 @@ world <- map_data("world")
 
 dat.uhi <- dat.uhi[dat.uhi$temp.diff.notree>-10,]
 
+range(dat.uhi$temp.diff.notree)
 mean(dat.uhi$temp.diff.notree); sd(dat.uhi$temp.diff.notree)
+
+# Creating a categorical, binned warming response
+dat.uhi$TreeEffect <- round(dat.uhi$temp.diff.notree)
+summary(dat.uhi)
+length(unique(dat.uhi$TreeEffect))
+# bins <- 100
+# cols <- c("darkblue","darkred")
+# colGradient <- colorRampPalette(cols)
+# cut.cols <- colGradient(bins)
+# cuts <- cut(df$val,bins)
+# names(cuts) <- sapply(cuts,function(t) cut.cols[which(as.character(t) == levels(cuts))])
+# 
+color.lims <- round(-1*max(abs(dat.uhi$temp.diff.notree))):round(1*max(abs(dat.uhi$temp.diff.notree)))
+effect.palette <- colorRampPalette(brewer.pal(11, "BrBG"))(length(color.lims))
+# length(unique())
 
 png("TreeBenefits_UrbanHeatIsland_TreeCooling_histogram.png", height=4, width=8, units="in", res=220)
 ggplot(data=dat.uhi) +
-  geom_histogram(aes(x=temp.diff.notree), binwidth=1) +
-  labs(x="Tree Effect on Temperature (deg. C)") +
-  theme_bw()
+  coord_cartesian(expand=0) +
+  geom_histogram(aes(x=factor(TreeEffect), fill=factor(TreeEffect)), stat="count", width=1) +
+  # geom_histogram(aes(x=temp.diff.notree, fill=cut(temp.diff.notree, 100)), binwidth=1, show.legend=F) +
+  # geom_histogram(aes(x=temp.diff.notree, fill=), binwidth=1, show.legend=F) +
+  scale_fill_manual(name="Tree Effect\non Temperature\n(deg. C)", values=rev(effect.palette)) +
+  # scale_fill_brewer(palette=rev("BrBG"), limits=c(-1,1)*max(abs(dat.uhi$temp.diff.notree))) +
+  labs(x="Tree Effect on Temperature (deg. C)", y="City Count") +
+  theme_bw() 
 dev.off()
 
 png("TreeBenefits_UrbanHeatIsland_TreeCooling_Map.png", height=4, width=8, units="in", res=220)
