@@ -43,7 +43,7 @@ for(i in 1:nrow(dat.uhi)){
   #   geom_raster(aes(x=x, y=y, fill=cover.tree))
   
   # Workign through spatial autocorrelation from here: http://rfunctions.blogspot.com/2017/06/how-to-identify-and-remove-spatial.html
-  # mod.gls <- gls(temp.summer ~ cover.tree, data=dat.city)
+  mod.gls <- gls(temp.summer ~ cover.tree, data=dat.city)
   # semivario <- Variogram(mod.gls, form = ~x + y, resType = "normalized")
   # plot(semivario, smooth = TRUE)
 
