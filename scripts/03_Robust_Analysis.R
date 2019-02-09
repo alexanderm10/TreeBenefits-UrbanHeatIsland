@@ -29,7 +29,7 @@ for(i in 1:nrow(dat.uhi)){
   #   geom_raster(aes(x=x, y=y, fill=cover.tree))
   
   # Workign through spatial autocorrelation from here: http://rfunctions.blogspot.com/2017/06/how-to-identify-and-remove-spatial.html
-  # mod.gls <- gls(temp.summer ~ cover.tree, data=dat.city)
+  mod.gls <- gls(temp.summer ~ cover.tree, data=dat.city)
   # semivario <- Variogram(mod.gls, form = ~x + y, resType = "normalized")
   # plot(semivario, smooth = TRUE)
 
@@ -77,11 +77,17 @@ for(i in 1:nrow(dat.uhi)){
 summary(dat.uhi)
 
 hist(dat.uhi$tree.cooling)
+hist(dat.uhi$tree.slope)
 
-dat.uhi <- dat.uhi[dat.uhi$tree.cooling>=-4,]
+# Pulling out some outliers
+dat.uhi <- dat.uhi[dat.uhi$tree.cooling>=-4 & dat.uhi$tree.slope>-1,]
+
+hist(dat.uhi$tree.cooling)
+hist(dat.uhi$tree.slope)
 
 range(dat.uhi$tree.cooling)
 mean(dat.uhi$tree.cooling); sd(dat.uhi$tree.cooling)
+mean(dat.uhi$tree.slope); sd(dat.uhi$tree.slope)
 
 # Creating a categorical, binned warming response
 dat.uhi$TreeEffect <- round(dat.uhi$tree.cooling*2)/2
@@ -123,3 +129,16 @@ ggplot(data=dat.uhi) +
   theme(legend.position="top")
 dev.off()
 
+
+png("../figures/TreeBenefits_UrbanHeatIsland_TreeSlope_Map_GAM.png", height=4, width=8, units="in", res=220)
+world <- map_data("world")
+ggplot(data=dat.uhi) +
+  coord_equal(expand=0, ylim=c(-65,80)) +
+  geom_path(data=world, aes(x=long, y=lat, group=group)) +
+  geom_point(aes(x=LONGITUDE, y=LATITUDE, color=tree.slope), size=5) +
+  scale_colour_distiller(name="Tree Effect\ndeg. C/% canopy)", palette=rev("BrBG"), limits=c(-1,1)*max(abs(dat.uhi$tree.slope))) +
+  # scale_color_gradient2(low="turquoise4", mid="wheat", high="sienna3", midpoint=0) +
+  # scale_color_gradient(low="003333", high="brown", midpoint=0) +
+  theme_bw() +
+  theme(legend.position="top")
+dev.off()
