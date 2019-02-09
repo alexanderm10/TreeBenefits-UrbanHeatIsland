@@ -1,4 +1,4 @@
-2# Exploring new dataset options thanks to NASA's Socioeconomic Data and Applicaitons Center (Hosted by CIESIN at Columbia)
+# Exploring new dataset options thanks to NASA's Socioeconomic Data and Applicaitons Center (Hosted by CIESIN at Columbia)
 # http://sedac.ciesin.columbia.edu/data/set/sdei-global-summer-lst-2013
 # http://sedac.ciesin.columbia.edu/data/set/sdei-global-uhi-2013
 
@@ -26,7 +26,7 @@
 #         - Temporal Extent: mean 1970-2000
 
 
-library(sp); library(rgdal); library(raster); library(rgeos)
+library(sp); library(rgdal); library(raster); library(rgeos); library(maps)
 
 # Using the SDEI urban database since it has additional info
 sdei.urb <- readOGR("/Volumes/Morton_SDM/sdei-global-uhi-2013-shp/shp/sdei-global-uhi-2013.shp")
@@ -37,7 +37,7 @@ summary(sdei.urb$SQKM_FINAL)
 # data.frame(sdei.urb[sdei.urb$NAME=="Chicago",])
 
 # These are now population estimates for the metropolitan areas (designated "Urban") -- we can scale back a bit
-cities.use <- sdei.urb[sdei.urb$ES00POP>2e6 &  !is.na(sdei.urb$NAME) & sdei.urb$SQKM_FINAL>1e3 & sdei.urb$D_T_DIFF>1,]
+cities.use <- sdei.urb[sdei.urb$ES00POP>1e6 &  !is.na(sdei.urb$NAME) & sdei.urb$SQKM_FINAL>1e2 & sdei.urb$D_T_DIFF>0,]
 dim(cities.use)
 summary(cities.use)
 summary(droplevels(cities.use$ISO3))
@@ -45,7 +45,7 @@ hist(cities.use$URB_N_MEAN)
 data.frame(cities.use[cities.use$URB_N_MEAN<10,])
 
 # Plot the map to get a better feel for geographic distribution
-png("../data_processed/cities_used_spdei_v2.png", height=4, width=8, units="in", res=120)
+png("../data_processed/cities_used_spdei_v3.png", height=4, width=8, units="in", res=120)
 map(col="red", lwd=0.5)
 plot(cities.use, add=T)
 dev.off()
@@ -54,6 +54,7 @@ dev.off()
 cities.use$NAME <- as.character(cities.use$NAME)
 cities.use[cities.use$NAME=="Xi'an", "NAME"] <- "Xian" # because syntax won't work with recode
 cities.use$NAME <- car::recode(cities.use$NAME, "'?stanbul'='Istanbul'; 'S?o Paulo'='Sao Paulo'; '?zmir'='Izmir'")
+cities.use$NAME <- gsub("?", "XX", cities.use$NAME)
 cities.use$NAME <- gsub(" ", "", cities.use$NAME)
 # cities.use$NAME <- gsub("  ", "", cities.use$NAME)
 
@@ -96,12 +97,13 @@ summary(ftree.df)
 
 # Testing the temperature data -- July 
 tmax <- raster("/Volumes/Morton_SDM/sdei-global-summer-lst-2013-global/sdei-global-summer-lst-2013-day-max-global.tif")
+elev <- raster("/Volumes/Morton_SDM/Elevation_SRTM30/topo30/topo30.grd")
 
 # -----------------------------------------
 # Looping through Cities
 # -----------------------------------------
 # cities.use$NAME
-path.save <- "../data_processed/cities_full_sdei_v2"
+path.save <- "../data_processed/cities_full_sdei_v3"
 dir.create(path.save, recursive=T, showWarnings = F)
 pb <- txtProgressBar(min=0, max=nrow(cities.use), style=3)
 for(i in 1:nrow(cities.use)){
@@ -152,6 +154,58 @@ for(i in 1:nrow(cities.use)){
   
   # plot(temp.city); plot(city.sp, add=T)
   # plot(temp.city2); plot(city.sp, add=T)
+  # ---------------
+
+  # ---------------
+  # Elevation data
+  # ---------------
+  # Cut down the dataset to a city-scale
+  # city.sp2 <- spTransform(city.sp, CRS(projection(elev)))
+  # city.sp2 <- city.sp
+  # extent(city.sp2)[1:2] <- extent(city.sp2)[1:2]+180
+  ext.city <- extent(city.sp)
+  if(all(ext.city[1:2]<0)) {
+    extent.new <- ext.city+c(360, 360,0,0)
+    elev.city <- crop(elev, extent.new)
+    extent(elev.city) <- ext.city
+  } else if(all(ext.city[1:2]>0)) {
+    elev.city <- crop(elev, ext.city)
+    extent(elev.city) <- ext.city
+  } else { # What to do if a city strattles the prime meridian
+    
+    ext1 <- c(ext.city[1]+360,360,ext.city[3:4])
+    ext2 <- c(0,ext.city[2],ext.city[3:4])
+    
+    city1 <- crop(elev, ext1)
+    extent(city1) <- extent(ext.city[1],0,ext.city[3:4])
+    
+    city2 <- crop(elev, ext2)
+    extent(city2) <- extent(0,ext.city[2],ext.city[3:4])
+    
+    elev.city <- mosaic(city1, city2, fun=mean)
+  }
+  
+  
+  elev.city <- resample(elev.city, temp.city)
+  
+  # Mask out water bodies
+  if(length(ocean.city)>0) elev.city <- mask(elev.city, ocean.city, inverse=T)
+  if(length(lakes.city)>0) elev.city <- mask(elev.city, lakes.city, inverse=T)
+  if(length(river.city)>0) elev.city <- mask(elev.city, river.city, inverse=T)
+  
+  elev.city2 <- mask(elev.city, city.sp)
+  # elev.city2[elev.city2<=0] <- NA
+  
+  # Filter out things beyond 6 sigma
+  vals.elev <- getValues(elev.city2)
+  elev.mean <- mean(vals.elev, na.rm=T)
+  elev.sd   <- sd(vals.elev, na.rm=T)
+  elev.city2[elev.city2>elev.mean + 6*elev.sd] <- NA
+  elev.city2[elev.city2<elev.mean - 6*elev.sd] <- NA
+  vals.elev <- getValues(elev.city2)
+  
+  # plot(elev.city); plot(city.sp, add=T)
+  # plot(elev.city2); plot(city.sp, add=T)
   # ---------------
   
   # ---------------
@@ -225,6 +279,8 @@ for(i in 1:nrow(cities.use)){
   # plot(tree.city)
   
   tree.city <- resample(tree.city, temp.city)
+  tree.city[tree.city<0] <- NA
+  tree.city[tree.city>100] <- NA
   # plot(tree.city); plot(city.sp, add=T)
   
   # Mask out water bodies
@@ -235,26 +291,34 @@ for(i in 1:nrow(cities.use)){
   
   
   tree.city2 <- mask(tree.city, city.sp)
-  # plot(tree.city2); plot(city.sp, add=T)
+  tree.city2[tree.city2<0] <- NA
+  tree.city2[tree.city2>100] <- NA
+  
+# plot(tree.city2); plot(city.sp, add=T)
   
   vals.tree <- getValues(tree.city2)
   
-  png(file.path(path.save, paste0(city.name, "_maps.png")), height=4, width=6, unit="in", res=180)
-  par(mfrow=c(1,2))
+  png(file.path(path.save, paste0(city.name, "_maps.png")), height=8, width=6, unit="in", res=180)
+  par(mfrow=c(2,2))
   plot(temp.city2, main="Summer Day Max Temp\n2013, deg.C"); plot(city.sp, add=T)
   plot(tree.city2, main="Tree Cover\n 2000, perc. cover"); plot(city.sp, add=T)
+  plot(elev.city2, main="Elevation; unknown units"); plot(city.sp, add=T)
   par(mfrow=c(1,1))
   dev.off()
   
   # test <- coordinates(tree.city2)
   
-  df.city <- data.frame(Name=city.name, coordinates(temp.city2), cover.tree=vals.tree, temp.summer=vals.tmax)
+  df.city <- data.frame(Name=city.name, coordinates(temp.city2), cover.tree=vals.tree, temp.summer=vals.tmax, elevation=vals.elev)
   df.city <- df.city[complete.cases(df.city),]
   write.csv(df.city, file.path(path.save, paste0(city.name, "_data_full.csv")), row.names=F)
   # summary(df.city)
   lm.city <- lm(temp.summer ~ cover.tree, data=df.city)
   sum.lm <- summary(lm.city)
   
+  # gam.test <- mgcv::gam(temp.summer ~ cover.tree + elevation + s(x,y), data=df.city)
+  # plot(gam.test)
+  # summary(gam.test)
+  # 
   png(file.path(path.save, paste0(city.name, "_scatter.png")), height=4, width=4, unit="in", res=90)
   plot(temp.summer ~ cover.tree, data=df.city, cex=0.5,
        main=paste0("R2=",round(sum.lm$r.squared,2))); 
@@ -266,18 +330,22 @@ for(i in 1:nrow(cities.use)){
   cities.use[i,"tree.sd"  ] <- sd(df.city$cover.tree, na.rm=T)
   cities.use[i,"tree.max" ] <- max(df.city$cover.tree, 0.90, na.rm=T)
   cities.use[i,"tree.min" ] <- min(df.city$cover.tree, 0.90, na.rm=T)
+  cities.use[i,"elev.mean"] <- mean(df.city$elevation, na.rm=T)
+  cities.use[i,"elev.sd"  ] <- sd(df.city$elevation, na.rm=T)
+  cities.use[i,"elev.max" ] <- max(df.city$elevation, na.rm=T)
+  cities.use[i,"elev.min" ] <- min(df.city$elevation, na.rm=T)
   cities.use[i,"temp.mean"] <- mean(df.city$temp.summer, na.rm=T)
   cities.use[i,"temp.sd"  ] <- sd(df.city$temp.summer, na.rm=T)
   cities.use[i,"temp.max" ] <- max(df.city$temp.summer, na.rm=T)
   cities.use[i,"temp.min" ] <- min(df.city$temp.summer, na.rm=T)
-  cities.use[i,"correlation"] <- sum.lm$r.squared
-  cities.use[i,"slope"] <- sum.lm$coefficients[2,1] 
+  # cities.use[i,"correlation"] <- sum.lm$r.squared
+  # cities.use[i,"slope"] <- sum.lm$coefficients[2,1] 
   
   rm(ocean.city, lakes.city, river.city)
 }
 # cities.use <- cities.use[,!names(cities.use) %in% c("july.mean", "july.sd", "july.max", "july.min")]
 summary(cities.use)
-write.csv(data.frame(cities.use), "../data_processed/cities_summary_sdei_v2.csv", row.names=F)
+write.csv(data.frame(cities.use), "../data_processed/cities_summary_sdei_v3.csv", row.names=F)
 # ---------------
 # -----------------------------------------
 
@@ -288,17 +356,4 @@ write.csv(data.frame(cities.use), "../data_processed/cities_summary_sdei_v2.csv"
 cities.use <- data.frame(cities.use)
 summary(cities.use)
 
-# cities.use[cities.use$temp.min<0,] # Clearly some sites where we need to filter the data better
-cities.use[cities.use$correlation<0.01,]
-
-hist(cities.use$correlation)
-hist(cities.use$slope)
-
-summary(cities.use)
-
-summary(cities.use[cities.use$correlation>=0.3,])
-cities.use[cities.use$correlation>=0.3,"NAME"]
-
-summary(cities.use[cities.use$correlation<0.01,])
-cities.use[cities.use$correlation<0.01,"NAME"]
 # -----------------------------------------
