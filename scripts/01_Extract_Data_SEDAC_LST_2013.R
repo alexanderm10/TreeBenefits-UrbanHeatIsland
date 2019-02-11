@@ -53,10 +53,12 @@ dev.off()
 # Cleaning up some names
 cities.use$NAME <- as.character(cities.use$NAME)
 cities.use[cities.use$NAME=="Xi'an", "NAME"] <- "Xian" # because syntax won't work with recode
-cities.use$NAME <- car::recode(cities.use$NAME, "'?stanbul'='Istanbul'; 'S?o Paulo'='Sao Paulo'; '?zmir'='Izmir'")
-cities.use$NAME <- gsub("?", "XX", cities.use$NAME)
+cities.use$NAME[grepl("[?]", cities.use$NAME)]
+
+cities.use$NAME <- car::recode(cities.use$NAME, "'?stanbul'='Istanbul'; 'S?o Paulo'='Sao Paulo'; '?zmir'='Izmir'; 'S?o Jos? dos Campos'='Sao Jose dos Campos'; 'Ni?nij Novgorod'='Nizhny Novgorod'")
+cities.use$NAME <- gsub("[?]", "XX", cities.use$NAME)
 cities.use$NAME <- gsub(" ", "", cities.use$NAME)
-# cities.use$NAME <- gsub("  ", "", cities.use$NAME)
+cities.use$NAME <- gsub("  ", "", cities.use$NAME)
 
 cities.use <- cities.use[order(cities.use$NAME), ]
 
