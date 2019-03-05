@@ -65,6 +65,25 @@ cities.use <- cities.use[order(cities.use$NAME), ]
 # plot(cities.use[cities.use$NAME=="Chicago",])
 # plot(cities.use)
 
+# Getting some baseline ecoregion info: https://www.worldwildlife.org/publications/terrestrial-ecoregions-of-the-world
+# ecoregions <- readOGR("../data_raw/wwf_biomes_official/wwf_terr_ecos.shp")
+ecoregions <- readOGR("../data_raw/global200ecoregions/g200_terr.shp")
+ecoregions$biome.name <- car::recode(ecoregions$G200_BIOME, "'1'='tropical moist broadleaf forest'; 
+                                                             '2'='tropical dry broadleaf forest'; 
+                                                             '3'='tropical coniferous forest';
+                                                             '4'='temperate broadleaf/mixed forest'; 
+                                                             '5'='temperate coniferous forest'; 
+                                                             '6'='boreal forest/taiga'; 
+                                                             '7'='tropical grassland/savannas'; 
+                                                             '8'='temperate grassland/savanna'; 
+                                                             '9'='flodded grassland/savanna'; 
+                                                            '10'='montane grassland/savanna'; 
+                                                            '11'='tundra'; 
+                                                            '12'='mediterranean'; 
+                                                            '13'='desert/xeric shrublands'; 
+                                                            '14'='mangroves'")
+summary(ecoregions)
+
 # Going to need to mask out water, so lets load a layer
 # water <- readOGR("/Volumes/Morton_SDM/water-polygons-split-4326/water_polygons.shp")
 # summary(water)
