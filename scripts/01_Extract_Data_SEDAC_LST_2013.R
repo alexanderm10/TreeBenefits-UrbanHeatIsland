@@ -45,7 +45,7 @@ hist(cities.use$URB_N_MEAN)
 data.frame(cities.use[cities.use$URB_N_MEAN<10,])
 
 # Plot the map to get a better feel for geographic distribution
-png("../data_processed/cities_used_spdei_v3.png", height=4, width=8, units="in", res=120)
+png("../data_processed/cities_used_spdei_v4.png", height=4, width=8, units="in", res=120)
 map(col="red", lwd=0.5)
 plot(cities.use, add=T)
 dev.off()
@@ -102,19 +102,19 @@ rivers <- spTransform(rivers, projection(cities.use))
 
 
 # Doing some indexing of tree cover data
-path.trees <- "/Volumes/Morton_SDM/TreeCover/"
-files.trees <- dir(path.trees, ".tif")
-ftree.df <- data.frame(file=files.trees)
-ftree.df$lat.char <- as.factor(unlist(lapply(stringr::str_split(ftree.df$file, "_"), function(x){x[4]})))
-ftree.df$lon.char <- as.factor(unlist(lapply(stringr::str_split(ftree.df$file, "_"), function(x){substr(x[5], 1, 4)})))
-ftree.df$lat <- ifelse(substr(ftree.df$lat.char,3,3)=="S", 
-                       -as.numeric(substr(ftree.df$lat.char,1,2)),
-                       as.numeric(substr(ftree.df$lat.char,1,2)))
-ftree.df$lon <- ifelse(substr(ftree.df$lon.char,4,4)=="W", 
-                       -as.numeric(substr(ftree.df$lon.char,1,3)),
-                       as.numeric(substr(ftree.df$lon.char,1,3)))
-# ftree.df$lat <- as.numeric(lapply())
+path.trees <- "/Volumes/Morton_SDM/TreeCover_MOD44Bv6/2013/HEGOUT/"
+ftree <- dir(path.trees, ".tif")
+ftree <- ftree[which(substr(ftree, nchar(ftree)-3, nchar(ftree))==".tif")] # ignore anything that's not a .tif
+
+# Creating a metadata sheet to keep track of bounding boxes
+ftree.df <- data.frame(file=ftree, xmin=NA, xmax=NA, ymin=NA, ymax=NA)
+for(i in 1:length(ftree)){
+  tmp <- raster(file.path(path.trees, ftree[i]))
+  
+  ftree.df[i,c("xmin", "xmax", "ymin", "ymax")] <- extent(tmp)
+}
 summary(ftree.df)
+
 
 # Testing the temperature data -- July 
 tmax <- raster("/Volumes/Morton_SDM/sdei-global-summer-lst-2013-global/sdei-global-summer-lst-2013-day-max-global.tif")
@@ -124,7 +124,7 @@ elev <- raster("/Volumes/Morton_SDM/Elevation_SRTM30/topo30/topo30.grd")
 # Looping through Cities
 # -----------------------------------------
 # cities.use$NAME
-path.save <- "../data_processed/cities_full_sdei_v3"
+path.save <- "../data_processed/cities_full_sdei_v4"
 dir.create(path.save, recursive=T, showWarnings = F)
 pb <- txtProgressBar(min=0, max=nrow(cities.use), style=3)
 for(i in 1:nrow(cities.use)){
@@ -232,21 +232,21 @@ for(i in 1:nrow(cities.use)){
   # ---------------
   # Find our tree canopy file
   # ---------------
-  f.city <- which(ftree.df$lat-10<=bb.city[2,1] & ftree.df$lat>=bb.city[2,2] &
-                    ftree.df$lon<=bb.city[1,1] & ftree.df$lon+10>=bb.city[1,2])
+  f.city <- which(ftree.df$ymin<=bb.city[2,1] & ftree.df$ymax>=bb.city[2,2] &
+                    ftree.df$xmin<=bb.city[1,1] & ftree.df$lon+10>=bb.city[1,2])
   # ftree.df$file[f.city]
   if(length(f.city)==0){
     # Figure out which dimension fails
-    test.lat <- which(ftree.df$lat-10<=bb.city[2,1] & ftree.df$lat>=bb.city[2,2])
-    test.lon <- which(ftree.df$lon<=bb.city[1,1] & ftree.df$lon+10>=bb.city[1,2])
+    test.lat <- which(ftree.df$ymin<=bb.city[2,1] & ftree.df$ymax>=bb.city[2,2])
+    test.lon <- which(ftree.df$xmin<=bb.city[1,1] & ftree.df$xmax>=bb.city[1,2])
     
     # Note: this may bonk, but we'll try it for now
     if(length(test.lon)==0){
-      test.lon <- which(ftree.df$lon<=bb.city[1,1]+10 & ftree.df$lon+10>=bb.city[1,2]-10)
+      test.lon <- which(ftree.df$xmin<=bb.city[1,1]+10 & ftree.df$xmax>=bb.city[1,2]-10)
       f.city <- test.lat[test.lat %in% test.lon]
     }
     if(length(test.lat)==0){
-      test.lat <- which(ftree.df$lat-10<=bb.city[2,1]+10 & ftree.df$lat+10>=bb.city[2,2]-10)
+      test.lat <- which(ftree.df$ymin<=bb.city[2,1]+10 & ftree.df$ymax>=bb.city[2,2]-10)
       f.city <- test.lat[test.lat %in% test.lon]
     }
     
@@ -255,9 +255,14 @@ for(i in 1:nrow(cities.use)){
   if(length(f.city)==0) next
   if(length(f.city)==1){
     tree.city <- raster(file.path(path.trees, ftree.df$file[f.city]))
-    tree.city
+    tree.city[tree.city>100] <- NA
+    tree.city[tree.city==0] <- NA
+    
+    # tree.city
   } else if(length(f.city)>=2) {
     tree.city <- raster(file.path(path.trees, ftree.df$file[f.city[1]]))
+    tree.city[tree.city>100] <- NA
+    tree.city[tree.city==0] <- NA
     
     ext.city <- extent(city.sp)
     
@@ -277,6 +282,9 @@ for(i in 1:nrow(cities.use)){
     
     for(j in 2:length(f.city)){
       tree2 <- raster(file.path(path.trees, ftree.df$file[f.city[j]]))
+      tree2[tree2>100] <- NA
+      tree2[tree2==0] <- NA
+      
       ext2 <- extent(tree2)
       
       # Setting up the temporary extent
@@ -290,18 +298,17 @@ for(i in 1:nrow(cities.use)){
       
       tree2 <- crop(tree2, extent(ext.temp))
       
-      tree.city <- mosaic(tree.city, tree2, fun=mean)
+      tree.city <- mosaic(tree.city, tree2, fun=mean, na.rm=T, tolerance=0.2)
     }
   } 
   
   tree.city <- crop(tree.city, city.sp)
-  tree.city[tree.city<0] <- NA
+  tree.city[tree.city<=0] <- NA
   tree.city[tree.city>100] <- NA
   # plot(tree.city)
   
   tree.city <- resample(tree.city, temp.city)
-  tree.city[tree.city<0] <- NA
-  tree.city[tree.city>100] <- NA
+  tree.city[is.na(tree.city)] <- 0
   # plot(tree.city); plot(city.sp, add=T)
   
   # Mask out water bodies
@@ -366,7 +373,7 @@ for(i in 1:nrow(cities.use)){
 }
 # cities.use <- cities.use[,!names(cities.use) %in% c("july.mean", "july.sd", "july.max", "july.min")]
 summary(cities.use)
-write.csv(data.frame(cities.use), "../data_processed/cities_summary_sdei_v3.csv", row.names=F)
+write.csv(data.frame(cities.use), "../data_processed/cities_summary_sdei_v4.csv", row.names=F)
 # ---------------
 # -----------------------------------------
 
