@@ -243,17 +243,17 @@ for(i in 1:nrow(cities.use)){
     
     # Note: this may bonk, but we'll try it for now
     if(length(test.lon)==0){
-      test.lon <- which(ftree.df$xmin<=bb.city[1,1]+10 & ftree.df$xmax>=bb.city[1,2]-10)
+      test.lon <- which(ftree.df$xmin<=bb.city[1,1]+2 & ftree.df$xmax>=bb.city[1,2]-2)
       f.city <- test.lat[test.lat %in% test.lon]
     }
     if(length(test.lat)==0){
-      test.lat <- which(ftree.df$ymin<=bb.city[2,1]+1 & ftree.df$ymax>=bb.city[2,2]-1)
+      test.lat <- which(ftree.df$ymin<=bb.city[2,1]+2 & ftree.df$ymax>=bb.city[2,2]-2)
       f.city <- test.lat[test.lat %in% test.lon]
     }
     
   }
   
-  f.city <- f.city[order(ftree.df$xmin[f.city], ftree.df$ymin[f.city])]
+  f.city <- f.city[order(ftree.df$ymax[f.city], ftree.df$xmax[f.city], decreasing=T)]
 
   if(length(f.city)==0) next
   if(length(f.city)==1){
@@ -263,10 +263,10 @@ for(i in 1:nrow(cities.use)){
     
     # tree.city
   } else if(length(f.city)>=2) {
-    if(city.name=="Helsinki"){ 
-      # Helsinki's being a pain, so we're going to manually grab the tiles that actually include it
-      f.city <- rev(f.city)[1:2]
-    } 
+    # if(city.name=="Helsinki"){ 
+    #   # Helsinki's being a pain, so we're going to manually grab the tiles that actually include it
+    #   f.city <- rev(f.city)[1:2]
+    # } 
     
     # For Huainan; cell 4 works
     tree.city <- raster(file.path(path.trees, ftree.df$file[f.city[1]]))
@@ -317,20 +317,14 @@ for(i in 1:nrow(cities.use)){
   } 
   
   tree.city <- crop(tree.city, city.sp)
-  tree.city[tree.city<=0] <- NA
-  tree.city[tree.city>100] <- NA
-  
-  tree.city[is.na(tree.city)] <- 0
-  # plot(tree.city); plot(city.sp, add=T)
-  
+  tree.city[is.na(tree.city)] <- 0 # anything not with trees, should be 0 bc land w/ no trees or water
+
+  tree.city <- resample(tree.city, temp.city, na.rm=F) # Do this next to make similar to surface temp
+
   # Mask out water bodies
   if(length(ocean.city)>0) tree.city <- mask(tree.city, ocean.city, inverse=T)
   if(length(lakes.city)>0) tree.city <- mask(tree.city, lakes.city, inverse=T)
   if(length(river.city)>0) tree.city <- mask(tree.city, river.city, inverse=T)
-  
-  
-  
-  tree.city <- resample(tree.city, temp.city)
   # plot(tree.city); plot(city.sp, add=T)
   
   tree.city2 <- mask(tree.city, city.sp)
