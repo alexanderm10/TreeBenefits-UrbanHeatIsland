@@ -88,9 +88,9 @@ summary(ecoregions)
 # water <- readOGR("/Volumes/Morton_SDM/water-polygons-split-4326/water_polygons.shp")
 # summary(water)
 # water <- readOGR("~/Desktop/occurrence.tif.lyr")
-oceans <- readOGR("~/Desktop/ocean-polygons-reduced-3857/ocean_reduced_z5.shp")
-lakes  <- readOGR("~/Desktop/lakes-polygons-reduced-3857/lakes_reduced_z5.shp")
-rivers <- readOGR("~/Desktop/river-polygons-reduced-3857/river_reduced_z5.shp")
+oceans <- readOGR("/Volumes/Morton_SDM/waterbodies_openstreet/ocean-polygons-reduced-3857/ocean_reduced_z5.shp")
+lakes  <- readOGR("/Volumes/Morton_SDM/waterbodies_openstreet/lakes-polygons-reduced-3857/lakes_reduced_z5.shp")
+rivers <- readOGR("/Volumes/Morton_SDM/waterbodies_openstreet/river-polygons-reduced-3857/river_reduced_z5.shp")
 
 oceans <- gBuffer(oceans, byid=T, width=0)
 lakes  <- gBuffer(lakes, byid=T, width=0)
@@ -127,8 +127,9 @@ elev <- raster("/Volumes/Morton_SDM/Elevation_SRTM30/topo30/topo30.grd")
 path.save <- "../data_processed/cities_full_sdei_v4"
 dir.create(path.save, recursive=T, showWarnings = F)
 pb <- txtProgressBar(min=0, max=nrow(cities.use), style=3)
+# for(i in 1:nrow(cities.use)){
 for(i in 1:nrow(cities.use)){
-  # i=which(cities.use$NAME=="Chicago")
+    # i=which(cities.use$NAME=="Chicago")
   
   setTxtProgressBar(pb, i)
   # Subset our shapefile
@@ -231,9 +232,9 @@ for(i in 1:nrow(cities.use)){
   
   # ---------------
   # Find our tree canopy file
-  # ---------------
+  # --------------
   f.city <- which(ftree.df$ymin<=bb.city[2,1] & ftree.df$ymax>=bb.city[2,2] &
-                    ftree.df$xmin<=bb.city[1,1] & ftree.df$lon+10>=bb.city[1,2])
+                    ftree.df$xmin<=bb.city[1,1] & ftree.df$xmax>=bb.city[1,2])
   # ftree.df$file[f.city]
   if(length(f.city)==0){
     # Figure out which dimension fails
@@ -246,12 +247,14 @@ for(i in 1:nrow(cities.use)){
       f.city <- test.lat[test.lat %in% test.lon]
     }
     if(length(test.lat)==0){
-      test.lat <- which(ftree.df$ymin<=bb.city[2,1]+10 & ftree.df$ymax>=bb.city[2,2]-10)
+      test.lat <- which(ftree.df$ymin<=bb.city[2,1]+1 & ftree.df$ymax>=bb.city[2,2]-1)
       f.city <- test.lat[test.lat %in% test.lon]
     }
     
   }
   
+  f.city <- f.city[order(ftree.df$xmin[f.city], ftree.df$ymin[f.city])]
+
   if(length(f.city)==0) next
   if(length(f.city)==1){
     tree.city <- raster(file.path(path.trees, ftree.df$file[f.city]))
@@ -260,9 +263,16 @@ for(i in 1:nrow(cities.use)){
     
     # tree.city
   } else if(length(f.city)>=2) {
+    if(city.name=="Helsinki"){ 
+      # Helsinki's being a pain, so we're going to manually grab the tiles that actually include it
+      f.city <- rev(f.city)[1:2]
+    } 
+    
+    # For Huainan; cell 4 works
     tree.city <- raster(file.path(path.trees, ftree.df$file[f.city[1]]))
     tree.city[tree.city>100] <- NA
     tree.city[tree.city==0] <- NA
+    # plot(tree.city); plot(city.sp, add=T)
     
     ext.city <- extent(city.sp)
     
@@ -278,7 +288,7 @@ for(i in 1:nrow(cities.use)){
     if(ext.temp[1]>=ext.temp[2]) ext.temp[1:2] <- ext1[1:2]
     if(ext.temp[3]>=ext.temp[4]) ext.temp[3:4] <- ext1[3:4]
     
-    tree.city <- crop(tree.city, extent(ext.temp))
+    tree.city <- crop(tree.city, extent(ext.temp)+c(-1,1,-1,1))
     
     for(j in 2:length(f.city)){
       tree2 <- raster(file.path(path.trees, ftree.df$file[f.city[j]]))
@@ -296,18 +306,16 @@ for(i in 1:nrow(cities.use)){
       if(ext.temp[1]>=ext.temp[2]) ext.temp[1:2] <- ext2[1:2]
       if(ext.temp[3]>=ext.temp[4]) ext.temp[3:4] <- ext2[3:4]
       
-      tree2 <- crop(tree2, extent(ext.temp))
+      tree2 <- crop(tree2, extent(ext.temp), snap="out")
       
-      tree.city <- mosaic(tree.city, tree2, fun=mean, na.rm=T, tolerance=0.2)
+      tree.city <- mosaic(tree.city, tree2, fun=mean, na.rm=T, tolerance=0.3)
     }
   } 
   
   tree.city <- crop(tree.city, city.sp)
   tree.city[tree.city<=0] <- NA
   tree.city[tree.city>100] <- NA
-  # plot(tree.city)
   
-  tree.city <- resample(tree.city, temp.city)
   tree.city[is.na(tree.city)] <- 0
   # plot(tree.city); plot(city.sp, add=T)
   
@@ -317,6 +325,9 @@ for(i in 1:nrow(cities.use)){
   if(length(river.city)>0) tree.city <- mask(tree.city, river.city, inverse=T)
   
   
+  
+  tree.city <- resample(tree.city, temp.city)
+  # plot(tree.city); plot(city.sp, add=T)
   
   tree.city2 <- mask(tree.city, city.sp)
   tree.city2[tree.city2<0] <- NA
