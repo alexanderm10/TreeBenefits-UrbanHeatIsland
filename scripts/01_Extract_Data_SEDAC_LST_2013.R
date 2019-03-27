@@ -288,7 +288,8 @@ for(i in 1:nrow(cities.use)){
     if(ext.temp[1]>=ext.temp[2]) ext.temp[1:2] <- ext1[1:2]
     if(ext.temp[3]>=ext.temp[4]) ext.temp[3:4] <- ext1[3:4]
     
-    tree.city <- crop(tree.city, extent(ext.temp)+c(-1,1,-1,1))
+    tree.city <- crop(tree.city, extent(ext.temp)+c(-0.5,0.5,-0.5,0.5))
+    # plot(tree.city); plot(city.sp, add=T)
     
     for(j in 2:length(f.city)){
       tree2 <- raster(file.path(path.trees, ftree.df$file[f.city[j]]))
@@ -307,6 +308,9 @@ for(i in 1:nrow(cities.use)){
       if(ext.temp[3]>=ext.temp[4]) ext.temp[3:4] <- ext2[3:4]
       
       tree2 <- crop(tree2, extent(ext.temp), snap="out")
+      
+      # Skip the mosaic step if oru regen of interest is blank
+      if(max(getValues(tree2), na.rm=T) == -Inf) next
       
       tree.city <- mosaic(tree.city, tree2, fun=mean, na.rm=T, tolerance=0.3)
     }
