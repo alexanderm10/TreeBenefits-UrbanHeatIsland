@@ -6,8 +6,8 @@
 
 library(raster)
 
-path.01 <- "/Volumes/Morton_SDM/SurfTemp_MODIS_MODA2_2013-01/HEGOUT/"
-path.07 <- "/Volumes/Morton_SDM/SurfTemp_MODIS_MODA2_2013-07/HEGOUT/"
+met.01 <- "/Volumes/Morton_SDM/SurfTemp_MODIS_MODA2_2013-01/HEGOUT/"
+met.07 <- "/Volumes/Morton_SDM/SurfTemp_MODIS_MODA2_2013-07/HEGOUT/"
 
 fjan <- dir(path.01, ".tif")
 fjan <- fjan[which(substr(fjan, nchar(fjan)-3, nchar(fjan))==".tif")] # ignore anything that's not a .tif

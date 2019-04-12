@@ -2,28 +2,19 @@
 # http://sedac.ciesin.columbia.edu/data/set/sdei-global-summer-lst-2013
 # http://sedac.ciesin.columbia.edu/data/set/sdei-global-uhi-2013
 
-# Summer Land Surface Temperature Grids for 2013:
-# http://sedac.ciesin.columbia.edu/data/set/sdei-global-summer-lst-2013
-# -- Global Grid at ~1km resolution produced from MODIS
-# -- July-August mean for N hemisphere, Jan=Feb for Southern
+# Summer Land Surface Temperature Grids for 2013: MODIS summer temperature
+# Data downloaded from here: https://ladsweb.modaps.eosdis.nasa.gov/search/
+#  https://ladsweb.modaps.eosdis.nasa.gov/api/v1/productPage/product=MOD11A2
+# According to documentation here: the scale factor for land surface day temperature is 0.02: https://icess.eri.ucsb.edu/modis/LstUsrGuide/usrguide_1dtil.html#Table_9
+# Rather relying SDEI product did not do higher-level processing and was sensitive to erronious (and impossible) values; Rather than rely on the SDEI product, I'm going the raw data and looking at July temperature for the Northern Hemisphere and January temperature for the Southern.  Still doing 2013 because that's what I'd already pulled for the new MODIS tree cover dataset.  Will process all tiles for both seasons becuase cities often cross the equator.
 
 # Water Bodies from here: http://openstreetmapdata.com/data/water-reduced-polygons
 
 # Extract info on tree cover and mean summer temp for major urban areas around the world
 # Datasets to use:
-# 1. Urban Areas: LandScan https://landscan.ornl.gov
-#     - Filter to areas >= 1,000,000 people (698 regions)
-# 2. Tree Cover Data: UMD Global Forest Change: http://earthenginepartners.appspot.com/science-2013-global-forest/download_v1.5.html
-#     - Spatial Resolution: 30 m
-#     - Temporal Extent: 2010
-# 3. Climate Data:
-#     - Plan A: Landsat; https://landsat.usgs.gov/landsat-surface-temperature
-#         ***** can't access during gov't shutdown
-#         - Spatial Resolution: 30 m 
-#         - Temporal Extent: ???
-#     - Plan B: WorldClim v2.0 http://worldclim.org/version2
-#         - Spatial Resolution: 30 arcseconds (approx 1 km)
-#         - Temporal Extent: mean 1970-2000
+# 1. Urban Areas: SDEI dataset
+# 2. Tree Cover Data: MODIS MOD44B
+# 3. Climate Data: MODIS MOD11A
 
 
 library(sp); library(rgdal); library(raster); library(rgeos); library(maps)
@@ -107,17 +98,60 @@ ftree <- dir(path.trees, ".tif")
 ftree <- ftree[which(substr(ftree, nchar(ftree)-3, nchar(ftree))==".tif")] # ignore anything that's not a .tif
 
 # Creating a metadata sheet to keep track of bounding boxes
-ftree.df <- data.frame(file=ftree, xmin=NA, xmax=NA, ymin=NA, ymax=NA)
-for(i in 1:length(ftree)){
-  tmp <- raster(file.path(path.trees, ftree[i]))
+ftree <- dir(path.trees, ".tif")
+ftree <- ftree[which(substr(ftree, nchar(ftree)-3, nchar(ftree))==".tif")] # ignore anything that's not a .tif
+ftree.split <- stringr::str_split(ftree, "[.]")
+ftree.df <- data.frame(file=ftree, matrix(unlist(ftree.split), ncol=length(ftree.split[[1]]), byrow = T))
+names(ftree.df) <- c("file", "dataset", "date.stamp", "tile", "version", "process.stamp", "extension")
+ftree.df$year <- as.numeric(substr(ftree.df$date.stamp, 2, 5))
+ftree.df <- ftree.df[ftree.df$year==2013,]
+summary(ftree.df)
+
+ftree.df[,c("xmin", "xmax", "ymin", "ymax")] <- NA
+for(i in 1:nrow(ftree.df)){
+  tmp <- raster(file.path(path.trees, ftree.df$file[i]))
   
   ftree.df[i,c("xmin", "xmax", "ymin", "ymax")] <- extent(tmp)
 }
 summary(ftree.df)
 
 
-# Testing the temperature data -- July 
-tmax <- raster("/Volumes/Morton_SDM/sdei-global-summer-lst-2013-global/sdei-global-summer-lst-2013-day-max-global.tif")
+# Setting up file paths and directories for the temperature data
+path.01 <- "/Volumes/Morton_SDM/SurfTemp_MODIS_MODA2_2013-01/HEGOUT/"
+path.07 <- "/Volumes/Morton_SDM/SurfTemp_MODIS_MODA2_2013-07/HEGOUT/"
+
+fjan <- dir(path.01, ".tif")
+fjan <- fjan[which(substr(fjan, nchar(fjan)-3, nchar(fjan))==".tif")] # ignore anything that's not a .tif
+fjan.split <- stringr::str_split(fjan, "[.]")
+fjan.df <- data.frame(file=fjan, matrix(unlist(fjan.split), ncol=length(fjan.split[[1]]), byrow = T))
+names(fjan.df) <- c("file", "dataset", "date.stamp", "tile", "version", "process.stamp", "extension")
+summary(fjan.df)
+
+fjan.df[,c("xmin", "xmax", "ymin", "ymax")] <- NA
+for(i in 1:nrow(fjan.df)){
+  tmp <- raster(file.path(path.01, fjan.df$file[i]))
+  
+  fjan.df[i,c("xmin", "xmax", "ymin", "ymax")] <- extent(tmp)
+}
+summary(fjan.df)
+
+fjul <- dir(path.07, ".tif")
+fjul <- fjul[which(substr(fjul, nchar(fjul)-3, nchar(fjul))==".tif")] # ignore anything that's not a .tif
+fjul.split <- stringr::str_split(fjul, "[.]")
+fjul.df <- data.frame(file=fjul, matrix(unlist(fjul.split), ncol=length(fjul.split[[1]]), byrow = T))
+names(fjul.df) <- c("file", "dataset", "date.stamp", "tile", "version", "process.stamp", "extension")
+summary(fjul.df)
+
+fjul.df[,c("xmin", "xmax", "ymin", "ymax")] <- NA
+for(i in 1:nrow(fjul.df)){
+  tmp <- raster(file.path(path.07, fjul.df$file[i]))
+  
+  fjul.df[i,c("xmin", "xmax", "ymin", "ymax")] <- extent(tmp)
+}
+summary(fjul.df)
+
+
+# Elevation as an additional predictor to account for potential bias in tree cover distribution
 elev <- raster("/Volumes/Morton_SDM/Elevation_SRTM30/topo30/topo30.grd")
 
 # -----------------------------------------
@@ -129,7 +163,8 @@ dir.create(path.save, recursive=T, showWarnings = F)
 pb <- txtProgressBar(min=0, max=nrow(cities.use), style=3)
 # for(i in 1:nrow(cities.use)){
 for(i in 1:nrow(cities.use)){
-    # i=which(cities.use$NAME=="Chicago")
+  # i=which(cities.use$NAME=="Chicago")
+  # i=which(cities.use$NAME=="Manaus")
   
   setTxtProgressBar(pb, i)
   # Subset our shapefile
@@ -153,38 +188,136 @@ for(i in 1:nrow(cities.use)){
   # ---------------
   # Extract the climate data
   # ---------------
-  # -- transform the projection of the city --> not actulaly necessary
+  # 1. Find whether to use January or July 
+  # 2. Figure out which rasters to process
+  # 3. For *each date* 
+  #    3.1. moasaic, then filter, then mask
+  #    3.2. calculate spatial deviation from city mean
+  # 4. Find & store mean deviation (& mean temp?)
+  # ---------------
+  # 1. Find whether to use January or July 
+  if(mean(extent(city.sp)[3:4])>0) {
+    # If mostly in northern hemishpere use July
+    met.path <- path.07
+    met.df <- fjul.df
+  } else {
+    # Else use January
+    met.path <- path.01
+    met.df <- fjan.df
+  } # End N/S identification
+  
+  # 2. Figure out which rasters to process
+  f.met <- which(met.df$ymin<=bb.city[2,1] & met.df$ymax>=bb.city[2,2] &
+                   met.df$xmin<=bb.city[1,1] & met.df$xmax>=bb.city[1,2])
+  # met.df[f.met,]
+  if(length(f.met)==0){
+    # Figure out which dimension fails
+    test.lat <- which(met.df$ymin<=bb.city[2,1] & met.df$ymax>=bb.city[2,2])
+    test.lon <- which(met.df$xmin<=bb.city[1,1] & met.df$xmax>=bb.city[1,2])
+    
+    # Note: this may bonk, but we'll try it for now
+    if(length(test.lon)==0){
+      test.lon <- which(met.df$xmin<=bb.city[1,1]+2 & met.df$xmax>=bb.city[1,2]-2)
+      f.met <- test.lat[test.lat %in% test.lon]
+    }
+    if(length(test.lat)==0){
+      test.lat <- which(met.df$ymin<=bb.city[2,1]+2 & met.df$ymax>=bb.city[2,2]-2)
+      f.met <- test.lat[test.lat %in% test.lon]
+    }
+  } # End loop to find more files
+  f.met <- f.met[order(met.df$ymax[f.met], met.df$xmax[f.met], decreasing=T)]
+  
+  # 3. For *each date* 
+  #    3.1. moasaic, then filter, then mask
+  #    3.2. calculate spatial deviation from city mean
+  tmax <- stack()
+  tdev <- stack()
+  for(NOW in unique(met.df[f.met, "date.stamp"])){
+    files.now <- met.df[f.met,]
+    files.now <- files.now[files.now$date.stamp==NOW,"file"]
+    
+    if(length(files.now)==1){
+      met.city <- raster(file.path(met.path, files.now))
+      met.city <- met.city*0.02
+      met.city[met.city<=0] <- NA
+    } else {
+      met.city <- raster(file.path(met.path, files.now[1]))
+      met.city <- met.city*0.02 # Scale factor from documentation; now in Kelvin
+      met.city[met.city<=250] <- NA # 250k = -23˚C = -9.7F; almost certainly not a sumemr temperature
+      # plot(met.city); plot(city.sp, add=T)
+      
+      for(j in 2:length(files.now)){
+        met2 <- raster(file.path(met.path,files.now[j]))
+        met2 <- met2*0.02 # Scale factor from documentation; now in Kelvin
+        met2[met2<=250] <- NA # 250k = -23˚C = -9.7F; almost certainly not a sumemr temperature
+        # plot(met2); plot(city.sp, add=T)
+        
+        met2 <- resample(met2, met.city[[1]])
+        
+        met.city <- mosaic(met.city, met2, fun=mean, na.rm=T, tolerance=0.2)
+        # plot(met.city); plot(city.sp, add=T)
+      } # end j loop
+    }# end ifelse multiple file mosaicing
+    
+    # Iteratively removing 6-sigma outliers
+    #  -- not great, but necessary to do at the large scale before clipping to cities with lower SD
+    #  -- in my test, this kept ~95% of data with the biggest outliers being on the coast;
+    # if this becomes too problematic, can do deviation from tile mean and do the multi-time analysis
+    #      with na.rm=T, but that might need to happen at a city-scale
+    #  but we'll need to
+    vals.tmp <- getValues(met.city); tmp.x <- mean(vals.tmp, na.rm=T); tmp.sd <- sd(vals.tmp, na.rm=T)
+    while(length(which(vals.tmp < tmp.x-6*tmp.sd | vals.tmp > tmp.x+6*tmp.sd))>0){
+      met.city[met.city < tmp.x-6*tmp.sd]  <- NA
+      met.city[met.city > tmp.x+6*tmp.sd]  <- NA
 
-  # Cut down the dataset to a city-scale
-  temp.city <- crop(tmax, city.sp)
-  
-  # Mask out water bodies
-  if(length(ocean.city)>0) temp.city <- mask(temp.city, ocean.city, inverse=T)
-  if(length(lakes.city)>0) temp.city <- mask(temp.city, lakes.city, inverse=T)
-  if(length(river.city)>0) temp.city <- mask(temp.city, river.city, inverse=T)
-  
-  temp.city2 <- mask(temp.city, city.sp)
-  temp.city2[temp.city2<=0] <- NA
+      vals.tmp <- getValues(met.city); tmp.x <- mean(vals.tmp, na.rm=T); tmp.sd <- sd(vals.tmp, na.rm=T)
+    } # end while loop
+
+    # Crop & mask out our city area
+    met.city <- crop(met.city, city.sp)
+    met.city <- mask(met.city, city.sp)
+    
+    # Mask out water bodies
+    if(length(ocean.city)>0) met.city <- mask(met.city, ocean.city, inverse=T)
+    if(length(lakes.city)>0) met.city <- mask(met.city, lakes.city, inverse=T)
+    if(length(river.city)>0) met.city <- mask(met.city, river.city, inverse=T)
+    
+    met.dev <- met.city - mean(getValues(met.city), na.rm=T)
+    # plot(met.city); plot(city.sp, add=T)
+    # plot(met.dev); plot(city.sp, add=T)
+    
+    tmax <- addLayer(tmax, met.city)
+    tdev <- addLayer(tdev, met.dev)
+  } # End Time loop
+  # 4. Find & store mean from all time points
+  tmax <- mean(tmax)
+  tdev <- mean(tdev, na.rm=T)
+  # plot(tmax); plot(city.sp, add=T)
+  # plot(tdev); plot(city.sp, add=T)
   
   # Filter out things beyond 6 sigma
-  vals.tmax <- getValues(temp.city2)
+  vals.tmax <- getValues(tmax)
   tmax.mean <- mean(vals.tmax, na.rm=T)
   tmax.sd   <- sd(vals.tmax, na.rm=T)
-  temp.city2[temp.city2>tmax.mean + 6*tmax.sd] <- NA
-  temp.city2[temp.city2<tmax.mean - 6*tmax.sd] <- NA
-  vals.tmax <- getValues(temp.city2)
+  tmax[tmax>tmax.mean + 6*tmax.sd] <- NA
+  tmax[tmax<tmax.mean - 6*tmax.sd] <- NA
+  vals.tmax <- getValues(tmax)
   
-  # plot(temp.city); plot(city.sp, add=T)
-  # plot(temp.city2); plot(city.sp, add=T)
+  vals.tdev <- getValues(tdev)
+  tdev.mean <- mean(vals.tdev, na.rm=T)
+  tdev.sd   <- sd(vals.tdev, na.rm=T)
+  tdev[tdev>tdev.mean + 6*tdev.sd] <- NA
+  tdev[tdev<tdev.mean - 6*tdev.sd] <- NA
+  vals.tdev <- getValues(tdev)
+  
+  # plot(tmax); plot(city.sp, add=T)
+  # plot(tdev); plot(city.sp, add=T)
   # ---------------
 
   # ---------------
   # Elevation data
   # ---------------
   # Cut down the dataset to a city-scale
-  # city.sp2 <- spTransform(city.sp, CRS(projection(elev)))
-  # city.sp2 <- city.sp
-  # extent(city.sp2)[1:2] <- extent(city.sp2)[1:2]+180
   ext.city <- extent(city.sp)
   if(all(ext.city[1:2]<0)) {
     extent.new <- ext.city+c(360, 360,0,0)
@@ -208,7 +341,7 @@ for(i in 1:nrow(cities.use)){
   }
   
   
-  elev.city <- resample(elev.city, temp.city)
+  elev.city <- resample(elev.city, tdev)
   
   # Mask out water bodies
   if(length(ocean.city)>0) elev.city <- mask(elev.city, ocean.city, inverse=T)
@@ -231,7 +364,7 @@ for(i in 1:nrow(cities.use)){
   # ---------------
   
   # ---------------
-  # Find our tree canopy file
+  # Find our tree canopy file(s)
   # --------------
   f.city <- which(ftree.df$ymin<=bb.city[2,1] & ftree.df$ymax>=bb.city[2,2] &
                     ftree.df$xmin<=bb.city[1,1] & ftree.df$xmax>=bb.city[1,2])
@@ -262,64 +395,42 @@ for(i in 1:nrow(cities.use)){
     tree.city[tree.city==0] <- NA
     
     # tree.city
-  } else if(length(f.city)>=2) {
-    # if(city.name=="Helsinki"){ 
-    #   # Helsinki's being a pain, so we're going to manually grab the tiles that actually include it
-    #   f.city <- rev(f.city)[1:2]
-    # } 
-    
-    # For Huainan; cell 4 works
+  } else {
     tree.city <- raster(file.path(path.trees, ftree.df$file[f.city[1]]))
     tree.city[tree.city>100] <- NA
-    tree.city[tree.city==0] <- NA
-    # plot(tree.city); plot(city.sp, add=T)
-    
-    ext.city <- extent(city.sp)
-    
-    # Setting up the temporary extent
-    ext1 <- extent(tree.city)
-    ext.temp <- c(max(ext1[1], ext.city[1]),
-                  min(ext1[2], ext.city[2]),
-                  max(ext1[3], ext.city[3]),
-                  min(ext1[4], ext.city[4]))
-    
-    # If we end up with bounding issues, just take the full range of the raster
-    # -- this will be slower, but more reliable for now
-    if(ext.temp[1]>=ext.temp[2]) ext.temp[1:2] <- ext1[1:2]
-    if(ext.temp[3]>=ext.temp[4]) ext.temp[3:4] <- ext1[3:4]
-    
-    tree.city <- crop(tree.city, extent(ext.temp)+c(-0.5,0.5,-0.5,0.5))
+    tree.city[tree.city<=0] <- NA
     # plot(tree.city); plot(city.sp, add=T)
     
     for(j in 2:length(f.city)){
       tree2 <- raster(file.path(path.trees, ftree.df$file[f.city[j]]))
       tree2[tree2>100] <- NA
-      tree2[tree2==0] <- NA
+      tree2[tree2<=0] <- NA
       
-      ext2 <- extent(tree2)
+      tree2 <- resample(tree2, tree.city)
+      # plot(tree2); plot(city.sp, add=T)
       
-      # Setting up the temporary extent
-      ext.temp <- c(max(ext2[1], ext.city[1]),
-                    min(ext2[2], ext.city[2]),
-                    max(ext2[3], ext.city[3]),
-                    min(ext2[4], ext.city[4]))
-      
-      if(ext.temp[1]>=ext.temp[2]) ext.temp[1:2] <- ext2[1:2]
-      if(ext.temp[3]>=ext.temp[4]) ext.temp[3:4] <- ext2[3:4]
-      
-      tree2 <- crop(tree2, extent(ext.temp), snap="out")
-      
-      # Skip the mosaic step if oru regen of interest is blank
-      if(max(getValues(tree2), na.rm=T) == -Inf) next
-      
-      tree.city <- mosaic(tree.city, tree2, fun=mean, na.rm=T, tolerance=0.3)
+      tree.city <- mosaic(tree.city, tree2, fun=mean, na.rm=T, tolerance=0.2)
     }
   } 
+  
+  # Iteratively removing 6-sigma outliers
+  #  -- not great, but necessary to do at the large scale before clipping to cities with lower SD
+  #  -- in my test, this kept ~95% of data with the biggest outliers being on the coast;
+  # if this becomes too problematic, can do deviation from tile mean and do the multi-time analysis
+  #      with na.rm=T, but that might need to happen at a city-scale
+  #  but we'll need to
+  vals.tmp <- getValues(tree.city); tmp.x <- mean(vals.tmp, na.rm=T); tmp.sd <- sd(vals.tmp, na.rm=T)
+  while(length(which(vals.tmp < tmp.x-6*tmp.sd | vals.tmp > tmp.x+6*tmp.sd))>0){
+    tree.city[tree.city < tmp.x-6*tmp.sd]  <- NA
+    tree.city[tree.city > tmp.x+6*tmp.sd]  <- NA
+    
+    vals.tmp <- getValues(tree.city); tmp.x <- mean(vals.tmp, na.rm=T); tmp.sd <- sd(vals.tmp, na.rm=T)
+  } # end while loop
   
   tree.city <- crop(tree.city, city.sp)
   tree.city[is.na(tree.city)] <- 0 # anything not with trees, should be 0 bc land w/ no trees or water
 
-  tree.city <- resample(tree.city, temp.city, na.rm=F) # Do this next to make similar to surface temp
+  tree.city <- resample(tree.city, tmax, na.rm=F) # Do this next to make similar to surface temp
 
   # Mask out water bodies
   if(length(ocean.city)>0) tree.city <- mask(tree.city, ocean.city, inverse=T)
@@ -328,25 +439,24 @@ for(i in 1:nrow(cities.use)){
   # plot(tree.city); plot(city.sp, add=T)
   
   tree.city2 <- mask(tree.city, city.sp)
-  tree.city2[tree.city2<0] <- NA
-  tree.city2[tree.city2>100] <- NA
-  
-# plot(tree.city2); plot(city.sp, add=T)
+
+  # plot(tree.city2); plot(city.sp, add=T)
   
   vals.tree <- getValues(tree.city2)
   
   png(file.path(path.save, paste0(city.name, "_maps.png")), height=8, width=6, unit="in", res=180)
   par(mfrow=c(2,2))
-  plot(temp.city2, main="Summer Day Max Temp\n2013, deg.C"); plot(city.sp, add=T)
-  plot(tree.city2, main="Tree Cover\n 2000, perc. cover"); plot(city.sp, add=T)
+  plot(tmax, main="Summer Day Max Temp\n2013, deg.C"); plot(city.sp, add=T)
+  plot(tdev, main="Summer Day Max Dev\n2013, deg.C"); plot(city.sp, add=T)
+  plot(tree.city2, main="Tree Cover\n 2013, perc. cover"); plot(city.sp, add=T)
   plot(elev.city2, main="Elevation; unknown units"); plot(city.sp, add=T)
   par(mfrow=c(1,1))
   dev.off()
   
   # test <- coordinates(tree.city2)
   
-  df.city <- data.frame(Name=city.name, coordinates(temp.city2), cover.tree=vals.tree, temp.summer=vals.tmax, elevation=vals.elev)
-  df.city <- df.city[complete.cases(df.city),]
+  df.city <- data.frame(Name=city.name, coordinates(tdev), cover.tree=vals.tree, temp.summer=vals.tmax, temp.dev.summer=vals.tdev, elevation=vals.elev)
+  df.city <- df.city[!is.na(df.city$cover.tree),]
   write.csv(df.city, file.path(path.save, paste0(city.name, "_data_full.csv")), row.names=F)
   # summary(df.city)
   lm.city <- lm(temp.summer ~ cover.tree, data=df.city)
@@ -375,11 +485,15 @@ for(i in 1:nrow(cities.use)){
   cities.use[i,"temp.sd"  ] <- sd(df.city$temp.summer, na.rm=T)
   cities.use[i,"temp.max" ] <- max(df.city$temp.summer, na.rm=T)
   cities.use[i,"temp.min" ] <- min(df.city$temp.summer, na.rm=T)
+  cities.use[i,"tdev.mean"] <- mean(df.city$temp.dev.summer, na.rm=T)
+  cities.use[i,"tdev.sd"  ] <- sd(df.city$temp.dev.summer, na.rm=T)
+  cities.use[i,"tdev.max" ] <- max(df.city$temp.dev.summer, na.rm=T)
+  cities.use[i,"tdev.min" ] <- min(df.city$temp.dev.summer, na.rm=T)
   # cities.use[i,"correlation"] <- sum.lm$r.squared
   # cities.use[i,"slope"] <- sum.lm$coefficients[2,1] 
   
   rm(ocean.city, lakes.city, river.city)
-}
+} # End city loop
 # cities.use <- cities.use[,!names(cities.use) %in% c("july.mean", "july.sd", "july.max", "july.min")]
 summary(cities.use)
 write.csv(data.frame(cities.use), "../data_processed/cities_summary_sdei_v4.csv", row.names=F)
