@@ -2,6 +2,15 @@
 # Data downloaded from here: https://ladsweb.modaps.eosdis.nasa.gov/search/
 #  https://ladsweb.modaps.eosdis.nasa.gov/api/v1/productPage/product=MOD11A2
 # According to documentation here: the scale factor for land surface day temperature is 0.02: https://icess.eri.ucsb.edu/modis/LstUsrGuide/usrguide_1dtil.html#Table_9
+# To DOWNLOAD:
+# wget -e robots=off -m -np -R .html,.tmp -nH --cut-dirs=3 \
+# https://ladsweb.modaps.eosdis.nasa.gov/archive/orders/<order_number>/ \
+# --header "Authorization: Bearer <your appKey>" -P <target dir>
+#
+# Replace the <your appKey> placeholder with your appKey.  AppKeys can be created and retrieved at:
+#  https://ladsweb.modaps.eosdis.nasa.gov/profile/app-keys/ 
+  
+
 # Rather relying on the apparently buggy SDEI product, I'm going the raw data and looking at July temperature for the Northern Hemisphere and January temperature for the Southern.  Still doing 2013 because that's what I'd already pulled for the new MODIS tree cover dataset.  Will process all tiles for both seasons becuase cities often cross the equator.
 
 library(raster)
