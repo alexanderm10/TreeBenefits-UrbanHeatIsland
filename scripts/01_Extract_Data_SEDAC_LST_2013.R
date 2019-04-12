@@ -165,6 +165,7 @@ pb <- txtProgressBar(min=0, max=nrow(cities.use), style=3)
 for(i in 1:nrow(cities.use)){
   # i=which(cities.use$NAME=="Chicago")
   # i=which(cities.use$NAME=="Manaus")
+  # i=which(cities.use$NAME=="NewYork")
   
   setTxtProgressBar(pb, i)
   # Subset our shapefile
@@ -207,24 +208,13 @@ for(i in 1:nrow(cities.use)){
   } # End N/S identification
   
   # 2. Figure out which rasters to process
-  f.met <- which(met.df$ymin<=bb.city[2,1] & met.df$ymax>=bb.city[2,2] &
-                   met.df$xmin<=bb.city[1,1] & met.df$xmax>=bb.city[1,2])
-  # met.df[f.met,]
-  if(length(f.met)==0){
-    # Figure out which dimension fails
-    test.lat <- which(met.df$ymin<=bb.city[2,1] & met.df$ymax>=bb.city[2,2])
-    test.lon <- which(met.df$xmin<=bb.city[1,1] & met.df$xmax>=bb.city[1,2])
-    
-    # Note: this may bonk, but we'll try it for now
-    if(length(test.lon)==0){
-      test.lon <- which(met.df$xmin<=bb.city[1,1]+2 & met.df$xmax>=bb.city[1,2]-2)
-      f.met <- test.lat[test.lat %in% test.lon]
-    }
-    if(length(test.lat)==0){
-      test.lat <- which(met.df$ymin<=bb.city[2,1]+2 & met.df$ymax>=bb.city[2,2]-2)
-      f.met <- test.lat[test.lat %in% test.lon]
-    }
-  } # End loop to find more files
+  f.met <- which(((met.df$ymin<=bb.city[2,1] & met.df$ymax>=bb.city[2,1]) |  # raster min < min & raster min > min
+                      (met.df$ymax>=bb.city[2,2] & met.df$ymin<=bb.city[2,2])) & # max is greater than both
+                   ((met.df$xmin<=bb.city[1,1] & met.df$xmax>=bb.city[1,1]) |  # raster min < min & raster min > min
+                      (met.df$xmax>=bb.city[1,2] & met.df$xmin<=bb.city[1,2]))
+                   
+                 )
+  
   f.met <- f.met[order(met.df$ymax[f.met], met.df$xmax[f.met], decreasing=T)]
   
   # 3. For *each date* 
@@ -252,8 +242,16 @@ for(i in 1:nrow(cities.use)){
         met2[met2<=250] <- NA # 250k = -23˚C = -9.7F; almost certainly not a sumemr temperature
         # plot(met2); plot(city.sp, add=T)
         
-        met2 <- resample(met2, met.city[[1]])
+        # met2 <- resample(met2, met.city[[1]])
+        ext1 <- extent(met.city)
+        ext2 <- extent(met2)
+        ext.temp <- c(min(ext1[1], ext2[1]),
+                      max(ext1[2], ext2[2]),
+                      min(ext1[3], ext2[3]),
+                      max(ext1[4], ext2[4]))
+        met.city <- extend(met.city, ext.temp)
         
+        met2 <- resample(met2, met.city)
         met.city <- mosaic(met.city, met2, fun=mean, na.rm=T, tolerance=0.2)
         # plot(met.city); plot(city.sp, add=T)
       } # end j loop
@@ -366,25 +364,11 @@ for(i in 1:nrow(cities.use)){
   # ---------------
   # Find our tree canopy file(s)
   # --------------
-  f.city <- which(ftree.df$ymin<=bb.city[2,1] & ftree.df$ymax>=bb.city[2,2] &
-                    ftree.df$xmin<=bb.city[1,1] & ftree.df$xmax>=bb.city[1,2])
-  # ftree.df$file[f.city]
-  if(length(f.city)==0){
-    # Figure out which dimension fails
-    test.lat <- which(ftree.df$ymin<=bb.city[2,1] & ftree.df$ymax>=bb.city[2,2])
-    test.lon <- which(ftree.df$xmin<=bb.city[1,1] & ftree.df$xmax>=bb.city[1,2])
-    
-    # Note: this may bonk, but we'll try it for now
-    if(length(test.lon)==0){
-      test.lon <- which(ftree.df$xmin<=bb.city[1,1]+2 & ftree.df$xmax>=bb.city[1,2]-2)
-      f.city <- test.lat[test.lat %in% test.lon]
-    }
-    if(length(test.lat)==0){
-      test.lat <- which(ftree.df$ymin<=bb.city[2,1]+2 & ftree.df$ymax>=bb.city[2,2]-2)
-      f.city <- test.lat[test.lat %in% test.lon]
-    }
-    
-  }
+  f.city <- which(((ftree.df$ymin<=bb.city[2,1] & ftree.df$ymax>=bb.city[2,1]) |  # raster min < min & raster min > min
+                    (ftree.df$ymax>=bb.city[2,2] & ftree.df$ymin<=bb.city[2,2])) & # max is greater than both
+                   ((ftree.df$xmin<=bb.city[1,1] & ftree.df$xmax>=bb.city[1,1]) |  # raster min < min & raster min > min
+                      (ftree.df$xmax>=bb.city[1,2] & ftree.df$xmin<=bb.city[1,2]))
+                  )
   
   f.city <- f.city[order(ftree.df$ymax[f.city], ftree.df$xmax[f.city], decreasing=T)]
 
@@ -405,11 +389,20 @@ for(i in 1:nrow(cities.use)){
       tree2 <- raster(file.path(path.trees, ftree.df$file[f.city[j]]))
       tree2[tree2>100] <- NA
       tree2[tree2<=0] <- NA
+      # plot(tree2, add=T); plot(city.sp, add=T)
       
-      tree2 <- resample(tree2, tree.city)
+      ext1 <- extent(tree.city)
+      ext2 <- extent(tree2)
+      ext.temp <- c(min(ext1[1], ext2[1]),
+                    max(ext1[2], ext2[2]),
+                    min(ext1[3], ext2[3]),
+                    max(ext1[4], ext2[4]))
+      tree.city <- extend(tree.city, ext.temp)
+      # tree2 <- resample(tree2, tree.city)
       # plot(tree2); plot(city.sp, add=T)
       
       tree.city <- mosaic(tree.city, tree2, fun=mean, na.rm=T, tolerance=0.2)
+      # plot(tree.city); plot(city.sp, add=T)
     }
   } 
   
@@ -430,7 +423,7 @@ for(i in 1:nrow(cities.use)){
   tree.city <- crop(tree.city, city.sp)
   tree.city[is.na(tree.city)] <- 0 # anything not with trees, should be 0 bc land w/ no trees or water
 
-  tree.city <- resample(tree.city, tmax, na.rm=F) # Do this next to make similar to surface temp
+  tree.city <- resample(tree.city, tdev, na.rm=F) # Do this next to make similar to surface temp
 
   # Mask out water bodies
   if(length(ocean.city)>0) tree.city <- mask(tree.city, ocean.city, inverse=T)
