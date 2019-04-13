@@ -28,7 +28,7 @@ summary(sdei.urb$SQKM_FINAL)
 # data.frame(sdei.urb[sdei.urb$NAME=="Chicago",])
 
 # These are now population estimates for the metropolitan areas (designated "Urban") -- we can scale back a bit
-cities.use <- sdei.urb[sdei.urb$ES00POP>1e6 &  !is.na(sdei.urb$NAME) & sdei.urb$SQKM_FINAL>1e2 & sdei.urb$D_T_DIFF>0,]
+cities.use <- sdei.urb[sdei.urb$ES00POP>1e6 &  !is.na(sdei.urb$NAME) & sdei.urb$SQKM_FINAL>1e2,]
 dim(cities.use)
 summary(cities.use)
 summary(droplevels(cities.use$ISO3))
@@ -96,10 +96,6 @@ rivers <- spTransform(rivers, projection(cities.use))
 path.trees <- "/Volumes/Morton_SDM/TreeCover_MOD44Bv6/2013/HEGOUT/"
 ftree <- dir(path.trees, ".tif")
 ftree <- ftree[which(substr(ftree, nchar(ftree)-3, nchar(ftree))==".tif")] # ignore anything that's not a .tif
-
-# Creating a metadata sheet to keep track of bounding boxes
-ftree <- dir(path.trees, ".tif")
-ftree <- ftree[which(substr(ftree, nchar(ftree)-3, nchar(ftree))==".tif")] # ignore anything that's not a .tif
 ftree.split <- stringr::str_split(ftree, "[.]")
 ftree.df <- data.frame(file=ftree, matrix(unlist(ftree.split), ncol=length(ftree.split[[1]]), byrow = T))
 names(ftree.df) <- c("file", "dataset", "date.stamp", "tile", "version", "process.stamp", "extension")
@@ -153,6 +149,26 @@ summary(fjul.df)
 
 # Elevation as an additional predictor to account for potential bias in tree cover distribution
 elev <- raster("/Volumes/Morton_SDM/Elevation_SRTM30/topo30/topo30.grd")
+
+
+# Setting up a function to iteratively remove outliers since we do it a LOT
+# Iteratively removing 6-sigma outliers
+#  -- not great, but necessary to do at the large scale before clipping to cities with lower SD
+#  -- in my test, this kept ~95% of data with the biggest outliers being on the coast;
+# if this becomes too problematic, can do deviation from tile mean and do the multi-time analysis
+#      with na.rm=T, but that might need to happen at a city-scale
+#  but we'll need to
+filter.outliers <- function(RASTER, n.sigma=6){
+  vals.tmp <- getValues(RASTER); tmp.x <- mean(vals.tmp, na.rm=T); tmp.sd <- sd(vals.tmp, na.rm=T)
+  while(length(which(vals.tmp < tmp.x-n.sigma*tmp.sd | vals.tmp > tmp.x+n.sigma*tmp.sd))>0){
+    RASTER[RASTER < tmp.x-6*tmp.sd]  <- NA
+    RASTER[RASTER > tmp.x+6*tmp.sd]  <- NA
+    
+    vals.tmp <- getValues(RASTER); tmp.x <- mean(vals.tmp, na.rm=T); tmp.sd <- sd(vals.tmp, na.rm=T)
+  } # end while loop
+  
+  return(RASTER)
+} # End function
 
 # -----------------------------------------
 # Looping through Cities
@@ -250,26 +266,17 @@ for(i in 1:nrow(cities.use)){
                       min(ext1[3], ext2[3]),
                       max(ext1[4], ext2[4]))
         met.city <- extend(met.city, ext.temp)
+        # plot(met.city); plot(city.sp, add=T)
         
         met2 <- resample(met2, met.city)
         met.city <- mosaic(met.city, met2, fun=mean, na.rm=T, tolerance=0.2)
         # plot(met.city); plot(city.sp, add=T)
       } # end j loop
     }# end ifelse multiple file mosaicing
-    
-    # Iteratively removing 6-sigma outliers
-    #  -- not great, but necessary to do at the large scale before clipping to cities with lower SD
-    #  -- in my test, this kept ~95% of data with the biggest outliers being on the coast;
-    # if this becomes too problematic, can do deviation from tile mean and do the multi-time analysis
-    #      with na.rm=T, but that might need to happen at a city-scale
-    #  but we'll need to
-    vals.tmp <- getValues(met.city); tmp.x <- mean(vals.tmp, na.rm=T); tmp.sd <- sd(vals.tmp, na.rm=T)
-    while(length(which(vals.tmp < tmp.x-6*tmp.sd | vals.tmp > tmp.x+6*tmp.sd))>0){
-      met.city[met.city < tmp.x-6*tmp.sd]  <- NA
-      met.city[met.city > tmp.x+6*tmp.sd]  <- NA
 
-      vals.tmp <- getValues(met.city); tmp.x <- mean(vals.tmp, na.rm=T); tmp.sd <- sd(vals.tmp, na.rm=T)
-    } # end while loop
+    # Iteratively removing 6-sigma outliers
+    met.city <- filter.outliers(RASTER=met.city, n.sigma = 6)
+    # plot(met.city); plot(city.sp, add=T)
 
     # Crop & mask out our city area
     met.city <- crop(met.city, city.sp)
@@ -287,6 +294,9 @@ for(i in 1:nrow(cities.use)){
     tmax <- addLayer(tmax, met.city)
     tdev <- addLayer(tdev, met.dev)
   } # End Time loop
+  # plot(tmax)
+  # plot(tdev)
+  
   # 4. Find & store mean from all time points
   tmax <- mean(tmax)
   tdev <- mean(tdev, na.rm=T)
@@ -294,20 +304,14 @@ for(i in 1:nrow(cities.use)){
   # plot(tdev); plot(city.sp, add=T)
   
   # Filter out things beyond 6 sigma
+  # tmax <- filter.outliers(RASTER = tmax, n.sigma = 6)
   vals.tmax <- getValues(tmax)
-  tmax.mean <- mean(vals.tmax, na.rm=T)
-  tmax.sd   <- sd(vals.tmax, na.rm=T)
-  tmax[tmax>tmax.mean + 6*tmax.sd] <- NA
-  tmax[tmax<tmax.mean - 6*tmax.sd] <- NA
-  vals.tmax <- getValues(tmax)
-  
-  vals.tdev <- getValues(tdev)
-  tdev.mean <- mean(vals.tdev, na.rm=T)
-  tdev.sd   <- sd(vals.tdev, na.rm=T)
-  tdev[tdev>tdev.mean + 6*tdev.sd] <- NA
-  tdev[tdev<tdev.mean - 6*tdev.sd] <- NA
+
+  # tdev <- filter.outliers(RASTER = tdev, n.sigma = 6)
   vals.tdev <- getValues(tdev)
   
+  # If we can't get good temperature data, skip this; right now this is a pretty low bar, but we'll see
+  if(length(which(!is.na(vals.tdev)))<50 | length(which(!is.na(vals.tmax)))<25) next
   # plot(tmax); plot(city.sp, add=T)
   # plot(tdev); plot(city.sp, add=T)
   # ---------------
@@ -339,30 +343,26 @@ for(i in 1:nrow(cities.use)){
   }
   
   
+  elev.city <- filter.outliers(RASTER = elev.city, n.sigma = 6)
   elev.city <- resample(elev.city, tdev)
+  
+  elev.city <- mask(elev.city, city.sp)
   
   # Mask out water bodies
   if(length(ocean.city)>0) elev.city <- mask(elev.city, ocean.city, inverse=T)
   if(length(lakes.city)>0) elev.city <- mask(elev.city, lakes.city, inverse=T)
   if(length(river.city)>0) elev.city <- mask(elev.city, river.city, inverse=T)
   
-  elev.city2 <- mask(elev.city, city.sp)
-  # elev.city2[elev.city2<=0] <- NA
-  
+
   # Filter out things beyond 6 sigma
-  vals.elev <- getValues(elev.city2)
-  elev.mean <- mean(vals.elev, na.rm=T)
-  elev.sd   <- sd(vals.elev, na.rm=T)
-  elev.city2[elev.city2>elev.mean + 6*elev.sd] <- NA
-  elev.city2[elev.city2<elev.mean - 6*elev.sd] <- NA
-  vals.elev <- getValues(elev.city2)
+  # elev.city <- filter.outliers(RASTER = elev.city, n.sigma = 6)
+  vals.elev <- getValues(elev.city)
   
   # plot(elev.city); plot(city.sp, add=T)
-  # plot(elev.city2); plot(city.sp, add=T)
   # ---------------
   
   # ---------------
-  # Find our tree canopy file(s)
+  # Tree Canopy
   # --------------
   f.city <- which(((ftree.df$ymin<=bb.city[2,1] & ftree.df$ymax>=bb.city[2,1]) |  # raster min < min & raster min > min
                     (ftree.df$ymax>=bb.city[2,2] & ftree.df$ymin<=bb.city[2,2])) & # max is greater than both
@@ -398,7 +398,8 @@ for(i in 1:nrow(cities.use)){
                     min(ext1[3], ext2[3]),
                     max(ext1[4], ext2[4]))
       tree.city <- extend(tree.city, ext.temp)
-      # tree2 <- resample(tree2, tree.city)
+      
+      tree2 <- resample(tree2, tree.city)
       # plot(tree2); plot(city.sp, add=T)
       
       tree.city <- mosaic(tree.city, tree2, fun=mean, na.rm=T, tolerance=0.2)
@@ -406,53 +407,45 @@ for(i in 1:nrow(cities.use)){
     }
   } 
   
-  # Iteratively removing 6-sigma outliers
-  #  -- not great, but necessary to do at the large scale before clipping to cities with lower SD
-  #  -- in my test, this kept ~95% of data with the biggest outliers being on the coast;
-  # if this becomes too problematic, can do deviation from tile mean and do the multi-time analysis
-  #      with na.rm=T, but that might need to happen at a city-scale
-  #  but we'll need to
-  vals.tmp <- getValues(tree.city); tmp.x <- mean(vals.tmp, na.rm=T); tmp.sd <- sd(vals.tmp, na.rm=T)
-  while(length(which(vals.tmp < tmp.x-6*tmp.sd | vals.tmp > tmp.x+6*tmp.sd))>0){
-    tree.city[tree.city < tmp.x-6*tmp.sd]  <- NA
-    tree.city[tree.city > tmp.x+6*tmp.sd]  <- NA
-    
-    vals.tmp <- getValues(tree.city); tmp.x <- mean(vals.tmp, na.rm=T); tmp.sd <- sd(vals.tmp, na.rm=T)
-  } # end while loop
-  
-  tree.city <- crop(tree.city, city.sp)
+  # Iteratively removing 6-sigma outliers from large scene; not local area
+  tree.city <- filter.outliers(RASTER = tree.city, n.sigma = 6)
+
+  # tree.city <- crop(tree.city, extent(city.sp)+c(-1,1-1,1)) # crop to reduce our area, but leave a buffer for the resamp
   tree.city[is.na(tree.city)] <- 0 # anything not with trees, should be 0 bc land w/ no trees or water
 
   tree.city <- resample(tree.city, tdev, na.rm=F) # Do this next to make similar to surface temp
-
+  tree.city <- crop(tree.city, extent(city.sp)) # Re-crop now that we've resampled & don't have edge effects
+  
+  tree.city <- mask(tree.city, city.sp)
+  
   # Mask out water bodies
   if(length(ocean.city)>0) tree.city <- mask(tree.city, ocean.city, inverse=T)
   if(length(lakes.city)>0) tree.city <- mask(tree.city, lakes.city, inverse=T)
   if(length(river.city)>0) tree.city <- mask(tree.city, river.city, inverse=T)
   # plot(tree.city); plot(city.sp, add=T)
   
-  tree.city2 <- mask(tree.city, city.sp)
-
-  # plot(tree.city2); plot(city.sp, add=T)
+  vals.tree <- getValues(tree.city)
+  # ---------------
   
-  vals.tree <- getValues(tree.city2)
-  
+  # ---------------
+  # Package everything together for more robust analysis
+  # ---------------
   png(file.path(path.save, paste0(city.name, "_maps.png")), height=8, width=6, unit="in", res=180)
   par(mfrow=c(2,2))
   plot(tmax, main="Summer Day Max Temp\n2013, deg.C"); plot(city.sp, add=T)
   plot(tdev, main="Summer Day Max Dev\n2013, deg.C"); plot(city.sp, add=T)
-  plot(tree.city2, main="Tree Cover\n 2013, perc. cover"); plot(city.sp, add=T)
-  plot(elev.city2, main="Elevation; unknown units"); plot(city.sp, add=T)
+  plot(tree.city, main="Tree Cover\n 2013, perc. cover"); plot(city.sp, add=T)
+  plot(elev.city, main="Elevation; unknown units"); plot(city.sp, add=T)
   par(mfrow=c(1,1))
   dev.off()
   
   # test <- coordinates(tree.city2)
   
   df.city <- data.frame(Name=city.name, coordinates(tdev), cover.tree=vals.tree, temp.summer=vals.tmax, temp.dev.summer=vals.tdev, elevation=vals.elev)
-  df.city <- df.city[!is.na(df.city$cover.tree),]
+  df.city <- df.city[!is.na(df.city$elevation),]
   write.csv(df.city, file.path(path.save, paste0(city.name, "_data_full.csv")), row.names=F)
   # summary(df.city)
-  lm.city <- lm(temp.summer ~ cover.tree, data=df.city)
+  lm.city <- lm(temp.dev.summer ~ cover.tree, data=df.city)
   sum.lm <- summary(lm.city)
   
   # gam.test <- mgcv::gam(temp.summer ~ cover.tree + elevation + s(x,y), data=df.city)
@@ -460,7 +453,7 @@ for(i in 1:nrow(cities.use)){
   # summary(gam.test)
   # 
   png(file.path(path.save, paste0(city.name, "_scatter.png")), height=4, width=4, unit="in", res=90)
-  plot(temp.summer ~ cover.tree, data=df.city, cex=0.5,
+  plot(temp.dev.summer ~ cover.tree, data=df.city, cex=0.5,
        main=paste0("R2=",round(sum.lm$r.squared,2))); 
   abline(lm.city, col="red", lwd=2); 
   dev.off()
