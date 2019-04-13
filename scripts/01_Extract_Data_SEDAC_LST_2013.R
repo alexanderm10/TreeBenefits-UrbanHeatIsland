@@ -182,6 +182,7 @@ for(i in 1:nrow(cities.use)){
   # i=which(cities.use$NAME=="Chicago")
   # i=which(cities.use$NAME=="Manaus")
   # i=which(cities.use$NAME=="NewYork")
+  # i=which(cities.use$NAME=="Amsterdam")
   
   setTxtProgressBar(pb, i)
   # Subset our shapefile
@@ -245,7 +246,8 @@ for(i in 1:nrow(cities.use)){
     if(length(files.now)==1){
       met.city <- raster(file.path(met.path, files.now))
       met.city <- met.city*0.02
-      met.city[met.city<=0] <- NA
+      met.city[met.city<=250] <- NA # 250k = -23˚C = -9.7F; almost certainly not a sumemr temperature
+      # plot(met.city); plot(city.sp, add=T)
     } else {
       met.city <- raster(file.path(met.path, files.now[1]))
       met.city <- met.city*0.02 # Scale factor from documentation; now in Kelvin
