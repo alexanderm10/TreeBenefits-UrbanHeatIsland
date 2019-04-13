@@ -113,8 +113,8 @@ summary(ftree.df)
 
 
 # Setting up file paths and directories for the temperature data
-path.01 <- "/Volumes/Morton_SDM/SurfTemp_MODIS_MODA2_2013-01/HEGOUT/"
-path.07 <- "/Volumes/Morton_SDM/SurfTemp_MODIS_MODA2_2013-07/HEGOUT/"
+path.01 <- "/Volumes/Morton_SDM/SurfTemp_MODIS_MODA2/2013/01-02/HEGOUT/"
+path.07 <- "/Volumes/Morton_SDM/SurfTemp_MODIS_MODA2/2013/07-08/HEGOUT/"
 
 fjan <- dir(path.01, ".tif")
 fjan <- fjan[which(substr(fjan, nchar(fjan)-3, nchar(fjan))==".tif")] # ignore anything that's not a .tif
@@ -181,8 +181,11 @@ pb <- txtProgressBar(min=0, max=nrow(cities.use), style=3)
 for(i in 1:nrow(cities.use)){
   # i=which(cities.use$NAME=="Chicago")
   # i=which(cities.use$NAME=="Manaus")
-  # i=which(cities.use$NAME=="NewYork")
+  # i=which(cities.use$NAME=="Atlanta")
   # i=which(cities.use$NAME=="Amsterdam")
+  # i=which(cities.use$NAME=="Chongqing")
+  # i=which(cities.use$NAME=="Barranquilla")
+  
   
   setTxtProgressBar(pb, i)
   # Subset our shapefile
@@ -299,8 +302,12 @@ for(i in 1:nrow(cities.use)){
   # plot(tmax)
   # plot(tdev)
   
+  # Filter outliers one more time before taking the mean; because we have multiple time bands, it's less likely to remove true data
+  tmax <- filter.outliers(RASTER=tmax, n.sigma=6)
+  tdev <- filter.outliers(RASTER=tdev, n.sigma=6)
+
   # 4. Find & store mean from all time points
-  tmax <- mean(tmax)
+  tmax <- mean(tmax, na.rm=T)
   tdev <- mean(tdev, na.rm=T)
   # plot(tmax); plot(city.sp, add=T)
   # plot(tdev); plot(city.sp, add=T)
@@ -310,6 +317,7 @@ for(i in 1:nrow(cities.use)){
   vals.tmax <- getValues(tmax)
 
   # tdev <- filter.outliers(RASTER = tdev, n.sigma = 6)
+  # tdev2 <- filter.outliers(RASTER = tdev, n.sigma = 6)
   vals.tdev <- getValues(tdev)
   
   # If we can't get good temperature data, skip this; right now this is a pretty low bar, but we'll see
@@ -480,11 +488,11 @@ for(i in 1:nrow(cities.use)){
   # cities.use[i,"correlation"] <- sum.lm$r.squared
   # cities.use[i,"slope"] <- sum.lm$coefficients[2,1] 
   
+  write.csv(data.frame(cities.use), "../data_processed/cities_summary_sdei_v4.csv", row.names=F, overwrite=T)
   rm(ocean.city, lakes.city, river.city)
 } # End city loop
 # cities.use <- cities.use[,!names(cities.use) %in% c("july.mean", "july.sd", "july.max", "july.min")]
 summary(cities.use)
-write.csv(data.frame(cities.use), "../data_processed/cities_summary_sdei_v4.csv", row.names=F)
 # ---------------
 # -----------------------------------------
 
