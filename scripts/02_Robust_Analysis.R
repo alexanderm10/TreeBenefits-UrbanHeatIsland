@@ -2,7 +2,7 @@
 library(sp); library(rgdal); library(raster); library(rgeos); library(maps)
 library(ggplot2); library(RColorBrewer); library(nlme); library(mgcv); 
 path.dat <- "../data_processed/"
-dat.uhi <- read.csv(file.path(path.dat, "cities_summary_sdei_v4.csv"))
+dat.uhi <- read.csv(file.path(path.dat, "cities_summary_sdei_v5.csv"))
 dat.uhi <- dat.uhi[!is.na(dat.uhi$elev.mean), ]
 dat.uhi$temp.diff <- dat.uhi$temp.max - dat.uhi$temp.min
 dat.uhi$tree.diff <- dat.uhi$tree.max - dat.uhi$tree.min
@@ -61,7 +61,7 @@ for(i in 1:nrow(dat.uhi)){
   dat.uhi[i,"WWF_ECO"] <- biome$ECO_NAME
   dat.uhi[i,"WWF_BIOME"] <- biome$biome.name
   
-  dat.city <- read.csv(file.path(path.dat, "cities_full_sdei_v4", paste0(dat.uhi$NAME[i], "_data_full.csv")))
+  dat.city <- read.csv(file.path(path.dat, "cities_full_sdei_v5", paste0(dat.uhi$NAME[i], "_data_full.csv")))
   # summary(dat.city)
   
   # Remove impossible values and outliers
@@ -70,6 +70,7 @@ for(i in 1:nrow(dat.uhi)){
   dat.city$temp.dev.summer <- filter.outliers(DAT=dat.city$temp.dev.summer, n.sigma=4)
 
   # Add a couple QAQC flags
+  dat.uhi[i,"n.cells.tdev"] <- length(which(!is.na(dat.city$temp.dev.summer)))
   dat.uhi[i,"prop.missing"] <- length(which(is.na(dat.city$temp.dev.summer)))/nrow(dat.city)
   dat.uhi[i,"tree.90"] <- quantile(dat.city$cover.tree, 0.9)
   
@@ -131,7 +132,7 @@ for(i in 1:nrow(dat.uhi)){
   dat.city$gam.resid <- resid(mod.gam)
   # plot(mod.gam)
   
-  png(file.path("../data_processed/cities_full_sdei_v4", paste0(dat.uhi$NAME[i], "_GAM_qaqc.png")), height=6, width=6, units="in", res=120)
+  png(file.path("../data_processed/cities_full_sdei_v5", paste0(dat.uhi$NAME[i], "_GAM_qaqc.png")), height=6, width=6, units="in", res=120)
   par(mfrow=c(2,2))
   plot(mod.gam)
   hist(dat.city$gam.resid)

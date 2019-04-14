@@ -32,11 +32,11 @@ cities.use <- sdei.urb[sdei.urb$ES00POP>1e6 &  !is.na(sdei.urb$NAME) & sdei.urb$
 dim(cities.use)
 summary(cities.use)
 summary(droplevels(cities.use$ISO3))
-hist(cities.use$URB_N_MEAN)
-data.frame(cities.use[cities.use$URB_N_MEAN<10,])
+hist(cities.use$D_T_DIFF)
+# data.frame(cities.use[cities.use$URB_N_MEAN<10,])
 
 # Plot the map to get a better feel for geographic distribution
-png("../data_processed/cities_used_spdei_v4.png", height=4, width=8, units="in", res=120)
+png("../data_processed/cities_used_spdei_v5.png", height=4, width=8, units="in", res=120)
 map(col="red", lwd=0.5)
 plot(cities.use, add=T)
 dev.off()
@@ -161,8 +161,8 @@ elev <- raster("/Volumes/Morton_SDM/Elevation_SRTM30/topo30/topo30.grd")
 filter.outliers <- function(RASTER, n.sigma=6){
   vals.tmp <- getValues(RASTER); tmp.x <- mean(vals.tmp, na.rm=T); tmp.sd <- sd(vals.tmp, na.rm=T)
   while(length(which(vals.tmp < tmp.x-n.sigma*tmp.sd | vals.tmp > tmp.x+n.sigma*tmp.sd))>0){
-    RASTER[RASTER < tmp.x-6*tmp.sd]  <- NA
-    RASTER[RASTER > tmp.x+6*tmp.sd]  <- NA
+    RASTER[RASTER < tmp.x-n.sigma*tmp.sd]  <- NA
+    RASTER[RASTER > tmp.x+n.sigma*tmp.sd]  <- NA
     
     vals.tmp <- getValues(RASTER); tmp.x <- mean(vals.tmp, na.rm=T); tmp.sd <- sd(vals.tmp, na.rm=T)
   } # end while loop
@@ -174,7 +174,7 @@ filter.outliers <- function(RASTER, n.sigma=6){
 # Looping through Cities
 # -----------------------------------------
 # cities.use$NAME
-path.save <- "../data_processed/cities_full_sdei_v4"
+path.save <- "../data_processed/cities_full_sdei_v5"
 dir.create(path.save, recursive=T, showWarnings = F)
 pb <- txtProgressBar(min=0, max=nrow(cities.use), style=3)
 # for(i in 1:nrow(cities.use)){
@@ -303,8 +303,8 @@ for(i in 1:nrow(cities.use)){
   # plot(tdev)
   
   # Filter outliers one more time before taking the mean; because we have multiple time bands, it's less likely to remove true data
-  tmax <- filter.outliers(RASTER=tmax, n.sigma=6)
-  tdev <- filter.outliers(RASTER=tdev, n.sigma=6)
+  tmax <- filter.outliers(RASTER=tmax, n.sigma=4)
+  tdev <- filter.outliers(RASTER=tdev, n.sigma=4)
 
   # 4. Find & store mean from all time points
   tmax <- mean(tmax, na.rm=T)
@@ -418,7 +418,7 @@ for(i in 1:nrow(cities.use)){
   } 
   
   # Iteratively removing 6-sigma outliers from large scene; not local area
-  tree.city <- filter.outliers(RASTER = tree.city, n.sigma = 6)
+  tree.city <- filter.outliers(RASTER = tree.city, n.sigma=4)
 
   # tree.city <- crop(tree.city, extent(city.sp)+c(-1,1-1,1)) # crop to reduce our area, but leave a buffer for the resamp
   tree.city[is.na(tree.city)] <- 0 # anything not with trees, should be 0 bc land w/ no trees or water
@@ -488,7 +488,7 @@ for(i in 1:nrow(cities.use)){
   # cities.use[i,"correlation"] <- sum.lm$r.squared
   # cities.use[i,"slope"] <- sum.lm$coefficients[2,1] 
   
-  write.csv(data.frame(cities.use), "../data_processed/cities_summary_sdei_v4.csv", row.names=F)
+  write.csv(data.frame(cities.use), "../data_processed/cities_summary_sdei_v5.csv", row.names=F)
   rm(ocean.city, lakes.city, river.city)
 } # End city loop
 # cities.use <- cities.use[,!names(cities.use) %in% c("july.mean", "july.sd", "july.max", "july.min")]
