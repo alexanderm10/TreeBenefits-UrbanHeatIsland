@@ -2,9 +2,8 @@
 library(sp); library(rgdal); library(raster); library(rgeos); library(maps)
 library(ggplot2); library(RColorBrewer); library(nlme); library(mgcv); 
 path.dat <- "../data_processed/"
-dat.uhi <- read.csv(file.path(path.dat, "cities_summary_sdei_v3.csv"))
-# Remove cities where max tree cover <25%
-dat.uhi <- dat.uhi[dat.uhi$tree.max>=25,]
+dat.uhi <- read.csv(file.path(path.dat, "cities_summary_sdei_v4.csv"))
+dat.uhi <- dat.uhi[!is.na(dat.uhi$elev.mean), ]
 dat.uhi$temp.diff <- dat.uhi$temp.max - dat.uhi$temp.min
 dat.uhi$tree.diff <- dat.uhi$tree.max - dat.uhi$tree.min
 summary(dat.uhi)
@@ -35,35 +34,53 @@ unique(data.frame(ecoregions[ecoregions$BIOME==4, "G200_REGIO"]))
 summary(ecoregions)
 # plot(ecoregions)
 
+# Filter outliers
+filter.outliers <- function(DAT, n.sigma=6){
+  tmp.x <- mean(DAT, na.rm=T); tmp.sd <- sd(DAT, na.rm=T)
+  while(length(which(DAT < tmp.x-n.sigma*tmp.sd | DAT > tmp.x+n.sigma*tmp.sd))>0){
+    DAT[DAT < tmp.x-n.sigma*tmp.sd]  <- NA
+    DAT[DAT > tmp.x+n.sigma*tmp.sd]  <- NA
+    
+    tmp.x <- mean(DAT, na.rm=T); tmp.sd <- sd(DAT, na.rm=T)
+  } # end while loop
+  
+  return(DAT)
+} # End function
+
 # New plan for quantifying effects of trees on UHI: 
 # apply mean temperature of treeless area to whole area and calculate the difference
 pb <- txtProgressBar(min=0, max=nrow(dat.uhi), style=3)
 for(i in 1:nrow(dat.uhi)){
   # i=which(dat.uhi$NAME=="Chicago") # MEDELLIN
   # i=which(dat.uhi$NAME=="MEDELLIN")
+  # i=which(dat.uhi$NAME=="Dalian")
+  
+  
   setTxtProgressBar(pb, i)
   biome <- extract(ecoregions, uhi.sp[i,], fun=modal)
   dat.uhi[i,"WWF_ECO"] <- biome$ECO_NAME
   dat.uhi[i,"WWF_BIOME"] <- biome$biome.name
   
-  dat.city <- read.csv(file.path(path.dat, "cities_full_sdei_v3", paste0(dat.uhi$NAME[i], "_data_full.csv")))
+  dat.city <- read.csv(file.path(path.dat, "cities_full_sdei_v4", paste0(dat.uhi$NAME[i], "_data_full.csv")))
+  # summary(dat.city)
   
   # Remove impossible values and outliers
   dat.city[dat.city$cover.tree<0 | dat.city$cover.tree>100 , "cover.tree"] <- NA # Get rid of impossible values
+  dat.city$temp.summer <- filter.outliers(DAT=dat.city$temp.summer, n.sigma=4)
+  dat.city$temp.dev.summer <- filter.outliers(DAT=dat.city$temp.dev.summer, n.sigma=4)
+
+  # Add a couple QAQC flags
+  dat.uhi[i,"prop.missing"] <- length(which(is.na(dat.city$temp.dev.summer)))/nrow(dat.city)
+  dat.uhi[i,"tree.90"] <- quantile(dat.city$cover.tree, 0.9)
   
-  tmax.mean <- mean(dat.city$temp.summer, na.rm=T)
-  tmax.sd   <- sd(dat.city$temp.summer, na.rm=T)
-  dat.city$temp.summer[dat.city$temp.summer>tmax.mean + 6*tmax.sd] <- NA
-  dat.city$temp.summer[dat.city$temp.summer<tmax.mean - 6*tmax.sd] <- NA
-  
-  dat.city <- dat.city[complete.cases(dat.city),]
+  dat.city <- dat.city[!is.na(dat.city$temp.dev.summer),]
   summary(dat.city)
   
   # dim(dat.city)
   
   # ggplot(data=dat.city) +
   #   coord_equal() +
-  #   geom_raster(aes(x=x, y=y, fill=temp.summer))
+  #   geom_raster(aes(x=x, y=y, fill=temp.dev.summer))
   # ggplot(data=dat.city) +
   #   coord_equal() +
   #   geom_raster(aes(x=x, y=y, fill=cover.tree))
@@ -77,8 +94,8 @@ for(i in 1:nrow(dat.uhi)){
   # gls.gaus <- gls( temp.summer ~ cover.tree , correlation = corGaus(form = ~x + y), data = dat.city )
   # sqrt(nrow(dat.city))
   dat.city[dat.city$cover.tree==0, "cover.tree"] <- 0.1
-  mod.gam.lin <- gam(temp.summer ~ cover.tree + elevation + s(x,y), data=dat.city)
-  mod.gam.log <- gam(temp.summer ~ log(cover.tree) + elevation + s(x,y), data=dat.city)
+  mod.gam.lin <- gam(temp.dev.summer ~ cover.tree + elevation + s(x,y), data=dat.city)
+  mod.gam.log <- gam(temp.dev.summer ~ log(cover.tree) + elevation + s(x,y), data=dat.city)
 
   AIC(mod.gam.lin, mod.gam.log)
   
@@ -114,12 +131,12 @@ for(i in 1:nrow(dat.uhi)){
   dat.city$gam.resid <- resid(mod.gam)
   # plot(mod.gam)
   
-  png(file.path("../data_processed/cities_full_sdei_v3", paste0(dat.uhi$NAME[i], "_GAM_qaqc.png")), height=6, width=6, units="in", res=120)
+  png(file.path("../data_processed/cities_full_sdei_v4", paste0(dat.uhi$NAME[i], "_GAM_qaqc.png")), height=6, width=6, units="in", res=120)
   par(mfrow=c(2,2))
   plot(mod.gam)
   hist(dat.city$gam.resid)
   plot(gam.resid ~ gam.pred, data=dat.city); abline(h=0, col="red")
-  plot(temp.summer ~ gam.pred, data=dat.city); abline(a=0, b=1, col="red")
+  plot(temp.dev.summer ~ gam.pred, data=dat.city); abline(a=0, b=1, col="red")
   par(mfrow=c(1,1))
   dev.off()
   
@@ -128,7 +145,7 @@ for(i in 1:nrow(dat.uhi)){
   dat.new$cover.tree <- 0.1
   
   dat.city$gam.notrees <- predict(mod.gam, newdata=dat.new)
-  dat.city$diff.gam <- dat.city$temp.summer - dat.city$gam.notrees
+  dat.city$diff.gam <- dat.city$temp.dev.summer - dat.city$gam.notrees
   dat.uhi[i,"tree.cooling"] <- mean(dat.city$diff.gam, na.rm=T)
 
   rm(dat.city)
@@ -156,6 +173,9 @@ mean(dat.uhi$tree.max); sd(dat.uhi$tree.max)
 median(dat.uhi$tree.max)
 quantile(dat.uhi$tree.max, c(0.025, 0.975))
 
+# Creating criteria by which to exclude results
+summary(dat.uhi[dat.uhi$tree.cooling< -10,])
+dat.filter <- dat.uhi$prop.missing<0.1 & dat.uhi$tree.90>10
 
 # Model Summary
 hist(dat.uhi$gam.r2)
@@ -165,9 +185,11 @@ summary(dat.uhi$tree.slope)
 summary(dat.uhi$elevation.slope) # adiabatic laspe = -9.8˚C/km = -9.8e-3
 
 # Looking for significant 
-length(which(dat.uhi$tree.pval<0.05))/nrow(dat.uhi) # Significant tree effect in 93% of cities
-length(which(dat.uhi$tree.cooling<0 & dat.uhi$tree.pval<0.05))/nrow(dat.uhi) # Significant tree cooling effect in 90% of cities
+summary(dat.uhi[dat.uhi$tree.pval<0.05 & dat.filter,])
+length(which(dat.uhi$tree.pval<0.05 & dat.filter))/nrow(dat.uhi[dat.filter,]) # Significant tree effect in 93% of cities
+length(which(dat.uhi$tree.cooling<0 & dat.uhi$tree.pval<0.05 & dat.filter))/nrow(dat.uhi[dat.filter,]) # Significant tree cooling effect in 90% of cities
 # Seeing which tree has warming
+length(which(dat.uhi$tree.pval<0.05 & dat.uhi$tree.cooling>0))
 summary(dat.uhi[dat.uhi$tree.pval<0.05 & dat.uhi$tree.cooling>0,])
 t.test(dat.uhi[dat.uhi$tree.pval<0.05 & dat.uhi$tree.cooling<0,"tree.mean"], dat.uhi[dat.uhi$tree.pval<0.05 & dat.uhi$tree.cooling>0,"tree.mean"])
 t.test(dat.uhi[dat.uhi$tree.pval<0.05 & dat.uhi$tree.cooling<0,"tree.sd"], dat.uhi[dat.uhi$tree.pval<0.05 & dat.uhi$tree.cooling>0,"tree.sd"])
