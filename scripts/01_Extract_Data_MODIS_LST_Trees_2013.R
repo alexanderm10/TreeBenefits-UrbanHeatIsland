@@ -488,7 +488,7 @@ for(i in 1:nrow(cities.use)){
   # cities.use[i,"correlation"] <- sum.lm$r.squared
   # cities.use[i,"slope"] <- sum.lm$coefficients[2,1] 
   
-  write.csv(data.frame(cities.use), "../data_processed/cities_summary_sdei_v4.csv", row.names=F, overwrite=T)
+  write.csv(data.frame(cities.use), "../data_processed/cities_summary_sdei_v4.csv", row.names=F)
   rm(ocean.city, lakes.city, river.city)
 } # End city loop
 # cities.use <- cities.use[,!names(cities.use) %in% c("july.mean", "july.sd", "july.max", "july.min")]
