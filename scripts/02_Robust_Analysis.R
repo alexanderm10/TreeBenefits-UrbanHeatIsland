@@ -72,7 +72,9 @@ for(i in 1:nrow(dat.uhi)){
   # Add a couple QAQC flags
   dat.uhi[i,"n.cells.tdev"] <- length(which(!is.na(dat.city$temp.dev.summer)))
   dat.uhi[i,"prop.missing"] <- length(which(is.na(dat.city$temp.dev.summer)))/nrow(dat.city)
-  dat.uhi[i,"tree.90"] <- quantile(dat.city$cover.tree, 0.9)
+  dat.uhi[i, "prop.tree.low"] <- length(which(dat.city$cover.tree<10))/length(which(!is.na(dat.city$cover.tree)))
+  dat.uhi[i,"tree.10"] <- quantile(dat.city$cover.tree, 0.1, na.rm=T)
+  dat.uhi[i,"tree.90"] <- quantile(dat.city$cover.tree, 0.9, na.rm=T)
   
   dat.city <- dat.city[!is.na(dat.city$temp.dev.summer),]
   summary(dat.city)
@@ -156,6 +158,8 @@ dat.uhi$WWF_BIOME <- as.factor(dat.uhi$WWF_BIOME)
 dat.uhi$model.type <- as.factor(dat.uhi$model.type)
 summary(dat.uhi)
 
+write.csv(dat.uhi, "../data_processed/analysis_cities_summary_sdei_v5.csv", row.names=F)
+
 # dat.uhi[is.na(dat.uhi$gam.r2),]
 
 dim(dat.uhi)
@@ -174,33 +178,46 @@ mean(dat.uhi$tree.max); sd(dat.uhi$tree.max)
 median(dat.uhi$tree.max)
 quantile(dat.uhi$tree.max, c(0.025, 0.975))
 
+hist(dat.uhi$tree.10)
+mean(dat.uhi$tree.10); sd(dat.uhi$tree.10)
+median(dat.uhi$tree.10)
+quantile(dat.uhi$tree.10, c(0.025, 0.975))
+
+hist(dat.uhi$tree.90)
+mean(dat.uhi$tree.90); sd(dat.uhi$tree.90)
+median(dat.uhi$tree.90)
+quantile(dat.uhi$tree.90, c(0.025, 0.975))
+
 # Creating criteria by which to exclude results
 summary(dat.uhi[dat.uhi$tree.cooling< -10,])
-dat.filter <- dat.uhi$prop.missing<0.1 & dat.uhi$tree.90>10
+
 
 # Model Summary
 hist(dat.uhi$gam.r2)
 range(dat.uhi$gam.r2)
 mean(dat.uhi$gam.r2); sd(dat.uhi$gam.r2)
-summary(dat.uhi$tree.slope)
+summary(dat.uhi$tree.slope.lin)
 summary(dat.uhi$elevation.slope) # adiabatic laspe = -9.8˚C/km = -9.8e-3
 
 # Looking for significant 
-summary(dat.uhi[dat.uhi$tree.pval<0.05 & dat.filter,])
-length(which(dat.uhi$tree.pval<0.05 & dat.filter))/nrow(dat.uhi[dat.filter,]) # Significant tree effect in 93% of cities
-length(which(dat.uhi$tree.cooling<0 & dat.uhi$tree.pval<0.05 & dat.filter))/nrow(dat.uhi[dat.filter,]) # Significant tree cooling effect in 90% of cities
+dat.filter <- dat.uhi$prop.missing<0.3 & dat.uhi$tree.90>10
+cool.filter <- dat.filter & dat.uhi$tree.pval<0.05 & dat.uhi$tree.cooling<0
+warm.filter <- dat.filter & dat.uhi$tree.pval<0.05 & dat.uhi$tree.cooling>0
+
+summary(dat.uhi[cool.filter,])
+summary(dat.uhi[warm.filter,])
+dat.uhi[dat.uhi$tree.cooling< -10,]
+
+length(which(dat.uhi$tree.pval<0.05))/nrow(dat.uhi[,]) # Significant tree effect in 93% of ALL cities, even with bad data
+length(which(cool.filter | warm.filter))/nrow(dat.uhi[dat.filter,]) # Significant tree effect in 97% of cities
+length(which(cool.filter))/nrow(dat.uhi[dat.filter,]) # Significant tree cooling effect in 96% of cities
 # Seeing which tree has warming
-length(which(dat.uhi$tree.pval<0.05 & dat.uhi$tree.cooling>0))
-summary(dat.uhi[dat.uhi$tree.pval<0.05 & dat.uhi$tree.cooling>0,])
-t.test(dat.uhi[dat.uhi$tree.pval<0.05 & dat.uhi$tree.cooling<0,"tree.mean"], dat.uhi[dat.uhi$tree.pval<0.05 & dat.uhi$tree.cooling>0,"tree.mean"])
-t.test(dat.uhi[dat.uhi$tree.pval<0.05 & dat.uhi$tree.cooling<0,"tree.sd"], dat.uhi[dat.uhi$tree.pval<0.05 & dat.uhi$tree.cooling>0,"tree.sd"])
-t.test(dat.uhi[dat.uhi$tree.pval<0.05 & dat.uhi$tree.cooling<0,"gam.r2"], dat.uhi[dat.uhi$tree.pval<0.05 & dat.uhi$tree.cooling>0,"gam.r2"])
+length(which(warm.filter))
+dat.uhi[warm.filter,] 
 
-hist(dat.uhi$tree.slope)
-mean(dat.uhi$tree.slope); sd(dat.uhi$tree.slope)
-median(dat.uhi$tree.slope)
-quantile(dat.uhi$tree.slope, c(0.025, 0.975))
-
+t.test(dat.uhi[cool.filter,"tree.mean"], dat.uhi[warm.filter,"tree.mean"])
+t.test(dat.uhi[cool.filter,"tree.sd"], dat.uhi[warm.filter,"tree.sd"])
+t.test(dat.uhi[cool.filter,"gam.r2"], dat.uhi[warm.filter,"gam.r2"])
 
 hist(dat.uhi$tree.cooling)
 mean(dat.uhi$tree.cooling); sd(dat.uhi$tree.cooling)
@@ -213,15 +230,9 @@ median(dat.uhi$tree.puhi)
 quantile(dat.uhi$tree.puhi, c(0.025, 0.975))
 
 
-hist(dat.uhi$D_T_DIFF[dat.uhi$D_T_DIFF<=2])
-hist(dat.uhi$tree.puhi)
-hist(dat.uhi$tree.cooling)
-hist(dat.uhi$tree.slope)
-
-dat.uhi <- dat.uhi[dat.uhi$tree.puhi>=-1,] # Can't have >100% cooling
-summary(dat.uhi)
+# dat.uhi <- dat.uhi[dat.uhi$tree.puhi>=-1,] # Can't have >100% cooling
+# summary(dat.uhi)
 # dat.uhi <- dat.uhi[dat.uhi$tree.cooling>=-4,]
-
 
 summary(dat.uhi[dat.uhi$tree.slope>0,])
 
@@ -243,17 +254,15 @@ quantile(dat.uhi$tree.slope, c(0.025, 0.975))
 # ---------------------------------
 # Making some figures
 # ---------------------------------
+path.figs <- "../figures/v5"
+dir.create(path.figs, recursive=T, showWarnings=F)
+
 # Creating a categorical, binned warming response
 dat.uhi$TreeEffect <- round(dat.uhi$tree.cooling*2)/2 # To the nearest 0.5 degree
 dat.uhi$TreeEffect2 <- round(dat.uhi$tree.cooling) # To the nearest degree
 summary(dat.uhi)
 length(unique(dat.uhi$TreeEffect))
 
-dat.uhi$TreeSlope <- round(dat.uhi$tree.slope*20)/20
-summary(dat.uhi)
-length(unique(dat.uhi$TreeSlope))
-
-dim(dat.uhi[dat.uhi$tree.pval>=0.05,])
 
 # bins <- 100
 # cols <- c("darkblue","darkred")
@@ -263,15 +272,13 @@ dim(dat.uhi[dat.uhi$tree.pval>=0.05,])
 # names(cuts) <- sapply(cuts,function(t) cut.cols[which(as.character(t) == levels(cuts))])
 # 
 effect.lims <- seq(-1*max(abs(dat.uhi$TreeEffect)), 1*max(abs(dat.uhi$TreeEffect)), by=0.5)
-slope.lims <- seq(-1*max(abs(dat.uhi$TreeSlope)), 1*max(abs(dat.uhi$TreeSlope)), by=0.05)
 effect.palette <- colorRampPalette(brewer.pal(11, "BrBG"))(length(effect.lims))
-slope.palette <- colorRampPalette(brewer.pal(11, "BrBG"))(length(slope.lims))
 
 effect.lims2 <- seq(-1*max(abs(dat.uhi$TreeEffect2)), 1*max(abs(dat.uhi$TreeEffect2)), by=1)
 effect.palette2 <- colorRampPalette(brewer.pal(11, "BrBG"))(length(effect.lims2))
 # length(unique())
 
-png("../figures/TreeBenefits_UrbanHeatIsland_TreeCover_Map.png", height=4, width=8, units="in", res=220)
+png(file.path(path.figs, "TreeBenefits_UrbanHeatIsland_TreeCover_Map.png"), height=4, width=8, units="in", res=220)
 world <- map_data("world")
 ggplot(data=dat.uhi) +
   coord_equal(expand=0, ylim=c(-65,80)) +
@@ -284,7 +291,7 @@ ggplot(data=dat.uhi) +
   theme(legend.position="top")
 dev.off()
 
-png("../figures/TreeBenefits_UrbanHeatIsland_TreeCover_Max_Map.png", height=4, width=8, units="in", res=220)
+png(file.path(path.figs, "TreeBenefits_UrbanHeatIsland_TreeCover_Max_Map.png"), height=4, width=8, units="in", res=220)
 world <- map_data("world")
 ggplot(data=dat.uhi) +
   coord_equal(expand=0, ylim=c(-65,80)) +
@@ -297,69 +304,31 @@ ggplot(data=dat.uhi) +
   theme(legend.position="top")
 dev.off()
 
-
-ggplot(data=dat.uhi) +
-  geom_point(aes(x=tree.mean, y=tree.cooling, color=tree.slope)) +
-  scale_colour_distiller(name="Tree Effect\n(deg. C / % canopy)", palette=rev("BrBG"), limits=c(-1,1)*max(abs(dat.uhi$tree.slope))) +
-  theme_bw() +
-  theme(panel.background=element_rect(fill="black"),
-        panel.grid = element_blank())
-
-png("../figures/TreeBenefits_UrbanHeatIsland_TreeMax_v_TreeSlope.png", height=4, width=8, units="in", res=220)
-ggplot(data=dat.uhi) +
-  facet_grid(model.type~., scales="free_y") +
-  geom_point(data=dat.uhi[dat.uhi$tree.pval<0.05,], aes(x=tree.max, y=tree.slope), size=2) +
-  geom_point(data=dat.uhi[dat.uhi$tree.pval>=0.05,], aes(x=tree.max, y=tree.slope), color="gray70") +
-  stat_smooth(data=dat.uhi[dat.uhi$tree.pval<0.05,], aes(x=tree.max, y=tree.slope)) +
-  # scale_colour_distiller(name="Tree Effect\n(deg. C)", palette=rev("BrBG"), limits=c(-1,1)*max(abs(dat.uhi$tree.effect))) +
-  theme_bw() 
-dev.off()
-
-ggplot(data=dat.uhi) +
-  facet_grid(model.type~., scales="free_y") +
-  geom_point(data=dat.uhi[dat.uhi$tree.pval<0.05,], aes(x=tree.mean, y=tree.slope), size=2) +
-  geom_point(data=dat.uhi[dat.uhi$tree.pval>=0.05,], aes(x=tree.mean, y=tree.slope), color="gray70") +
-  # scale_colour_distiller(name="Tree Effect\n(deg. C)", palette=rev("BrBG"), limits=c(-1,1)*max(abs(dat.uhi$tree.effect))) +
-  theme_bw() 
-
-png("../figures/TreeBenefits_UrbanHeatIsland_TreeSlope_histogram_GAM.png", height=4, width=8, units="in", res=220)
-ggplot(data=dat.uhi) +
-  facet_wrap(~model.type, scales="free", ncol=1) +
-  coord_cartesian(expand=0) +
-  geom_histogram(aes(x=factor(TreeSlope), fill=factor(TreeSlope)), stat="count", width=1) +
-  geom_histogram(data=dat.uhi[dat.uhi$tree.pval>=0.05,],aes(x=factor(TreeSlope)), fill="gray50", stat="count", width=1) +
-  # geom_histogram(aes(x=tree.cooling, fill=cut(tree.cooling, 100)), binwidth=1, show.legend=F) +
-  # geom_histogram(aes(x=tree.cooling, fill=), binwidth=1, show.legend=F) +
-  scale_fill_manual(name="Tree Effect\n(deg. C / % canopy)", values=rev(slope.palette)) +
-  # scale_fill_brewer(palette=rev("BrBG"), limits=c(-1,1)*max(abs(dat.uhi$tree.cooling))) +
-  guides(fill=F) +
-  labs(x="Tree Effect (deg. C / % canopy)", y="City Count") +
-  theme_bw() 
-dev.off()
-
-# Need to change to using Cowplot to get different scales
-png("../figures/TreeBenefits_UrbanHeatIsland_TreeSlope_Map_GAM.png", height=4, width=8, units="in", res=220)
+png(file.path(path.figs, "TreeBenefits_UrbanHeatIsland_TreeModel_Map.png"), height=4, width=8, units="in", res=220)
 world <- map_data("world")
 ggplot(data=dat.uhi) +
-  facet_grid(model.type~.) +
   coord_equal(expand=0, ylim=c(-65,80)) +
   geom_path(data=world, aes(x=long, y=lat, group=group)) +
-  geom_point(aes(x=LONGITUDE, y=LATITUDE, color=tree.slope), size=5) +
-  scale_colour_distiller(name="Tree Effect\n(deg. C / % canopy)", palette=rev("BrBG"), limits=c(-1,1)*max(abs(dat.uhi$tree.slope))) +
+  geom_point(data=dat.uhi[!dat.filter,], aes(x=LONGITUDE, y=LATITUDE, color="data deficient"), size=1.5) +
+  geom_point(data=dat.uhi[dat.filter & dat.uhi$tree.pval>=0.05,], aes(x=LONGITUDE, y=LATITUDE, color="no effect"), size=2) +
+  geom_point(data=dat.uhi[dat.filter & dat.uhi$tree.pval<0.05,], aes(x=LONGITUDE, y=LATITUDE, color=model.type), size=3) +
+  scale_color_manual(name="Model Type", values=c("gray70", "#a6cee3", "#1f78b4", "gray30")) +
+  # scale_colour_distiller(name="Maximum Tree Cover", palette=rev("BrBG"), trans="reverse") +
   # scale_color_gradient2(low="turquoise4", mid="wheat", high="sienna3", midpoint=0) +
   # scale_color_gradient(low="003333", high="brown", midpoint=0) +
   theme_bw() +
   theme(legend.position="top")
 dev.off()
 
+
 effect.lims[which(effect.lims %in% unique(dat.uhi$TreeEffect))]
 effect.use <- effect.palette[which(effect.lims %in% unique(dat.uhi$TreeEffect))]
 effect.palette[26]
-png("../figures/TreeBenefits_UrbanHeatIsland_TreeCooling_histogram_GAM.png", height=4, width=8, units="in", res=220)
-ggplot(data=dat.uhi[,]) +
+png(file.path(path.figs, "TreeBenefits_UrbanHeatIsland_TreeCooling_histogram_GAM.png"), height=4, width=8, units="in", res=220)
+ggplot(data=dat.uhi[dat.filter,]) +
   coord_cartesian(expand=0) +
   geom_histogram(aes(x=factor(TreeEffect2), fill=factor(TreeEffect2)), stat="count", width=1) +
-  geom_histogram(data=dat.uhi[dat.uhi$tree.pval>=0.05,],aes(x=factor(TreeEffect2)), fill="gray50", stat="count", width=1) +
+  geom_histogram(data=dat.uhi[dat.filter & dat.uhi$tree.pval>=0.05,],aes(x=factor(TreeEffect2)), fill="gray50", stat="count", width=1) +
   # geom_histogram(aes(x=tree.cooling, fill=cut(tree.cooling, 100)), binwidth=1, show.legend=F) +
   # geom_histogram(aes(x=tree.cooling, fill=), binwidth=1, show.legend=F) +
   scale_fill_manual(name="Tree Effect\non Temperature\n(deg. C)", values=rev(effect.palette2)[which(effect.lims2 %in% unique(dat.uhi$TreeEffect2))]) +
@@ -370,13 +339,14 @@ ggplot(data=dat.uhi[,]) +
         panel.grid = element_blank())
 dev.off()
 
-png("../figures/TreeBenefits_UrbanHeatIsland_TreeCooling_Map_GAM.png", height=4, width=8, units="in", res=220)
+png(file.path(path.figs, "TreeBenefits_UrbanHeatIsland_TreeCooling_Map_GAM.png"), height=4, width=8, units="in", res=220)
 world <- map_data("world")
 ggplot(data=dat.uhi) +
   coord_equal(expand=0, ylim=c(-65,80)) +
   geom_path(data=world, aes(x=long, y=lat, group=group)) +
-  geom_point(data=dat.uhi[dat.uhi$tree.pval>=0.05,], aes(x=LONGITUDE, y=LATITUDE), color="gray50", size=3) +
-  geom_point(data=dat.uhi[dat.uhi$tree.pval<0.05,], aes(x=LONGITUDE, y=LATITUDE, color=tree.cooling), size=5) +
+  geom_point(data=dat.uhi[!dat.filter,], aes(x=LONGITUDE, y=LATITUDE), size=1, color="gray70") +
+  geom_point(data=dat.uhi[dat.filter & dat.uhi$tree.pval>=0.05,], aes(x=LONGITUDE, y=LATITUDE), color="gray30", size=3) +
+  geom_point(data=dat.uhi[dat.filter & dat.uhi$tree.pval<0.05,], aes(x=LONGITUDE, y=LATITUDE, color=tree.cooling), size=3) +
   scale_colour_distiller(name="Tree Effect\non Temperature\n(deg. C)", palette=rev("BrBG"), limits=c(-1,1)*max(abs(dat.uhi$tree.cooling))) +
   # scale_color_gradient2(low="turquoise4", mid="wheat", high="sienna3", midpoint=0) +
   # scale_color_gradient(low="003333", high="brown", midpoint=0) +
@@ -384,18 +354,52 @@ ggplot(data=dat.uhi) +
   theme(legend.position="top")
 dev.off()
 
-png("../figures/TreeBenefits_UrbanHeatIsland_TreeCooling_Map_GAM_TreeWarming.png", height=4, width=8, units="in", res=220)
+png(file.path(path.figs, "TreeBenefits_UrbanHeatIsland_TreeCooling_Map_GAM_categorical.png"), height=4, width=8, units="in", res=220)
 world <- map_data("world")
 ggplot(data=dat.uhi) +
   coord_equal(expand=0, ylim=c(-65,80)) +
   geom_path(data=world, aes(x=long, y=lat, group=group)) +
-  # geom_point(data=dat.uhi[dat.uhi$tree.pval>=0.05,], aes(x=LONGITUDE, y=LATITUDE), color="gray50", size=3) +
-  geom_point(data=dat.uhi[dat.uhi$tree.pval<0.05 & dat.uhi$tree.cooling>0,], aes(x=LONGITUDE, y=LATITUDE, color=tree.cooling), size=5) +
-  scale_colour_distiller(name="Tree Effect\non Temperature\n(deg. C)", palette=rev("BrBG"), limits=c(-1,1)*max(abs(dat.uhi$tree.cooling))) +
+  geom_point(data=dat.uhi[!dat.filter,], aes(x=LONGITUDE, y=LATITUDE), size=1, color="gray70") +
+  geom_point(data=dat.uhi[dat.filter & dat.uhi$tree.pval>=0.05,], aes(x=LONGITUDE, y=LATITUDE), color="gray30", size=3) +
+  geom_point(data=dat.uhi[dat.filter & dat.uhi$tree.pval<0.05,], aes(x=LONGITUDE, y=LATITUDE, color=factor(TreeEffect2)), size=3) +
+  scale_color_manual(name="Tree Effect\non Temperature\n(deg. C)", values=rev(effect.palette2)[which(effect.lims2 %in% unique(dat.uhi$TreeEffect2))]) +
+  
   # scale_color_gradient2(low="turquoise4", mid="wheat", high="sienna3", midpoint=0) +
   # scale_color_gradient(low="003333", high="brown", midpoint=0) +
   theme_bw() +
   theme(legend.position="top")
 dev.off()
+
+
+ggplot(data=dat.uhi[dat.filter,]) +
+  geom_point(data=dat.uhi[!dat.filter,], aes(x=tree.mean, y=tree.cooling), color="gray50") +
+  geom_point(aes(x=tree.mean, y=tree.cooling)) +
+  theme_bw()
+
+ggplot(data=dat.uhi[dat.filter,]) +
+  geom_point(data=dat.uhi[!dat.filter,], aes(x=tree.max, y=tree.cooling), color="gray50") +
+  geom_point(aes(x=tree.max, y=tree.cooling)) +
+  theme_bw()
+
+ggplot(data=dat.uhi[dat.filter,]) +
+  geom_point(data=dat.uhi[!dat.filter,], aes(x=tree.90, y=tree.cooling), color="gray50") +
+  geom_point(aes(x=tree.90, y=tree.cooling)) +
+  theme_bw()
+
+ggplot(data=dat.uhi[dat.filter,]) +
+  geom_point(data=dat.uhi[!dat.filter,], aes(x=temp.mean, y=tree.cooling), color="gray50") +
+  geom_point(aes(x=temp.mean, y=tree.cooling)) +
+  theme_bw()
+
+ggplot(data=dat.uhi[dat.filter,]) +
+  geom_point(data=dat.uhi[!dat.filter,], aes(x=LATITUDE, y=tree.cooling), color="gray50") +
+  geom_point(aes(x=LATITUDE, y=tree.cooling)) +
+  theme_bw()
+
+
+ggplot(data=dat.uhi[dat.filter,]) +
+  geom_point(data=dat.uhi[!dat.filter,], aes(x=elev.sd, y=tree.cooling), color="gray50") +
+  geom_point(aes(x=elev.sd, y=tree.cooling)) +
+  theme_bw()
 
 # ---------------------------------
