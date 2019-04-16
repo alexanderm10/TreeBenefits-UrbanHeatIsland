@@ -122,6 +122,7 @@ fjan.split <- stringr::str_split(fjan, "[.]")
 fjan.df <- data.frame(file=fjan, matrix(unlist(fjan.split), ncol=length(fjan.split[[1]]), byrow = T))
 names(fjan.df) <- c("file", "dataset", "date.stamp", "tile", "version", "process.stamp", "extension")
 summary(fjan.df)
+length(unique(fjan.df$date.stamp))
 
 fjan.df[,c("xmin", "xmax", "ymin", "ymax")] <- NA
 for(i in 1:nrow(fjan.df)){
@@ -137,6 +138,7 @@ fjul.split <- stringr::str_split(fjul, "[.]")
 fjul.df <- data.frame(file=fjul, matrix(unlist(fjul.split), ncol=length(fjul.split[[1]]), byrow = T))
 names(fjul.df) <- c("file", "dataset", "date.stamp", "tile", "version", "process.stamp", "extension")
 summary(fjul.df)
+length(unique(fjul.df$date.stamp))
 
 fjul.df[,c("xmin", "xmax", "ymin", "ymax")] <- NA
 for(i in 1:nrow(fjul.df)){
@@ -280,7 +282,7 @@ for(i in 1:nrow(cities.use)){
     }# end ifelse multiple file mosaicing
 
     # Iteratively removing 6-sigma outliers
-    met.city <- filter.outliers(RASTER=met.city, n.sigma = 6)
+    met.city <- filter.outliers(RASTER=met.city, n.sigma=4)
     # plot(met.city); plot(city.sp, add=T)
 
     # Crop & mask out our city area
@@ -353,7 +355,7 @@ for(i in 1:nrow(cities.use)){
   }
   
   
-  elev.city <- filter.outliers(RASTER = elev.city, n.sigma = 6)
+  elev.city <- filter.outliers(RASTER = elev.city, n.sigma=4)
   elev.city <- resample(elev.city, tdev)
   
   elev.city <- mask(elev.city, city.sp)
@@ -417,11 +419,11 @@ for(i in 1:nrow(cities.use)){
     }
   } 
   
+  tree.city[is.na(tree.city)] <- 0 # anything not with trees, should be 0 bc land w/ no trees or water; note: do this before resampling otherwise outliers become 0 instead of NA
+  
   # Iteratively removing 6-sigma outliers from large scene; not local area
   tree.city <- filter.outliers(RASTER = tree.city, n.sigma=4)
 
-  # tree.city <- crop(tree.city, extent(city.sp)+c(-1,1-1,1)) # crop to reduce our area, but leave a buffer for the resamp
-  tree.city[is.na(tree.city)] <- 0 # anything not with trees, should be 0 bc land w/ no trees or water
 
   tree.city <- resample(tree.city, tdev, na.rm=F) # Do this next to make similar to surface temp
   tree.city <- crop(tree.city, extent(city.sp)) # Re-crop now that we've resampled & don't have edge effects
