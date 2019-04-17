@@ -354,8 +354,7 @@ for(i in 1:nrow(cities.use)){
     elev.city <- mosaic(city1, city2, fun=mean)
   }
   
-  
-  elev.city <- filter.outliers(RASTER = elev.city, n.sigma=4)
+  # elev.city <- filter.outliers(RASTER = elev.city, n.sigma=4)
   elev.city <- resample(elev.city, tdev)
   
   elev.city <- mask(elev.city, city.sp)
@@ -422,8 +421,7 @@ for(i in 1:nrow(cities.use)){
   tree.city[is.na(tree.city)] <- 0 # anything not with trees, should be 0 bc land w/ no trees or water; note: do this before resampling otherwise outliers become 0 instead of NA
   
   # Iteratively removing 6-sigma outliers from large scene; not local area
-  tree.city <- filter.outliers(RASTER = tree.city, n.sigma=4)
-
+  # tree.city <- filter.outliers(RASTER = tree.city, n.sigma=6)
 
   tree.city <- resample(tree.city, tdev, na.rm=F) # Do this next to make similar to surface temp
   tree.city <- crop(tree.city, extent(city.sp)) # Re-crop now that we've resampled & don't have edge effects
