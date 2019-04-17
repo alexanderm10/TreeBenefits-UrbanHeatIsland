@@ -19,6 +19,9 @@
 
 library(sp); library(rgdal); library(raster); library(rgeos); library(maps)
 
+# Set the buffer size to re-calculate urban heat island effect
+city.buff <- 10e3 # in meters; sdei dataset foudn 10km to have the least overlap with nearby cities
+
 # Using the SDEI urban database since it has additional info
 sdei.urb <- readOGR("/Volumes/Morton_SDM/sdei-global-uhi-2013-shp/shp/sdei-global-uhi-2013.shp")
 summary(sdei.urb)
@@ -36,7 +39,7 @@ hist(cities.use$D_T_DIFF)
 # data.frame(cities.use[cities.use$URB_N_MEAN<10,])
 
 # Plot the map to get a better feel for geographic distribution
-png("../data_processed/cities_used_spdei_v5.png", height=4, width=8, units="in", res=120)
+png("../data_processed/cities_used_spdei_v6.png", height=4, width=8, units="in", res=120)
 map(col="red", lwd=0.5)
 plot(cities.use, add=T)
 dev.off()
@@ -92,10 +95,15 @@ lakes <- spTransform(lakes, projection(cities.use))
 rivers <- spTransform(rivers, projection(cities.use))
 
 
-# Doing some indexing of tree cover data
-path.trees <- "/Volumes/Morton_SDM/TreeCover_MOD44Bv6/2013/HEGOUT/"
+# Doing some indexing of tree cover data; all of these were extracted from the same file & should have the same indices
+path.trees <- "/Volumes/Morton_SDM/TreeCover_MOD44Bv6/2013/HEGOUT_TreeCover/" # Percent Tree Cover
+path.veg <- "/Volumes/Morton_SDM/TreeCover_MOD44Bv6/2013/HEGOUT_Veg-NonTree/" # Percent cover of non-tree vegetation
+path.noveg <- "/Volumes/Morton_SDM/TreeCover_MOD44Bv6/2013/HEGOUT_NoVeg/" # Percent cover of unvegetated surfaces
 ftree <- dir(path.trees, ".tif")
 ftree <- ftree[which(substr(ftree, nchar(ftree)-3, nchar(ftree))==".tif")] # ignore anything that's not a .tif
+fveg <- dir(path.veg, ".tif")
+fveg <- fveg[which(substr(fveg, nchar(fveg)-3, nchar(fveg))==".tif")] # ignore anything that's not a .tif
+
 ftree.split <- stringr::str_split(ftree, "[.]")
 ftree.df <- data.frame(file=ftree, matrix(unlist(ftree.split), ncol=length(ftree.split[[1]]), byrow = T))
 names(ftree.df) <- c("file", "dataset", "date.stamp", "tile", "version", "process.stamp", "extension")
@@ -112,9 +120,16 @@ for(i in 1:nrow(ftree.df)){
 summary(ftree.df)
 
 
-# Setting up file paths and directories for the temperature data
-path.01 <- "/Volumes/Morton_SDM/SurfTemp_MODIS_MODA2/2013/01-02/HEGOUT/"
-path.07 <- "/Volumes/Morton_SDM/SurfTemp_MODIS_MODA2/2013/07-08/HEGOUT/"
+# Setting up file paths and directories for the temperature data; QA files should have same indexing
+path.01 <- "/Volumes/Morton_SDM/SurfTemp_MODIS_MODA2/2013/01-02/HEGOUT_LST_Day/"
+path.01.qa <- "/Volumes/Morton_SDM/SurfTemp_MODIS_MODA2/2013/01-02/HEGOUT_LST_Day_QA/"
+path.07 <- "/Volumes/Morton_SDM/SurfTemp_MODIS_MODA2/2013/07-08/HEGOUT_LST_Day/"
+path.07.qa <- "/Volumes/Morton_SDM/SurfTemp_MODIS_MODA2/2013/07-08/HEGOUT_LST_Day_QA/"
+
+source("MODIS_QA_Flags_Encoding.R") # Source a file where we figure out and set our encoding flags
+
+fjan.qa <- dir(path.01, ".tif")
+fjan.qa <- fjan.qa[which(substr(fjan.qa, nchar(fjan.qa)-3, nchar(fjan.qa))==".tif")] # ignore anything that's not a .tif
 
 fjan <- dir(path.01, ".tif")
 fjan <- fjan[which(substr(fjan, nchar(fjan)-3, nchar(fjan))==".tif")] # ignore anything that's not a .tif
@@ -131,6 +146,9 @@ for(i in 1:nrow(fjan.df)){
   fjan.df[i,c("xmin", "xmax", "ymin", "ymax")] <- extent(tmp)
 }
 summary(fjan.df)
+
+fjul.qa <- dir(path.07, ".tif")
+fjul.qa <- fjul.qa[which(substr(fjul.qa, nchar(fjul.qa)-3, nchar(fjul.qa))==".tif")] # ignore anything that's not a .tif
 
 fjul <- dir(path.07, ".tif")
 fjul <- fjul[which(substr(fjul, nchar(fjul)-3, nchar(fjul))==".tif")] # ignore anything that's not a .tif
@@ -176,7 +194,7 @@ filter.outliers <- function(RASTER, n.sigma=6){
 # Looping through Cities
 # -----------------------------------------
 # cities.use$NAME
-path.save <- "../data_processed/cities_full_sdei_v5"
+path.save <- "../data_processed/cities_full_sdei_v6"
 dir.create(path.save, recursive=T, showWarnings = F)
 pb <- txtProgressBar(min=0, max=nrow(cities.use), style=3)
 # for(i in 1:nrow(cities.use)){
@@ -191,19 +209,28 @@ for(i in 1:nrow(cities.use)){
   
   setTxtProgressBar(pb, i)
   # Subset our shapefile
-  city.sp <- cities.use[i,]
+  city.raw <- cities.use[i,]
   # data.frame(city.sp)
-  city.name <- city.sp$NAME
+  city.name <- city.raw$NAME
   city.name <- sub(c("[?]"), "X", city.name) # Getting rid of the ? infront of some cities
   city.name <- sub(c("[?]"), "X", city.name) # Being lazy and doing this twice just in case to get rid of the rare ??
+  
+  # Create a 10km buffer around city area to analyze UHI
+  # -- Note: To do this we need to take make it into a projection with m as using to do this
+  # Stealing from the oceans projection
+  city.sp <- spTransform(city.raw, CRS("+init=epsg:3347"))
+  city.sp <- gBuffer(city.sp, width=10e3)
+  city.sp <- spTransform(city.sp, projection(city.raw))
   bb.city <- bbox(city.sp)
+  # plot(city.sp, col="blue"); plot(city.raw, col="red", add=T)
+  
   
   ocean.city <- lakes.city <- river.city <- NULL
   ocean.city <- crop(oceans, extent(city.sp))
   lakes.city <- crop(lakes, extent(city.sp))
   river.city <- crop(rivers, extent(city.sp))
   
-  # plot(city.sp);
+  # plot(city.sp); plot(city.raw, add=T)
   # if(length(ocean.city)>0) plot(ocean.city, add=T, col="blue3");
   # if(length(lakes.city)>0) plot(lakes.city, add=T, col="cadetblue2");
   # if(length(river.city)>0) plot(river.city, add=T, col="dodgerblue2")
@@ -223,10 +250,14 @@ for(i in 1:nrow(cities.use)){
     # If mostly in northern hemishpere use July
     met.path <- path.07
     met.df <- fjul.df
+    qa.path <- path.07.qa
+    fqa <- fjul.qa
   } else {
     # Else use January
     met.path <- path.01
     met.df <- fjan.df
+    qa.path <- path.01.qa
+    fqa <- fjan.qa
   } # End N/S identification
   
   # 2. Figure out which rasters to process
@@ -246,17 +277,33 @@ for(i in 1:nrow(cities.use)){
   tdev <- stack()
   for(NOW in unique(met.df[f.met, "date.stamp"])){
     files.now <- met.df[f.met,]
-    files.now <- files.now[files.now$date.stamp==NOW,"file"]
+    ind.now <- which(files.now$date.stamp==NOW)
+    
+    files.now <- files.now[ind.now,"file"]
+    
+    qa.now <- fqa[f.met]
+    qa.now <- qa.now[ind.now]
     
     if(length(files.now)==1){
       met.city <- raster(file.path(met.path, files.now))
+      met.city[met.city==0] <- NA
       met.city <- met.city*0.02
-      met.city[met.city<=250] <- NA # 250k = -23˚C = -9.7F; almost certainly not a sumemr temperature
+      
+      qa.city <- raster(file.path(qa.path, qa.now))
+      qa.city[is.na(met.city)] <- NA
       # plot(met.city); plot(city.sp, add=T)
     } else {
       met.city <- raster(file.path(met.path, files.now[1]))
       met.city <- met.city*0.02 # Scale factor from documentation; now in Kelvin
-      met.city[met.city<=250] <- NA # 250k = -23˚C = -9.7F; almost certainly not a sumemr temperature
+      met.city[met.city==0] <- NA # 0 = missing data
+      # plot(met.city); plot(city.sp, add=T)
+      
+      qa.city <- raster(file.path(qa.path, qa.now[1]))
+      qa.city[is.na(met.city)] <- NA # Make this match our missing data
+      # plot(qa.city); plot(city.sp, add=T)
+      
+      met.city[!(qa.city %in% flags.good)] <- NA
+      # plot(qa.city2); plot(city.sp, add=T)
       # plot(met.city); plot(city.sp, add=T)
       
       for(j in 2:length(files.now)){
@@ -323,7 +370,7 @@ for(i in 1:nrow(cities.use)){
   vals.tdev <- getValues(tdev)
   
   # If we can't get good temperature data, skip this; right now this is a pretty low bar, but we'll see
-  if(length(which(!is.na(vals.tdev)))<50 | length(which(!is.na(vals.tmax)))<25) next
+  # if(length(which(!is.na(vals.tdev)))<50 | length(which(!is.na(vals.tmax)))<25) next
   # plot(tmax); plot(city.sp, add=T)
   # plot(tdev); plot(city.sp, add=T)
   # ---------------
@@ -369,6 +416,12 @@ for(i in 1:nrow(cities.use)){
   # elev.city <- filter.outliers(RASTER = elev.city, n.sigma = 6)
   vals.elev <- getValues(elev.city)
   
+  # Use the elevation raster (which is the most reliable) to generate our city/buffer vector
+  elev.raw <- mask(elev.city, city.raw)
+  elev.raw <- getValues(elev.raw)
+  city.buff <- ifelse(is.na(vals.elev) & is.na(elev.raw), NA, 
+                      ifelse(is.na(elev.raw), "buffer", "city"))
+  summary(as.factor(city.buff))
   # plot(elev.city); plot(city.sp, add=T)
   # ---------------
   
@@ -389,18 +442,32 @@ for(i in 1:nrow(cities.use)){
     tree.city[tree.city>100] <- NA
     tree.city[tree.city==0] <- NA
     
+    veg.city <- raster(file.path(path.veg, fveg[f.city]))
+    veg.city[veg.city>100] <- NA
+    veg.city[veg.city==0] <- NA
     # tree.city
   } else {
     tree.city <- raster(file.path(path.trees, ftree.df$file[f.city[1]]))
     tree.city[tree.city>100] <- NA
     tree.city[tree.city<=0] <- NA
+    
+    veg.city <- raster(file.path(path.veg, fveg[f.city[1]]))
+    veg.city[veg.city>100] <- NA
+    veg.city[veg.city==0] <- NA
+    
     # plot(tree.city); plot(city.sp, add=T)
+    # plot(veg.city); plot(city.sp, add=T)
     
     for(j in 2:length(f.city)){
       tree2 <- raster(file.path(path.trees, ftree.df$file[f.city[j]]))
       tree2[tree2>100] <- NA
       tree2[tree2<=0] <- NA
       # plot(tree2, add=T); plot(city.sp, add=T)
+      
+      veg2 <- raster(file.path(path.vegs, fveg[f.city[j]]))
+      veg2[veg2>100] <- NA
+      veg2[veg2<=0] <- NA
+      # plot(veg2, add=T); plot(city.sp, add=T)
       
       ext1 <- extent(tree.city)
       ext2 <- extent(tree2)
@@ -409,32 +476,54 @@ for(i in 1:nrow(cities.use)){
                     min(ext1[3], ext2[3]),
                     max(ext1[4], ext2[4]))
       tree.city <- extend(tree.city, ext.temp)
+      veg.city <- extend(veg.city, ext.temp)
       
       tree2 <- resample(tree2, tree.city)
+      veg2 <- resample(veg2, tree.city)
       # plot(tree2); plot(city.sp, add=T)
       
       tree.city <- mosaic(tree.city, tree2, fun=mean, na.rm=T, tolerance=0.2)
+      veg.city <- mosaic(veg.city, veg2, fun=mean, na.rm=T, tolerance=0.2)
       # plot(tree.city); plot(city.sp, add=T)
+      # plot(veg.city); plot(city.sp, add=T)
     }
   } 
   
-  tree.city[is.na(tree.city)] <- 0 # anything not with trees, should be 0 bc land w/ no trees or water; note: do this before resampling otherwise outliers become 0 instead of NA
+  # anything not with trees, should be 0 bc land w/ no trees or water; note: do this before resampling otherwise outliers become 0 instead of NA
+  tree.city[is.na(tree.city)] <- 0 
+  veg.city[is.na(veg.city)] <- 0 
   
   # Iteratively removing 6-sigma outliers from large scene; not local area
   # tree.city <- filter.outliers(RASTER = tree.city, n.sigma=6)
 
-  tree.city <- resample(tree.city, tdev, na.rm=F) # Do this next to make similar to surface temp
-  tree.city <- crop(tree.city, extent(city.sp)) # Re-crop now that we've resampled & don't have edge effects
+  # Resample to make similar to surface temp
+  tree.city <- resample(tree.city, tdev, na.rm=F) 
+  tree.city <- crop(tree.city, extent(city.sp)) 
+  
+  veg.city <- resample(veg.city, tdev, na.rm=F) 
+  veg.city <- crop(veg.city, extent(city.sp)) 
   
   tree.city <- mask(tree.city, city.sp)
+  veg.city <- mask(veg.city, city.sp)
   
   # Mask out water bodies
-  if(length(ocean.city)>0) tree.city <- mask(tree.city, ocean.city, inverse=T)
-  if(length(lakes.city)>0) tree.city <- mask(tree.city, lakes.city, inverse=T)
-  if(length(river.city)>0) tree.city <- mask(tree.city, river.city, inverse=T)
+  if(length(ocean.city)>0){
+    tree.city <- mask(tree.city, ocean.city, inverse=T)
+    veg.city <- mask(veg.city, ocean.city, inverse=T)
+  } 
+  if(length(lakes.city)>0){
+    tree.city <- mask(tree.city, lakes.city, inverse=T)
+    veg.city <- mask(veg.city, lakes.city, inverse=T)
+  } 
+  if(length(river.city)>0){
+    tree.city <- mask(tree.city, river.city, inverse=T)
+    veg.city <- mask(veg.city, river.city, inverse=T)
+  } 
   # plot(tree.city); plot(city.sp, add=T)
+  # plot(veg.city); plot(city.sp, add=T)
   
   vals.tree <- getValues(tree.city)
+  vals.veg <- getValues(veg.city)
   # ---------------
   
   # ---------------
@@ -451,9 +540,18 @@ for(i in 1:nrow(cities.use)){
   
   # test <- coordinates(tree.city2)
   
-  df.city <- data.frame(Name=city.name, coordinates(tdev), cover.tree=vals.tree, temp.summer=vals.tmax, temp.dev.summer=vals.tdev, elevation=vals.elev)
-  df.city <- df.city[!is.na(df.city$elevation),]
+  df.city <- data.frame(Name=city.name, coordinates(tdev), 
+                        location=city.buff, 
+                        elevation=vals.elev,
+                        temp.summer=vals.tmax, 
+                        temp.dev.summer=vals.tdev,
+                        cover.tree=vals.tree, 
+                        cover.veg=vals.veg
+                        )
+  df.city <- df.city[!is.na(df.city$city.buff),]
   write.csv(df.city, file.path(path.save, paste0(city.name, "_data_full.csv")), row.names=F)
+  
+  
   # summary(df.city)
   lm.city <- lm(temp.dev.summer ~ cover.tree, data=df.city)
   sum.lm <- summary(lm.city)
@@ -468,27 +566,8 @@ for(i in 1:nrow(cities.use)){
   abline(lm.city, col="red", lwd=2); 
   dev.off()
   
-  
-  cities.use[i,"tree.mean"] <- mean(df.city$cover.tree, na.rm=T)
-  cities.use[i,"tree.sd"  ] <- sd(df.city$cover.tree, na.rm=T)
-  cities.use[i,"tree.max" ] <- max(df.city$cover.tree, 0.90, na.rm=T)
-  cities.use[i,"tree.min" ] <- min(df.city$cover.tree, 0.90, na.rm=T)
-  cities.use[i,"elev.mean"] <- mean(df.city$elevation, na.rm=T)
-  cities.use[i,"elev.sd"  ] <- sd(df.city$elevation, na.rm=T)
-  cities.use[i,"elev.max" ] <- max(df.city$elevation, na.rm=T)
-  cities.use[i,"elev.min" ] <- min(df.city$elevation, na.rm=T)
-  cities.use[i,"temp.mean"] <- mean(df.city$temp.summer, na.rm=T)
-  cities.use[i,"temp.sd"  ] <- sd(df.city$temp.summer, na.rm=T)
-  cities.use[i,"temp.max" ] <- max(df.city$temp.summer, na.rm=T)
-  cities.use[i,"temp.min" ] <- min(df.city$temp.summer, na.rm=T)
-  cities.use[i,"tdev.mean"] <- mean(df.city$temp.dev.summer, na.rm=T)
-  cities.use[i,"tdev.sd"  ] <- sd(df.city$temp.dev.summer, na.rm=T)
-  cities.use[i,"tdev.max" ] <- max(df.city$temp.dev.summer, na.rm=T)
-  cities.use[i,"tdev.min" ] <- min(df.city$temp.dev.summer, na.rm=T)
-  # cities.use[i,"correlation"] <- sum.lm$r.squared
-  # cities.use[i,"slope"] <- sum.lm$coefficients[2,1] 
-  
-  write.csv(data.frame(cities.use), "../data_processed/cities_summary_sdei_v5.csv", row.names=F)
+
+  write.csv(data.frame(cities.use), "../data_processed/cities_summary_sdei_v6.csv", row.names=F)
   rm(ocean.city, lakes.city, river.city)
 } # End city loop
 # cities.use <- cities.use[,!names(cities.use) %in% c("july.mean", "july.sd", "july.max", "july.min")]
