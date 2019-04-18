@@ -99,10 +99,13 @@ rivers <- spTransform(rivers, projection(cities.use))
 path.trees <- "/Volumes/Morton_SDM/TreeCover_MOD44Bv6/2013/HEGOUT_TreeCover/" # Percent Tree Cover
 path.veg <- "/Volumes/Morton_SDM/TreeCover_MOD44Bv6/2013/HEGOUT_Veg-NonTree/" # Percent cover of non-tree vegetation
 path.noveg <- "/Volumes/Morton_SDM/TreeCover_MOD44Bv6/2013/HEGOUT_NoVeg/" # Percent cover of unvegetated surfaces
+
 ftree <- dir(path.trees, ".tif")
 ftree <- ftree[which(substr(ftree, nchar(ftree)-3, nchar(ftree))==".tif")] # ignore anything that's not a .tif
 fveg <- dir(path.veg, ".tif")
 fveg <- fveg[which(substr(fveg, nchar(fveg)-3, nchar(fveg))==".tif")] # ignore anything that's not a .tif
+fnoveg <- dir(path.noveg, ".tif")
+fnoveg <- fnoveg[which(substr(fnoveg, nchar(fnoveg)-3, nchar(fnoveg))==".tif")] # ignore anything that's not a .tif
 
 ftree.split <- stringr::str_split(ftree, "[.]")
 ftree.df <- data.frame(file=ftree, matrix(unlist(ftree.split), ncol=length(ftree.split[[1]]), byrow = T))
@@ -445,6 +448,11 @@ for(i in 1:nrow(cities.use)){
     veg.city <- raster(file.path(path.veg, fveg[f.city]))
     veg.city[veg.city>100] <- NA
     veg.city[veg.city==0] <- NA
+    
+    noveg.city <- raster(file.path(path.noveg, fnoveg[f.city]))
+    noveg.city[noveg.city>100] <- NA
+    noveg.city[noveg.city==0] <- NA
+    
     # tree.city
   } else {
     tree.city <- raster(file.path(path.trees, ftree.df$file[f.city[1]]))
@@ -455,8 +463,12 @@ for(i in 1:nrow(cities.use)){
     veg.city[veg.city>100] <- NA
     veg.city[veg.city==0] <- NA
     
+    noveg.city <- raster(file.path(path.noveg, fnoveg[f.city[1]]))
+    noveg.city[noveg.city>100] <- NA
+    noveg.city[noveg.city==0] <- NA
     # plot(tree.city); plot(city.sp, add=T)
     # plot(veg.city); plot(city.sp, add=T)
+    # plot(noveg.city); plot(city.sp, add=T)
     
     for(j in 2:length(f.city)){
       tree2 <- raster(file.path(path.trees, ftree.df$file[f.city[j]]))
@@ -468,6 +480,11 @@ for(i in 1:nrow(cities.use)){
       veg2[veg2>100] <- NA
       veg2[veg2<=0] <- NA
       # plot(veg2, add=T); plot(city.sp, add=T)
+
+      noveg2 <- raster(file.path(path.novegs, fnoveg[f.city[j]]))
+      noveg2[noveg2>100] <- NA
+      noveg2[noveg2<=0] <- NA
+      # plot(noveg2, add=T); plot(city.sp, add=T)
       
       ext1 <- extent(tree.city)
       ext2 <- extent(tree2)
@@ -477,21 +494,26 @@ for(i in 1:nrow(cities.use)){
                     max(ext1[4], ext2[4]))
       tree.city <- extend(tree.city, ext.temp)
       veg.city <- extend(veg.city, ext.temp)
+      noveg.city <- extend(noveg.city, ext.temp)
       
       tree2 <- resample(tree2, tree.city)
       veg2 <- resample(veg2, tree.city)
+      noveg2 <- resample(noveg2, tree.city)
       # plot(tree2); plot(city.sp, add=T)
       
       tree.city <- mosaic(tree.city, tree2, fun=mean, na.rm=T, tolerance=0.2)
       veg.city <- mosaic(veg.city, veg2, fun=mean, na.rm=T, tolerance=0.2)
+      noveg.city <- mosaic(noveg.city, noveg2, fun=mean, na.rm=T, tolerance=0.2)
       # plot(tree.city); plot(city.sp, add=T)
       # plot(veg.city); plot(city.sp, add=T)
+      # plot(noveg.city); plot(city.sp, add=T)
     }
   } 
   
   # anything not with trees, should be 0 bc land w/ no trees or water; note: do this before resampling otherwise outliers become 0 instead of NA
   tree.city[is.na(tree.city)] <- 0 
   veg.city[is.na(veg.city)] <- 0 
+  noveg.city[is.na(noveg.city)] <- 0 
   
   # Iteratively removing 6-sigma outliers from large scene; not local area
   # tree.city <- filter.outliers(RASTER = tree.city, n.sigma=6)
@@ -503,27 +525,36 @@ for(i in 1:nrow(cities.use)){
   veg.city <- resample(veg.city, tdev, na.rm=F) 
   veg.city <- crop(veg.city, extent(city.sp)) 
   
+  noveg.city <- resample(noveg.city, tdev, na.rm=F) 
+  noveg.city <- crop(noveg.city, extent(city.sp)) 
+  
+  # Masking
   tree.city <- mask(tree.city, city.sp)
   veg.city <- mask(veg.city, city.sp)
+  noveg.city <- mask(noveg.city, city.sp)
   
   # Mask out water bodies
   if(length(ocean.city)>0){
     tree.city <- mask(tree.city, ocean.city, inverse=T)
     veg.city <- mask(veg.city, ocean.city, inverse=T)
+    noveg.city <- mask(noveg.city, ocean.city, inverse=T)
   } 
   if(length(lakes.city)>0){
     tree.city <- mask(tree.city, lakes.city, inverse=T)
     veg.city <- mask(veg.city, lakes.city, inverse=T)
+    noveg.city <- mask(noveg.city, lakes.city, inverse=T)
   } 
   if(length(river.city)>0){
     tree.city <- mask(tree.city, river.city, inverse=T)
     veg.city <- mask(veg.city, river.city, inverse=T)
+    noveg.city <- mask(noveg.city, river.city, inverse=T)
   } 
   # plot(tree.city); plot(city.sp, add=T)
   # plot(veg.city); plot(city.sp, add=T)
   
   vals.tree <- getValues(tree.city)
   vals.veg <- getValues(veg.city)
+  vals.noveg <- getValues(noveg.city)
   # ---------------
   
   # ---------------
@@ -546,7 +577,8 @@ for(i in 1:nrow(cities.use)){
                         temp.summer=vals.tmax, 
                         temp.dev.summer=vals.tdev,
                         cover.tree=vals.tree, 
-                        cover.veg=vals.veg
+                        cover.veg=vals.veg,
+                        cover.noveg=vals.noveg
                         )
   df.city <- df.city[!is.na(df.city$city.buff),]
   write.csv(df.city, file.path(path.save, paste0(city.name, "_data_full.csv")), row.names=F)
@@ -575,11 +607,3 @@ summary(cities.use)
 # ---------------
 # -----------------------------------------
 
-
-# -----------------------------------------
-# Looking at some quick summary stats
-# -----------------------------------------
-cities.use <- data.frame(cities.use)
-summary(cities.use)
-
-# -----------------------------------------
