@@ -627,7 +627,7 @@ for(i in 1:nrow(cities.use)){
   # ---------------
   # Package everything together for more robust analysis
   # ---------------
-  png(file.path(path.save, paste0(city.name, "_maps.png")), height=8, width=18, unit="in", res=180)
+  png(file.path(path.save, paste0(city.name, "_maps.png")), height=8, width=11, unit="in", res=180)
   par(mfrow=c(2,4))
   plot(tn, main="Number Temp Slices\n2013"); plot(city.raw, add=T)
   plot(tmax, main="Summer Day Temp\n2013, deg.C"); plot(city.raw, add=T)
