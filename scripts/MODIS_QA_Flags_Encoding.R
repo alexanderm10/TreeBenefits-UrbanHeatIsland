@@ -44,8 +44,10 @@ FINAL <- QC_Data[QC_Data$QA_word1=="LST GOOD" & !(QC_Data$QA_word4=="LST Err > 4
 FINAL
 
 # Right now, just ignoring the worst
+# flags.good <- QC_Data[(QC_Data$QA_word1=="LST GOOD" & QC_Data$QA_word2=="Good Data") |
+#                         (QC_Data$QA_word2=="Good Data" & !QC_Data$QA_word3 %in% c("Emiss Err > .04")) |
+#                            (QC_Data$QA_word2=="Good Data" & !QC_Data$QA_word3 %in% c("LST Err > 4")),"Integer_Value"]
 flags.good <- QC_Data[(QC_Data$QA_word1=="LST GOOD" & QC_Data$QA_word2=="Good Data") |
-                        (QC_Data$QA_word2=="Good Data" & !QC_Data$QA_word3 %in% c("Emiss Err > .04")) |
-                           (QC_Data$QA_word2=="Good Data" & !QC_Data$QA_word3 %in% c("LST Err > 4")),"Integer_Value"]
+                        (QC_Data$QA_word2=="Good Data" & !(QC_Data$QA_word2 %in% c("Emiss Err > .04") & QC_Data$QA_word3 %in% c("LST Err > 4"))),"Integer_Value"]
 
-flags.good <- QC_Data[QC_Data$QA_word2=="Good Data", "Integer_Value"]
+# flags.good <- QC_Data[QC_Data$QA_word2=="Good Data", "Integer_Value"]
