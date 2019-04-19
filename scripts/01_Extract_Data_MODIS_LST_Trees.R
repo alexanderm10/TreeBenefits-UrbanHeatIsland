@@ -404,9 +404,9 @@ for(YEAR in yr.process){
     
     # Calculate deviations on the post-filtered tmax
     tdev <- stack()
-    for(i in 1:nlayers(tmax)){
+    for(LAY in 1:nlayers(tmax)){
       # mean.now <- mean(getValues(tmax[[i]]), na.rm=T)
-      tdev <- addLayer(tdev, tmax[[i]] - mean(getValues(tmax[[i]]), na.rm=T))
+      tdev <- addLayer(tdev, tmax[[LAY]] - mean(getValues(tmax[[LAY]]), na.rm=T))
     }
     
     # setting up to look at the number of slcies
@@ -440,6 +440,7 @@ for(YEAR in yr.process){
     if(length(which(!is.na(vals.tdev)))<10 ) next
     # plot(tmax); plot(city.sp, add=T)
     # plot(tdev); plot(city.sp, add=T)
+    # plot(tn); plot(city.sp, add=T)    
     # ---------------
     
     # ---------------
@@ -503,7 +504,7 @@ for(YEAR in yr.process){
                                              ifelse(!is.na(elev.15), 15, 
                                                     ifelse(!is.na(elev.20), 20, 25))))))
     # summary(as.factor(city.buff))
-    # plot(elev.city); plot(city.sp, add=T)
+    # plot(elev.city); plot(city.raw, add=T)
     # ---------------
     
     # ---------------
@@ -511,6 +512,13 @@ for(YEAR in yr.process){
     # --------------
     # 2. Figure out which rasters to process
     f.veg <- which(ftree.df$tile %in% modis.tiles & ftree.df$year==YEAR)
+    
+    # For some reason we have multiple files for some of our tree covers
+    # These have different process time stamps; lets go with whatever is most recent
+    if(length(f.veg)>length(modis.tiles)){
+      process.stamps <- as.numeric(substr(ftree.df[f.veg,"process.stamp"], 1, 6))
+      f.veg <- f.veg[process.stamps==max(process.stamps)]
+    }
     
     if(length(f.veg)==0) next
     if(length(f.veg)==1){
@@ -636,14 +644,14 @@ for(YEAR in yr.process){
     # ---------------
     png(file.path(path.save, paste0(city.name, "_maps.png")), height=8, width=11, unit="in", res=180)
     par(mfrow=c(2,4))
-    plot(tn, main=paste("Number Temp Slices\n"), YEAR); plot(city.raw, add=T)
-    plot(tmax, main=paste("Summer Day Temp\n"), YEAR, "deg. C"); plot(city.raw, add=T)
-    plot(tmax.sd, main=paste("Summer Day Temp SD\n"), YEAR, "deg. C"); plot(city.raw, add=T)
-    plot(tdev, main=paste("Summer Day Mean Dev\n"), YEAR, "deg. C"); plot(city.raw, add=T)
+    plot(tn, main=paste("Number Temp Slices\n", YEAR)); plot(city.raw, add=T)
+    plot(tmax, main=paste("Summer Day Temp\n", YEAR, "deg. C")); plot(city.raw, add=T)
+    plot(tmax.sd, main=paste("Summer Day Temp SD\n", YEAR, "deg. C")); plot(city.raw, add=T)
+    plot(tdev, main=paste("Summer Day Mean Dev\n", YEAR, "deg. C")); plot(city.raw, add=T)
     plot(elev.city, main="Elevation (m)"); plot(city.raw, add=T)
-    plot(tree.city, main=paste("Veg. Cover: Trees\n"), YEAR, "% cover"); plot(city.raw, add=T)
-    plot(veg.city, main=paste("Veg. Cover: Non-Tree\n"), YEAR, "% cover"); plot(city.raw, add=T)
-    plot(noveg.city, main=paste("Non-Veg. Cover\n"), YEAR, "% cover"); plot(city.raw, add=T)
+    plot(tree.city, main=paste("Veg. Cover: Trees\n", YEAR, "% cover")); plot(city.raw, add=T)
+    plot(veg.city, main=paste("Veg. Cover: Non-Tree\n", YEAR, "% cover")); plot(city.raw, add=T)
+    plot(noveg.city, main=paste("Non-Veg. Cover\n", YEAR, "% cover")); plot(city.raw, add=T)
     par(mfrow=c(1,1))
     dev.off()
     
