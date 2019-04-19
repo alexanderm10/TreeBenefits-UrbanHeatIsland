@@ -179,13 +179,15 @@ elev <- raster("/Volumes/Morton_SDM/Elevation_SRTM30/topo30/topo30.grd")
 # if this becomes too problematic, can do deviation from tile mean and do the multi-time analysis
 #      with na.rm=T, but that might need to happen at a city-scale
 #  but we'll need to
-filter.outliers <- function(RASTER, n.sigma=6){
+filter.outliers <- function(RASTER, n.sigma=6, max.iters=10){
   vals.tmp <- getValues(RASTER); tmp.x <- mean(vals.tmp, na.rm=T); tmp.sd <- sd(vals.tmp, na.rm=T)
-  while(length(which(vals.tmp < tmp.x-n.sigma*tmp.sd | vals.tmp > tmp.x+n.sigma*tmp.sd))>0){
+  ITER=1
+  while(length(which(vals.tmp < tmp.x-n.sigma*tmp.sd | vals.tmp > tmp.x+n.sigma*tmp.sd))>0 & ITER<max.iters){
     RASTER[RASTER < tmp.x-n.sigma*tmp.sd]  <- NA
     RASTER[RASTER > tmp.x+n.sigma*tmp.sd]  <- NA
     
     vals.tmp <- getValues(RASTER); tmp.x <- mean(vals.tmp, na.rm=T); tmp.sd <- sd(vals.tmp, na.rm=T)
+    ITER=ITER+1
   } # end while loop
   
   return(RASTER)
@@ -224,6 +226,10 @@ for(i in 1:nrow(cities.use)){
   city.name <- city.raw$NAME
   city.name <- sub(c("[?]"), "X", city.name) # Getting rid of the ? infront of some cities
   city.name <- sub(c("[?]"), "X", city.name) # Being lazy and doing this twice just in case to get rid of the rare ??
+
+  # Check to see if we should jump to the next file
+  if(file.exists(file.path(path.save, paste0(city.name, "_data_full.csv")))) next
+  
   
   # Create a 10km buffer around city area to analyze UHI
   # -- Note: To do this we need to take make it into a projection with m as using to do this
@@ -673,7 +679,7 @@ for(i in 1:nrow(cities.use)){
   dev.off()
   
 
-  write.csv(data.frame(cities.use), "../data_processed/cities_summary_sdei_v6.csv", row.names=F)
+  # write.csv(data.frame(cities.use), "../data_processed/cities_summary_sdei_v6.csv", row.names=F)
   rm(ocean.city, lakes.city, river.city)
 } # End city loop
 # cities.use <- cities.use[,!names(cities.use) %in% c("july.mean", "july.sd", "july.max", "july.min")]
