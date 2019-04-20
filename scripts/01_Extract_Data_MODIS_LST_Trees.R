@@ -396,6 +396,7 @@ for(YEAR in yr.process){
       
       tmax <- addLayer(tmax, met.city)
       
+      rm(met.city)
     } # End Time loop
     # plot(tmax)
     
@@ -437,7 +438,7 @@ for(YEAR in yr.process){
     vals.tn <- getValues(tn)
     
     # If we can't get good temperature data, skip this; right now this is a pretty low bar, but we'll see
-    if(length(which(!is.na(vals.tdev)))<10 ) next
+    if(length(which(!is.na(vals.tdev)))<10) next
     # plot(tmax); plot(city.sp, add=T)
     # plot(tdev); plot(city.sp, add=T)
     # plot(tn); plot(city.sp, add=T)    
@@ -461,12 +462,15 @@ for(YEAR in yr.process){
       ext2 <- c(0,ext.city[2],ext.city[3:4])
       
       city1 <- crop(elev, ext1)
-      extent(city1) <- extent(ext.city[1],0,ext.city[3:4])
+      extent(city1) <- extent(extent(city1)[1:2]-360,extent(city1)[3:4])
+      # city1 <- extend(city1, ext.city)
       
       city2 <- crop(elev, ext2)
-      extent(city2) <- extent(0,ext.city[2],ext.city[3:4])
+      # extent(city2) <- extent(extent(city2)[1:2]-360,extent(city2)[3:4])
+      # extent(city2) <- extent(0,ext.city[2],ext.city[3:4])
+      # city2 <- extend(city2, ext.city)
       
-      elev.city <- mosaic(city1, city2, fun=mean)
+      elev.city <- mosaic(city1, city2, fun=mean, tolerance=0.2)
     }
     
     # elev.city <- filter.outliers(RASTER = elev.city, n.sigma=4)
@@ -689,9 +693,9 @@ for(YEAR in yr.process){
     
     
     # write.csv(data.frame(cities.use), "../data_processed/cities_summary_sdei_v6.csv", row.names=F)
-    rm(ocean.city, lakes.city, river.city)
+    rm(ocean.city, lakes.city, river.city, tmax, tmax.sd, tdev, tdev.sd, tn, tree.city, veg.city, noveg.city)
   } # End city loop
-  
+
 } # End YEAR loop
 # cities.use <- cities.use[,!names(cities.use) %in% c("july.mean", "july.sd", "july.max", "july.min")]
 summary(cities.use)
