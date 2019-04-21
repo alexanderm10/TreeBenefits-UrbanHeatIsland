@@ -1,9 +1,13 @@
-# Doing some quick EDA for geography of Urban Heat island
+# Analyzing effects of trees on the Urban Heat Island effect
 library(sp); library(rgdal); library(raster); library(rgeos); library(maps)
 library(ggplot2); library(RColorBrewer); library(nlme); library(mgcv); 
 path.dat <- "../data_processed/"
+
+# --------------------------------------------------------------
+# Run models
+# --------------------------------------------------------------
 dat.uhi <- read.csv(file.path(path.dat, "cities_summary_sdei_v5.csv"))
-dat.uhi <- dat.uhi[!is.na(dat.uhi$elev.mean), ]
+# dat.uhi <- dat.uhi[!is.na(dat.uhi$elev.mean), ]
 dat.uhi$temp.diff <- dat.uhi$temp.max - dat.uhi$temp.min
 dat.uhi$tree.diff <- dat.uhi$tree.max - dat.uhi$tree.min
 summary(dat.uhi)
@@ -49,11 +53,15 @@ filter.outliers <- function(DAT, n.sigma=6){
 
 # New plan for quantifying effects of trees on UHI: 
 # apply mean temperature of treeless area to whole area and calculate the difference
+# Set some thresholds for analyses
+tree.low <- 10
+
 pb <- txtProgressBar(min=0, max=nrow(dat.uhi), style=3)
 for(i in 1:nrow(dat.uhi)){
   # i=which(dat.uhi$NAME=="Chicago") # MEDELLIN
   # i=which(dat.uhi$NAME=="MEDELLIN")
-  # i=which(dat.uhi$NAME=="Dalian")
+  # i=which(dat.uhi$NAME=="Tokyo")
+  # i=which(dat.uhi$NAME=="Nashville-Davidson")
   
   
   setTxtProgressBar(pb, i)
@@ -61,20 +69,22 @@ for(i in 1:nrow(dat.uhi)){
   dat.uhi[i,"WWF_ECO"] <- biome$ECO_NAME
   dat.uhi[i,"WWF_BIOME"] <- biome$biome.name
   
-  dat.city <- read.csv(file.path(path.dat, "cities_full_sdei_v5", paste0(dat.uhi$NAME[i], "_data_full.csv")))
+  dat.city <- read.csv(file.path(path.dat, "cities_full_sdei_v5_old", paste0(dat.uhi$NAME[i], "_data_full.csv")))
   # summary(dat.city)
   
   # Remove impossible values and outliers
   dat.city[dat.city$cover.tree<0 | dat.city$cover.tree>100 , "cover.tree"] <- NA # Get rid of impossible values
-  dat.city$temp.summer <- filter.outliers(DAT=dat.city$temp.summer, n.sigma=4)
-  dat.city$temp.dev.summer <- filter.outliers(DAT=dat.city$temp.dev.summer, n.sigma=4)
+  # dat.city$temp.summer <- filter.outliers(DAT=dat.city$temp.summer, n.sigma=4)
+  # dat.city$temp.dev.summer <- filter.outliers(DAT=dat.city$temp.dev.summer, n.sigma=4)
 
   # Add a couple QAQC flags
   dat.uhi[i,"n.cells.tdev"] <- length(which(!is.na(dat.city$temp.dev.summer)))
   dat.uhi[i,"prop.missing"] <- length(which(is.na(dat.city$temp.dev.summer)))/nrow(dat.city)
-  dat.uhi[i, "prop.tree.low"] <- length(which(dat.city$cover.tree<10))/length(which(!is.na(dat.city$cover.tree)))
+  dat.uhi[i, "prop.tree.low"] <- length(which(dat.city$cover.tree<tree.low))/length(which(!is.na(dat.city$cover.tree)))
+  dat.uhi[i,"tree.05"] <- quantile(dat.city$cover.tree, 0.1, na.rm=T)
   dat.uhi[i,"tree.10"] <- quantile(dat.city$cover.tree, 0.1, na.rm=T)
   dat.uhi[i,"tree.90"] <- quantile(dat.city$cover.tree, 0.9, na.rm=T)
+  dat.uhi[i,"tree.95"] <- quantile(dat.city$cover.tree, 0.95, na.rm=T)
   
   dat.city <- dat.city[!is.na(dat.city$temp.dev.summer),]
   summary(dat.city)
@@ -96,6 +106,7 @@ for(i in 1:nrow(dat.uhi)){
   # Theoretically speaking and based on a quick EDA of a subset of data, the Gaussian spatial autocorrelation function seemed to be most appropriate and had the lowest AIC
   # gls.gaus <- gls( temp.summer ~ cover.tree , correlation = corGaus(form = ~x + y), data = dat.city )
   # sqrt(nrow(dat.city))
+  # For smoothing, not sure if a soap smoother is appropriate or not
   dat.city[dat.city$cover.tree==0, "cover.tree"] <- 0.1
   mod.gam.lin <- gam(temp.dev.summer ~ cover.tree + elevation + s(x,y), data=dat.city)
   mod.gam.log <- gam(temp.dev.summer ~ log(cover.tree) + elevation + s(x,y), data=dat.city)
@@ -147,10 +158,17 @@ for(i in 1:nrow(dat.uhi)){
   dat.new <- dat.city
   dat.new$cover.tree <- 0.1
   
-  dat.city$gam.notrees <- predict(mod.gam, newdata=dat.new)
-  dat.city$diff.gam <- dat.city$temp.dev.summer - dat.city$gam.notrees
-  dat.uhi[i,"tree.cooling"] <- mean(dat.city$diff.gam, na.rm=T)
+  dat.city$gam.trees.no <- predict(mod.gam, newdata=dat.new)
+  dat.city$diff.gam.no <- dat.city$temp.dev.summer - dat.city$gam.trees.no
+  dat.uhi[i,"tree.cooling.no"] <- mean(dat.city$diff.gam.no, na.rm=T)
 
+  # Try using the minimum tree cover in that city instead for heavily greened cities
+  dat.new$cover.tree <- min(dat.city$cover.tree, na.rm=T)
+  
+  dat.city$gam.trees.lo <- predict(mod.gam, newdata=dat.new)
+  dat.city$diff.gam.lo <- dat.city$temp.dev.summer - dat.city$gam.trees.lo
+  dat.uhi[i,"tree.cooling.lo"] <- mean(dat.city$diff.gam.lo, na.rm=T)
+  
   rm(dat.city)
 }
 dat.uhi$tree.puhi <- -dat.uhi$tree.cooling/(dat.uhi$D_T_DIFF-dat.uhi$tree.cooling)
@@ -159,10 +177,19 @@ dat.uhi$model.type <- as.factor(dat.uhi$model.type)
 summary(dat.uhi)
 
 write.csv(dat.uhi, "../data_processed/analysis_cities_summary_sdei_v5.csv", row.names=F)
-
+# --------------------------------------------------------------
 # dat.uhi[is.na(dat.uhi$gam.r2),]
 
+# --------------------------------------------------------------
+# Look at output
+# --------------------------------------------------------------
+dat.uhi <- read.csv("../data_processed/analysis_cities_summary_sdei_v5.csv")
+dat.filter <- dat.uhi$prop.missing<0.3 & dat.uhi$tree.90>10
 dim(dat.uhi)
+dim(dat.uhi[dat.filter,])
+dim(dat.uhi[!dat.filter,])
+
+
 hist(dat.uhi$D_T_DIFF)
 mean(dat.uhi$D_T_DIFF); sd(dat.uhi$D_T_DIFF)
 median(dat.uhi$D_T_DIFF)
@@ -402,4 +429,4 @@ ggplot(data=dat.uhi[dat.filter,]) +
   geom_point(aes(x=elev.sd, y=tree.cooling)) +
   theme_bw()
 
-# ---------------------------------
+# --------------------------------------------------------------
