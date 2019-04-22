@@ -38,14 +38,14 @@ cities.use <- sdei.urb[sdei.urb$ES00POP>1e6 &  !is.na(sdei.urb$NAME) & sdei.urb$
 dim(cities.use)
 summary(cities.use)
 summary(droplevels(cities.use$ISO3))
-hist(cities.use$D_T_DIFF)
+# hist(cities.use$D_T_DIFF)
 # data.frame(cities.use[cities.use$URB_N_MEAN<10,])
 
-# Plot the map to get a better feel for geographic distribution
-png("../data_processed/cities_used_spdei_v6.png", height=4, width=8, units="in", res=120)
-map(col="red", lwd=0.5)
-plot(cities.use, add=T)
-dev.off()
+# # Plot the map to get a better feel for geographic distribution
+# png("../data_processed/cities_used_spdei_v6.png", height=4, width=8, units="in", res=120)
+# map(col="red", lwd=0.5)
+# plot(cities.use, add=T)
+# dev.off()
 
 # Cleaning up some names
 cities.use$NAME <- as.character(cities.use$NAME)
@@ -206,7 +206,8 @@ for(YEAR in yr.process){
   fmet.df$month <- lubridate::month(fmet.df$date)
   fmet.df$yday <- lubridate::yday(fmet.df$date)
   summary(fmet.df)
-  length(unique(fmet.df$date.stamp))
+  summary(fmet.df$tile)
+  # length(unique(fmet.df$date.stamp))
   # -------------------
   
   
@@ -214,7 +215,12 @@ for(YEAR in yr.process){
   # Creating an index of MODIS tiles so we can index off of that alone
   # -------------------
   # Using our land surface temperature to determine what tiles we have
-  modis.df <- fmet.df[fmet.df$date==min(fmet.df$date),]
+  tile1 <- unique(fmet.df[fmet.df$date==min(fmet.df$date),"tile"])
+  tile2 <- unique(fmet.df[fmet.df$date==max(fmet.df$date),"tile"])
+  
+  tile1[!tile1 %in% tile2]
+  tile2[!tile2 %in% tile1]
+  modis.df <- fmet.df[fmet.df$date==max(fmet.df$date),]
   summary(modis.df); dim(modis.df)
   
   modis.df[,c("xmin", "xmax", "ymin", "ymax")] <- NA
@@ -313,8 +319,9 @@ for(YEAR in yr.process){
       mos.use <- 1:2
     } # End N/S identification
     
-    # 2. Figure out which rasters to process
+    # 2. Figure out which rasters to process & make sure we have all of the time slices
     f.met <- which(fmet.df$tile %in% modis.tiles & fmet.df$year==YEAR & fmet.df$month %in% mos.use)
+    if(length(unique(fmet.df[f.met, "date.stamp"])) < length(unique(fmet.df[fmet.df$year==YEAR & fmet.df$month %in% mos.use,"date.stamp"]))) stop(paste("missing scenes for tile:", modis.tiles))
     
     # 3. For *each date* 
     #    3.1. moasaic, then filter, then mask
