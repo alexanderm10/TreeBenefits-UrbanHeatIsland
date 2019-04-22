@@ -137,48 +137,6 @@ summary(ftree.df)
 # -------------------
 
 # -------------------
-# Setting up an index for our met files
-# -------------------
-# Setting up file paths and directories for the temperature data; QA files should have same indexing
-met.base <- "/Volumes/Morton_SDM/SurfTemp_MODIS_MODA2/processed/geotiff"
-path.met <- file.path(met.base, "MOD11A2_LST_Day")
-path.qa <- file.path(met.base, "MOD11A2_LST_Day_QA")
-
-fmet.all <- dir(path.met, ".tif")
-fmet.all <- fmet.all[which(substr(fmet.all, nchar(fmet.all)-3, nchar(fmet.all))==".tif")] # ignore anything that's not a .tif
-
-fmet.qa.all <- dir(path.qa, ".tif")
-fmet.qa.all <- fmet.qa.all[which(substr(fmet.qa.all, nchar(fmet.qa.all)-3, nchar(fmet.qa.all))==".tif")] # ignore anything that's not a .tif
-
-fmet.split <- stringr::str_split(fmet.all, "[.]")
-fmet.df <- data.frame(file=fmet.all, matrix(unlist(fmet.split), ncol=length(fmet.split[[1]]), byrow = T))
-names(fmet.df) <- c("file", "dataset", "date.stamp", "tile", "version", "process.stamp", "extension")
-fmet.df$date <- strptime(as.numeric(substr(fmet.df$date.stamp, 2, 8)), "%Y%j")
-fmet.df$year <- lubridate::year(fmet.df$date)
-fmet.df$month <- lubridate::month(fmet.df$date)
-fmet.df$yday <- lubridate::yday(fmet.df$date)
-summary(fmet.df)
-length(unique(fmet.df$date.stamp))
-# -------------------
-
-
-# -------------------
-# Creating an index of MODIS tiles so we can index off of that alone
-# -------------------
-# Using our land surface temperature to determine what tiles we have
-modis.df <- fmet.df[fmet.df$date==min(fmet.df$date),]
-summary(modis.df); dim(modis.df)
-
-modis.df[,c("xmin", "xmax", "ymin", "ymax")] <- NA
-for(i in 1:nrow(modis.df)){
-  tmp <- raster(file.path(path.met, modis.df$file[i]))
-  
-  modis.df[i,c("xmin", "xmax", "ymin", "ymax")] <- extent(tmp)
-}
-summary(modis.df)
-# -------------------
-
-# -------------------
 # Handy functions to help with processing
 # -------------------
 # Setting up a function to iteratively remove outliers since we do it a LOT
@@ -220,10 +178,55 @@ source("MODIS_QA_Flags_Encoding.R")
 save.base <- "../data_processed/cities_full_sdei_v6"
 
 # yr.process <- 2011:2015
-yr.process=2013
+yr.process=2011
 for(YEAR in yr.process){
   path.save <- file.path(save.base, YEAR)
   dir.create(path.save, recursive=T, showWarnings = F)
+  
+    
+  # -------------------
+  # Setting up an index for our met files
+  # -------------------
+  # Setting up file paths and directories for the temperature data; QA files should have same indexing
+  met.base <- file.path("/Volumes/Morton_SDM/SurfTemp_MODIS_MODA2/processed", YEAR, "geotiff")
+  path.met <- file.path(met.base, "MOD11A2_LST_Day")
+  path.qa <- file.path(met.base, "MOD11A2_LST_Day_QA")
+  
+  fmet.all <- dir(path.met, ".tif")
+  fmet.all <- fmet.all[which(substr(fmet.all, nchar(fmet.all)-3, nchar(fmet.all))==".tif")] # ignore anything that's not a .tif
+  
+  fmet.qa.all <- dir(path.qa, ".tif")
+  fmet.qa.all <- fmet.qa.all[which(substr(fmet.qa.all, nchar(fmet.qa.all)-3, nchar(fmet.qa.all))==".tif")] # ignore anything that's not a .tif
+  
+  fmet.split <- stringr::str_split(fmet.all, "[.]")
+  fmet.df <- data.frame(file=fmet.all, matrix(unlist(fmet.split), ncol=length(fmet.split[[1]]), byrow = T))
+  names(fmet.df) <- c("file", "dataset", "date.stamp", "tile", "version", "process.stamp", "extension")
+  fmet.df$date <- strptime(as.numeric(substr(fmet.df$date.stamp, 2, 8)), "%Y%j")
+  fmet.df$year <- lubridate::year(fmet.df$date)
+  fmet.df$month <- lubridate::month(fmet.df$date)
+  fmet.df$yday <- lubridate::yday(fmet.df$date)
+  summary(fmet.df)
+  length(unique(fmet.df$date.stamp))
+  # -------------------
+  
+  
+  # -------------------
+  # Creating an index of MODIS tiles so we can index off of that alone
+  # -------------------
+  # Using our land surface temperature to determine what tiles we have
+  modis.df <- fmet.df[fmet.df$date==min(fmet.df$date),]
+  summary(modis.df); dim(modis.df)
+  
+  modis.df[,c("xmin", "xmax", "ymin", "ymax")] <- NA
+  for(i in 1:nrow(modis.df)){
+    tmp <- raster(file.path(path.met, modis.df$file[i]))
+    
+    modis.df[i,c("xmin", "xmax", "ymin", "ymax")] <- extent(tmp)
+  }
+  summary(modis.df)
+  # -------------------
+  
+  
   pb <- txtProgressBar(min=0, max=nrow(cities.use), style=3)
   # for(i in 1:nrow(cities.use)){
   for(i in 1:nrow(cities.use)){
