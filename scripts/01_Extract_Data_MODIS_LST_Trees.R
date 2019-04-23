@@ -41,11 +41,11 @@ summary(droplevels(cities.use$ISO3))
 # hist(cities.use$D_T_DIFF)
 # data.frame(cities.use[cities.use$URB_N_MEAN<10,])
 
-# # Plot the map to get a better feel for geographic distribution
-# png("../data_processed/cities_used_spdei_v6.png", height=4, width=8, units="in", res=120)
-# map(col="red", lwd=0.5)
-# plot(cities.use, add=T)
-# dev.off()
+# Plot the map to get a better feel for geographic distribution
+png("../data_processed/cities_used_spdei_v6.png", height=4, width=8, units="in", res=120)
+map(col="red", lwd=0.5)
+plot(cities.use, add=T)
+dev.off()
 
 # Cleaning up some names
 cities.use$NAME <- as.character(cities.use$NAME)
@@ -215,11 +215,11 @@ for(YEAR in yr.process){
   # Creating an index of MODIS tiles so we can index off of that alone
   # -------------------
   # Using our land surface temperature to determine what tiles we have
-  tile1 <- unique(fmet.df[fmet.df$date==min(fmet.df$date),"tile"])
-  tile2 <- unique(fmet.df[fmet.df$date==max(fmet.df$date),"tile"])
+  # tile1 <- unique(fmet.df[fmet.df$date==min(fmet.df$date),"tile"])
+  # tile2 <- unique(fmet.df[fmet.df$date==max(fmet.df$date),"tile"])
   
-  tile1[!tile1 %in% tile2]
-  tile2[!tile2 %in% tile1]
+  # tile1[!tile1 %in% tile2]
+  # tile2[!tile2 %in% tile1]
   modis.df <- fmet.df[fmet.df$date==max(fmet.df$date),]
   summary(modis.df); dim(modis.df)
   
