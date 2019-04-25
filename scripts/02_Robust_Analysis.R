@@ -1,8 +1,8 @@
 # Analyzing effects of trees on the Urban Heat Island effect
 library(sp); library(rgdal); library(raster); library(rgeos); library(maps)
 library(ggplot2); library(RColorBrewer); library(nlme); library(mgcv); 
-# path.dat <- "../data_processed/"
-path.dat <- "/Volumes/GoogleDrive/My Drive/TreeBenefits_UrbanHeatIsland/data_processed/"
+path.dat <- "../data_processed/"
+# path.dat <- "/Volumes/GoogleDrive/My Drive/TreeBenefits_UrbanHeatIsland/data_processed/"
 
 # --------------------------------------------------------------
 # Run models
@@ -62,8 +62,9 @@ buff.use = 10
 
 pb <- txtProgressBar(min=0, max=nrow(dat.uhi), style=3)
 # yr.process <- 2011:2015
-yr.process=2013
-for(i in 1:nrow(dat.uhi)){
+yr.process=2011:2013
+# for(i in 1:nrow(dat.uhi)){
+for(i in 328:nrow(dat.uhi)){
   # i=which(dat.uhi$NAME=="Chicago") # MEDELLIN
   # i=which(dat.uhi$NAME=="MEDELLIN")
   # i=which(dat.uhi$NAME=="Tokyo")
@@ -85,7 +86,7 @@ for(i in 1:nrow(dat.uhi)){
     
     dat.yr <- read.csv(file.path(path.dat, "cities_full_sdei_v6", YEAR, paste0(dat.uhi$NAME[i], "_data_full.csv")))
     dat.yr$year <- YEAR
-    dat.yr$temp.dev.summer2 <- dat.yr$temp.summer - mean(dat.yr$temp.summer[dat.yr$temp.n>n.lo], na.rm=T)
+    # dat.yr$temp.dev.summer2 <- dat.yr$temp.summer - mean(dat.yr$temp.summer[dat.yr$temp.n>n.lo], na.rm=T)
     # summary(dat.yr)
     
     dat.city <- rbind(dat.city, dat.yr)
@@ -96,21 +97,40 @@ for(i in 1:nrow(dat.uhi)){
   # If we don't have any data for this city, skip over it
   if(nrow(dat.city)==0) next
   
+  # ggplot(data=dat.city) +
+  #   geom_histogram(aes(x=temp.dev.summer2, fill=year))
+  # ggplot(data=dat.city) +
+  #   facet_wrap(~year) +
+  #   coord_equal() +
+  #   geom_raster(aes(x=x, y=y, fill=temp.dev.summer2)) +
+  #   theme(legend.position="top")
+
   # Remove impossible values and outliers
-  # dat.city$temp.summer <- filter.outliers(DAT=dat.city$temp.summer, n.sigma=6)
-  # dat.city$temp.dev.summer <- filter.outliers(DAT=dat.city$temp.dev.summer, n.sigma=6)
+  dat.city$temp.summer <- filter.outliers(DAT=dat.city$temp.summer, n.sigma=6)
+  dat.city$temp.dev.summer <- filter.outliers(DAT=dat.city$temp.dev.summer, n.sigma=6)
+  # dat.city$temp.dev.summer2 <- filter.outliers(DAT=dat.city$temp.dev.summer2, n.sigma=6)
   # dat.city$cover.tree <- filter.outliers(DAT=dat.city$cover.tree, n.sigma=6)
   # dat.city$cover.veg <- filter.outliers(DAT=dat.city$cover.veg, n.sigma=6)
   # dat.city$cover.noveg <- filter.outliers(DAT=dat.city$cover.noveg, n.sigma=6)
+  
+  # Now that we've excluded outliers (AGAIN), loop through and do the deviations again
+  for(YEAR in unique(dat.city$year)){
+    yr.ind <- which(dat.city$year==YEAR)
+    ind.good <- which(dat.city$year==YEAR & dat.city$temp.n > n.lo)
+    
+    # Note we're just going to re-center temp.dev.summer, but temp.dev.summer2 is based off of just good cells
+    dat.city[yr.ind, "temp.dev.summer"] <- dat.city[yr.ind, "temp.dev.summer"] - mean(dat.city[yr.ind, "temp.dev.summer"], na.rm=T)
+    dat.city[yr.ind, "temp.dev.summer2"] <- dat.city[yr.ind, "temp.summer"] - mean(dat.city[ind.good, "temp.summer"], na.rm=T)
+  }
   
   # Add a couple QAQC flags
   dat.uhi[i,"prop.missing"] <- length(which(is.na(dat.city$temp.dev.summer)))/nrow(dat.city)
   dat.uhi[i,"prop.temp.n.lo"] <- length(which(dat.city$temp.n<=n.lo & !is.na(dat.city$temp.n)))/length(which(!is.na(dat.city$temp.n)))
   
-  # Remove missing values and cells with questionable temperature data for our own sanity
+  # Remove missing values and cells with questionable temperature data for our own sanity; also require multiple years
   dat.city <- dat.city[!is.na(dat.city$temp.dev.summer2) & dat.city$temp.n>n.lo,]
-  summary(dat.city)
-  if(nrow(dat.city)<=10) next
+  summary(dat.city); dim(dat.city)
+  if(nrow(dat.city)<=50*length(unique(dat.city$year)) | length(unique(dat.city$year))<2) next
   
   # dim(dat.city)
   
@@ -188,7 +208,7 @@ for(i in 1:nrow(dat.uhi)){
   dat.city$gam.resid <- resid(mod.gam)
   # plot(mod.gam)
   
-  png(file.path("../data_processed/cities_full_sdei_v6", paste0(dat.uhi$NAME[i], "_GAM_qaqc.png")), height=6, width=6, units="in", res=120)
+  png(file.path(path.dat, "cities_full_sdei_v6", "analysis_all_years", paste0(dat.uhi$NAME[i], "_GAM_qaqc.png")), height=6, width=6, units="in", res=120)
   par(mfrow=c(2,2))
   plot(mod.gam)
   hist(dat.city$gam.resid)
@@ -249,8 +269,10 @@ for(i in 1:nrow(dat.uhi)){
   
   vars.diff <- c("temp.summer", "cover.tree", "cover.veg", "cover.noveg")
   for(YR in unique(city.summary$year)){
-    yr.ind <- which(city.summary$year==YEAR)
-    dat.ref <- city.summary[city.summary$year==YEAR & city.summary$location==0,]
+    yr.ind <- which(city.summary$year==YR)
+    dat.ref <- city.summary[city.summary$year==YR & city.summary$location==0,]
+    
+    if(nrow(dat.ref)==0) next
     
     for(VAR in vars.diff){
       city.summary[yr.ind, paste0("d.", VAR, ".buff")] <- city.summary[yr.ind,VAR] - dat.ref[,VAR]
@@ -259,7 +281,10 @@ for(i in 1:nrow(dat.uhi)){
   summary(city.summary)
   
   # ggplot(data=city.summary) +
-  #   geom_bar(aes(x=as.factor(location), y=d.temp.summer, fill=as.factor(location)), stat="identity", position="dodge")
+  #   geom_bar(aes(x=as.factor(location), y=d.temp.summer.buff, fill=as.factor(location)), stat="identity", position="dodge")
+
+  # ggplot(data=city.summary) +
+  #   geom_line(aes(x=year, y=cover.tree, color=as.factor(location)))
   
   # ----------
   # Exploratory graphing of select cities 
@@ -270,11 +295,11 @@ for(i in 1:nrow(dat.uhi)){
   # city.cover[,c("location", "year")] <- city.summary[,c("location", "year")]
   # city.cover$cover.change <- stack(city.summary[,paste0("d.",c("cover.tree.buff", "cover.veg.buff", "cover.noveg.buff"))])$values
   # summary(city.cover)
-  # 
-  # ggplot(data=city.cover) +
-  #   geom_bar(aes(x=cover.type, y=cover.mean, fill=as.factor(location)), stat="identity", position="dodge")
-  # ggplot(data=city.cover) +
-  #   geom_bar(aes(x=cover.type, y=cover.change, fill=as.factor(location)), stat="identity", position="dodge")
+# 
+#   ggplot(data=city.cover) +
+#     geom_bar(aes(x=cover.type, y=cover.mean, fill=as.factor(location)), stat="identity", position="dodge")
+#   ggplot(data=city.cover) +
+#     geom_bar(aes(x=cover.type, y=cover.change, fill=as.factor(location)), stat="identity", position="dodge")
   # ----------
   
   # ----------
@@ -303,20 +328,31 @@ for(i in 1:nrow(dat.uhi)){
   dat.uhi[i, "Tdiff.trees2veg.city"] <- mean(city.summary[city.summary$location==0,"diff.trees2veg"], na.rm=T)
   dat.uhi[i, "Tdiff.veg2noveg.city"] <- mean(city.summary[city.summary$location==0,"diff.veg2noveg"], na.rm=T)
   
-  yr.min <- min(city.summary$year); yr.max <- max(city.summary$year)
-  dat.uhi[i, "d.cover.tree.time.city"] <- city.summary[city.summary$location==0 & city.summary$year==yr.max,"cover.tree"] - city.summary[city.summary$location==0 & city.summary$year==yr.min,"cover.tree"]
-  dat.uhi[i, "d.cover.veg.time.city"] <- city.summary[city.summary$location==0 & city.summary$year==yr.max,"cover.veg"] - city.summary[city.summary$location==0 & city.summary$year==yr.min,"cover.veg"]
-  dat.uhi[i, "d.cover.noveg.time.city"] <- city.summary[city.summary$location==0 & city.summary$year==yr.max,"cover.noveg"] - city.summary[city.summary$location==0 & city.summary$year==yr.min,"cover.noveg"]
+  # Quick calculation of veg trends
+  # yr.min <- min(city.summary$year); yr.max <- max(city.summary$year)
+  trend.tree <- lm(cover.tree ~ year*as.factor(location)-year, data=city.summary[city.summary$location %in% c(0, buff.use),])
+  trend.veg <- lm(cover.veg ~ year*as.factor(location)-year, data=city.summary[city.summary$location %in% c(0, buff.use),])
+  trend.noveg <- lm(cover.noveg ~ year*as.factor(location)-year, data=city.summary[city.summary$location %in% c(0, buff.use),])
+  sum.trend.tree <- summary(trend.tree)
+  sum.trend.veg <- summary(trend.veg)
+  sum.trend.noveg <- summary(trend.noveg)
   
-  dat.uhi[i, "d.cover.tree.time.buff"] <- city.summary[city.summary$location==buff.use & city.summary$year==yr.max,"cover.tree"] - city.summary[city.summary$location==buff.use & city.summary$year==yr.min,"cover.tree"]
-  dat.uhi[i, "d.cover.veg.time.buff"] <- city.summary[city.summary$location==buff.use & city.summary$year==yr.max,"cover.veg"] - city.summary[city.summary$location==buff.use & city.summary$year==yr.min,"cover.veg"]
-  dat.uhi[i, "d.cover.noveg.time.buff"] <- city.summary[city.summary$location==buff.use & city.summary$year==yr.max,"cover.noveg"] - city.summary[city.summary$location==buff.use & city.summary$year==yr.min,"cover.noveg"]
+  # Note: in some cases, may not be able to estimate city
+  ind.city <- which(dimnames(sum.trend.tree$coefficients)[[1]]==paste0("year:as.factor(location)",0))
+  ind.buff <- which(dimnames(sum.trend.tree$coefficients)[[1]]==paste0("year:as.factor(location)",buff.use))
+  
+  if(length(ind.city)>0) dat.uhi[i, "trend.cover.tree.city"] <- sum.trend.tree$coefficients[ind.city,1]
+  if(length(ind.buff)>0) dat.uhi[i, "trend.cover.tree.buff"] <- sum.trend.tree$coefficients[ind.buff,1]
+  if(length(ind.city)>0) dat.uhi[i, "trend.cover.veg.city"] <- sum.trend.veg$coefficients[ind.city,1]
+  if(length(ind.buff)>0) dat.uhi[i, "trend.cover.veg.buff"] <- sum.trend.veg$coefficients[ind.buff,1]
+  if(length(ind.city)>0) dat.uhi[i, "trend.cover.noveg.city"] <- sum.trend.noveg$coefficients[ind.city,1]
+  if(length(ind.buff)>0) dat.uhi[i, "trend.cover.noveg.buff"] <- sum.trend.noveg$coefficients[ind.buff,1]
   
   
   # ----------
   
   # -------------------------
-  
+  write.csv(dat.city, file.path(path.dat, "cities_full_sdei_v6", "analysis_all_years", paste0(dat.uhi$NAME[i], "_data_full_analyzed.csv")))
   rm(dat.city)
 }
 dat.uhi$WWF_BIOME <- as.factor(dat.uhi$WWF_BIOME)

@@ -178,7 +178,7 @@ source("MODIS_QA_Flags_Encoding.R")
 save.base <- "../data_processed/cities_full_sdei_v6"
 
 # yr.process <- 2011:2015
-yr.process=2011
+yr.process=2014
 for(YEAR in yr.process){
   path.save <- file.path(save.base, YEAR)
   dir.create(path.save, recursive=T, showWarnings = F)
