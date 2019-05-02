@@ -29,7 +29,7 @@ ecoregions$biome.name <- car::recode(ecoregions$BIOME, "'1'='tropical moist broa
                                      '6'='boreal forest/taiga'; 
                                      '7'='tropical grassland/savannas'; 
                                      '8'='temperate grassland/savanna'; 
-                                     '9'='flodded grassland/savanna'; 
+                                     '9'='flooded grassland/savanna'; 
                                      '10'='montane grassland/savanna'; 
                                      '11'='tundra'; 
                                      '12'='mediterranean'; 
@@ -61,10 +61,8 @@ n.lo = 2
 buff.use = 10
 
 pb <- txtProgressBar(min=0, max=nrow(dat.uhi), style=3)
-# yr.process <- 2011:2015
-yr.process=2011:2013
-# for(i in 1:nrow(dat.uhi)){
-for(i in 328:nrow(dat.uhi)){
+yr.process <- 2011:2015
+for(i in 1:nrow(dat.uhi)){
   # i=which(dat.uhi$NAME=="Chicago") # MEDELLIN
   # i=which(dat.uhi$NAME=="MEDELLIN")
   # i=which(dat.uhi$NAME=="Tokyo")
@@ -191,6 +189,8 @@ for(i in 328:nrow(dat.uhi)){
     dat.uhi[i, "gam.dev.exp"] <- sum.lin$dev.expl
     dat.uhi[i, "elevation.slope"] <- sum.lin$p.coeff["elevation"]
     dat.uhi[i, "tree.pval"] <- sum.lin$p.pv["cover.tree"]
+    dat.uhi[i, "veg.pval"] <- sum.lin$p.pv["cover.veg"]
+    dat.uhi[i, "noveg.pval"] <- sum.lin$p.pv["cover.noveg"]
     
   } else {
     mod.gam <- mod.gam.log
@@ -200,6 +200,8 @@ for(i in 328:nrow(dat.uhi)){
     dat.uhi[i, "gam.dev.exp"] <- sum.log$dev.expl
     dat.uhi[i, "elevation.slope"] <- sum.log$p.coeff["elevation"]
     dat.uhi[i, "tree.pval"] <- sum.log$p.pv["log(cover.tree)"]
+    dat.uhi[i, "veg.pval"] <- sum.log$p.pv["log(cover.noveg)"]
+    dat.uhi[i, "noveg.pval"] <- sum.log$p.pv["log(cover.veg)"]
     
   }
   
