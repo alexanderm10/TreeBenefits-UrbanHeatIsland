@@ -13,8 +13,8 @@ dat.uhi$WWF_ECO <- as.character(dat.uhi$WWF_ECO)
 dat.uhi$WWF_BIOME <- as.character(dat.uhi$WWF_BIOME)
 dat.uhi[is.na(dat.uhi$WWF_BIOME),]
 dat.uhi[!is.na(dat.uhi$WWF_BIOME) & dat.uhi$WWF_BIOME=="98",]
-# Toronto = ; Rasht = 
-# Tonto is in the same cluster as Montreal
+
+# Ecoregions based on looking at them on a map on a websites
 dat.uhi[dat.uhi$NAME=="NewYork", c("WWF_ECO", "WWF_BIOME")] <- c("Northeastern coastal forests", "temperate broadleaf/mixed forest")
 dat.uhi[dat.uhi$NAME=="SanJose", c("WWF_ECO", "WWF_BIOME")] <- c("California interior chaparral and woodlands", "mediterranean")
 dat.uhi[dat.uhi$NAME=="VirginiaBeach", c("WWF_ECO", "WWF_BIOME")] <- c("Middle Atlantic coastal forests", "temperate coniferous forest")
@@ -29,6 +29,8 @@ dat.uhi$WWF_ECO <- as.factor(dat.uhi$WWF_ECO)
 dat.uhi$WWF_BIOME <- as.factor(dat.uhi$WWF_BIOME)
 dat.uhi[dat.uhi$WWF_BIOME=="mangroves",]
 summary(dat.uhi$WWF_BIOME)
+
+# Lumping the biomes a bit more to make easier to see figures
 dat.uhi$Biome2 <- car::recode(dat.uhi$WWF_BIOME, 
                               "'mangroves'='Tropical Forest'; 
                               'boreal forest/taiga'='Boreal'; 
@@ -95,10 +97,18 @@ ggplot(data=dat.uhi[dat.filter,]) +
 
 
 # Urban tree cover
-hist(dat.uhi$cover.tree.city)
-mean(dat.uhi$cover.tree.city, na.rm=T); sd(dat.uhi$cover.tree.city, na.rm=T)
-median(dat.uhi$cover.tree.city, na.rm=T)
-quantile(dat.uhi$cover.tree.city, c(0.025, 0.975), na.rm=T)
+hist(dat.uhi$cover.tree.city[dat.filter])
+mean(dat.uhi$cover.tree.city[dat.filter], na.rm=T); sd(dat.uhi$cover.tree.city[dat.filter], na.rm=T)
+median(dat.uhi$cover.tree.city[dat.filter], na.rm=T)
+range(dat.uhi$cover.tree.city[dat.filter], na.rm=T)
+quantile(dat.uhi$cover.tree.city[dat.filter], c(0.025, 0.975), na.rm=T)
+
+# city with highest cover
+dat.uhi[dat.uhi$cover.tree.city==max(dat.uhi$cover.tree.city[dat.filter], na.rm=T),]
+dat.uhi[dat.uhi$cover.tree.buff==max(dat.uhi$cover.tree.buff[dat.filter], na.rm=T),]
+
+dat.uhi[dat.uhi$cover.]
+dat.uhi[dat.uhi$d.cover.tree.buff==max(dat.uhi$d.cover.tree.buff[dat.filter], na.rm=T),]
 
 png(file.path(path.figs, "TreeBenefits_UrbanHeatIsland_TreeCover_City_Map.png"), height=4, width=8, units="in", res=220)
 world <- map_data("world")
@@ -337,6 +347,9 @@ dat.uhi$cover.dom.city <- apply(dat.uhi[,c("cover.tree.city", "cover.veg.city", 
 dat.uhi$cover.dom.buff <- apply(dat.uhi[,c("cover.tree.buff", "cover.veg.buff", "cover.noveg.buff")], 1, FUN=function(x){ifelse(!is.na(x[1]), c("tree", "other veg", "no veg")[which(x==max(x, na.rm=T))], NA)})
 # dat.uhi$cover.dom.city <- as.factor(dat.uhi$cover.dom.city)
 # dat.uhi$cover.dom.buff <- as.factor(dat.uhi$cover.dom.buff)
+dat.uhi[dat.filter & dat.uhi$cover.dom.city=="tree" & !is.na(dat.uhi$cover.tree.city) ,]
+summary(as.factor(dat.uhi$cover.dom.city[dat.filter]))
+summary(as.factor(dat.uhi$cover.dom.buff[dat.filter]))
 summary(dat.uhi)
 
 city.buffer <- stack(dat.uhi[dat.filter,c("cover.dom.city", "cover.dom.buff")])
