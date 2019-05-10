@@ -63,7 +63,7 @@ buff.use = 10
 pb <- txtProgressBar(min=0, max=nrow(dat.uhi), style=3)
 yr.process <- 2011:2015
 for(i in 1:nrow(dat.uhi)){
-  # i=which(dat.uhi$NAME=="Chicago") # MEDELLIN
+  # i=which(dat.uhi$NAME=="Chicago")
   # i=which(dat.uhi$NAME=="MEDELLIN")
   # i=which(dat.uhi$NAME=="Tokyo")
   # i=which(dat.uhi$NAME=="Nashville-Davidson")
@@ -126,9 +126,18 @@ for(i in 1:nrow(dat.uhi)){
   dat.uhi[i,"prop.temp.n.lo"] <- length(which(dat.city$temp.n<=n.lo & !is.na(dat.city$temp.n)))/length(which(!is.na(dat.city$temp.n)))
   
   # Remove missing values and cells with questionable temperature data for our own sanity; also require multiple years
-  dat.city <- dat.city[!is.na(dat.city$temp.dev.summer2) & dat.city$temp.n>n.lo,]
-  summary(dat.city); dim(dat.city)
-  if(nrow(dat.city)<=50*length(unique(dat.city$year)) | length(unique(dat.city$year))<2) next
+  dat.exclude <- is.na(dat.city$temp.dev.summer2) & dat.city$temp.n<=n.lo
+  # dat.city <- dat.city[,]
+  summary(dat.city[!dat.exclude,]); dim(dat.city[!dat.exclude,])
+  
+  # Note, because we can't predict in years we don't have *any* data, we need to exclude those years entirely
+  dat.city <- dat.city[dat.city$year %in% unique(dat.city$year[!dat.exclude]),]
+  dat.uhi[i,"n.years"] <- length(unique(dat.city$year))
+  
+  # Need to redo indices now because we've screwed it up by getting rid of blank years
+  dat.exclude <- is.na(dat.city$temp.dev.summer2) & dat.city$temp.n<=n.lo
+  
+  if(nrow(dat.city[!dat.exclude,])<=50*length(unique(dat.city$year)) | length(unique(dat.city$year[!dat.exclude]))<2) next
   
   # dim(dat.city)
   
@@ -145,7 +154,7 @@ for(i in 1:nrow(dat.uhi)){
   # ---------------------------
   # Fit models to predict temperature based on elevation and land cover
   # ---------------------------
-  # Because we'll attempt 
+  # Because we'll attempt a log model
   dat.city[dat.city$cover.tree==0, "cover.tree"] <- 0.1
   dat.city[dat.city$cover.veg==0, "cover.veg"] <- 0.1
   dat.city[dat.city$cover.noveg==0, "cover.noveg"] <- 0.1
@@ -153,8 +162,10 @@ for(i in 1:nrow(dat.uhi)){
   # -------
   # Simple generalized additive models that work for a single year of data 
   # -------
-  mod.gam.lin <- gam(temp.dev.summer2 ~ cover.tree + cover.veg + cover.noveg + elevation + s(x,y) + as.factor(year), data=dat.city)
-  mod.gam.log <- gam(temp.dev.summer2 ~ log(cover.tree) + log(cover.veg) + log(cover.noveg) + elevation + s(x,y) + as.factor(year), data=dat.city)
+  mod.gam.lin <- gam(temp.summer ~ cover.tree + cover.veg + cover.noveg + elevation + s(x,y) + as.factor(year)-1, data=dat.city[!dat.exclude,])
+  mod.gam.log <- gam(temp.summer ~ log(cover.tree) + log(cover.veg) + log(cover.noveg) + elevation + s(x,y) + as.factor(year)-1, data=dat.city[!dat.exclude,])
+  # mod.gam.lin <- gam(temp.dev.summer2 ~ cover.tree + cover.veg + elevation + s(x,y) + as.factor(year), data=dat.city)
+  # mod.gam.log <- gam(temp.dev.summer2 ~ log(cover.tree) + log(cover.veg) + elevation + s(x,y) + as.factor(year), data=dat.city)
   # AIC(mod.gam.lin, mod.gam.log)
 
   sum.lin <- summary(mod.gam.lin)
@@ -178,8 +189,8 @@ for(i in 1:nrow(dat.uhi)){
   dat.uhi[i, "tree.slope.log"] <- sum.log$p.coeff["log(cover.tree)"]
   dat.uhi[i, "veg.slope.lin"] <- sum.lin$p.coeff["cover.veg"]
   dat.uhi[i, "veg.slope.log"] <- sum.log$p.coeff["log(cover.veg)"]
-  dat.uhi[i, "noveg.slope.lin"] <- sum.lin$p.coeff["cover.noveg"]
-  dat.uhi[i, "noveg.slope.log"] <- sum.log$p.coeff["log(cover.noveg)"]
+  # dat.uhi[i, "noveg.slope.lin"] <- sum.lin$p.coeff["cover.noveg"]
+  # dat.uhi[i, "noveg.slope.log"] <- sum.log$p.coeff["log(cover.noveg)"]
   
   if(sum.lin$r.sq >= sum.log$r.sq) {
     mod.gam <- mod.gam.lin
@@ -204,10 +215,10 @@ for(i in 1:nrow(dat.uhi)){
     dat.uhi[i, "noveg.pval"] <- sum.log$p.pv["log(cover.veg)"]
     
   }
-  
+
   gam.summary <- summary(mod.gam)
-  dat.city$gam.pred <- predict(mod.gam)
-  dat.city$gam.resid <- resid(mod.gam)
+  dat.city$gam.pred <- predict(mod.gam, newdata=dat.city)
+  dat.city$gam.resid[!dat.exclude] <- resid(mod.gam)
   # plot(mod.gam)
   
   png(file.path(path.dat, "cities_full_sdei_v6", "analysis_all_years", paste0(dat.uhi$NAME[i], "_GAM_qaqc.png")), height=6, width=6, units="in", res=120)
@@ -226,10 +237,16 @@ for(i in 1:nrow(dat.uhi)){
   # ---------
   # Scenario 1: Trees to No Veg
   # ---------
+  # Just get rid of trees to do their raw effects
+  dat.new <- dat.city
+  dat.new$cover.tree <- min(dat.city$cover.tree, na.rm=T)
+  dat.city$pred.trees <- predict(mod.gam, newdata=dat.new)
+  dat.city$diff.trees <- dat.city$pred.trees - dat.city$gam.pred 
+
+  # Covert trees to no veg
   dat.new <- dat.city
   dat.new$cover.noveg <- dat.new$cover.noveg + (dat.new$cover.tree - min(dat.city$cover.tree, na.rm=T))
   dat.new$cover.tree <- min(dat.city$cover.tree, na.rm=T)
-  
   dat.city$pred.trees2noveg <- predict(mod.gam, newdata=dat.new)
   dat.city$diff.trees2noveg <- dat.city$pred.trees2noveg - dat.city$gam.pred 
   # ---------
@@ -237,10 +254,10 @@ for(i in 1:nrow(dat.uhi)){
   # ---------
   # Scenario 2: Trees to Other Veg
   # ---------
+  # Covert trees to no veg
   dat.new <- dat.city
   dat.new$cover.veg <- dat.new$cover.veg + (dat.new$cover.tree - min(dat.city$cover.tree, na.rm=T))
   dat.new$cover.tree <- min(dat.city$cover.tree, na.rm=T)
-  
   dat.city$pred.trees2veg <- predict(mod.gam, newdata=dat.new)
   dat.city$diff.trees2veg <- dat.city$pred.trees2veg - dat.city$gam.pred 
   # ---------
@@ -248,10 +265,16 @@ for(i in 1:nrow(dat.uhi)){
   # ---------
   # Scenario 3: Other Veg to No Veg
   # ---------
+  # Just get rid of veg to do their raw effects
+  dat.new <- dat.city
+  dat.new$cover.veg <- min(dat.city$cover.veg, na.rm=T)
+  dat.city$pred.veg <- predict(mod.gam, newdata=dat.new)
+  dat.city$diff.veg <- dat.city$pred.veg - dat.city$gam.pred 
+  
+  
   dat.new <- dat.city
   dat.new$cover.noveg <- dat.new$cover.noveg + (dat.new$cover.veg - min(dat.city$cover.veg, na.rm=T))
   dat.new$cover.veg <- min(dat.city$cover.veg, na.rm=T)
-  
   dat.city$pred.veg2noveg <- predict(mod.gam, newdata=dat.new)
   dat.city$diff.veg2noveg <- dat.city$pred.veg2noveg - dat.city$gam.pred 
   # ---------
@@ -263,7 +286,7 @@ for(i in 1:nrow(dat.uhi)){
   # -------------------------
   # Doing some summary statistics of the city data
   # -------------------------
-  vars.agg <- c("temp.summer", "cover.tree", "cover.veg", "cover.noveg", "gam.pred", "diff.trees2noveg", "diff.trees2veg", "diff.veg2noveg")
+  vars.agg <- c("temp.summer", "cover.tree", "cover.veg", "cover.noveg", "gam.pred", "diff.trees", "diff.veg",  "diff.trees2noveg", "diff.trees2veg", "diff.veg2noveg")
   city.summary <- aggregate(dat.city[,vars.agg], 
                             by=dat.city[,c("location", "year")],
                             FUN=mean, na.rm=T)
@@ -326,6 +349,8 @@ for(i in 1:nrow(dat.uhi)){
   dat.uhi[i, "d.cover.tree.buff"] <- -mean(city.summary[city.summary$location==buff.use,"d.cover.tree.buff"], na.rm=T)
   dat.uhi[i, "d.cover.veg.buff"] <- -mean(city.summary[city.summary$location==buff.use,"d.cover.veg.buff"], na.rm=T)
   dat.uhi[i, "d.cover.noveg.buff"] <- -mean(city.summary[city.summary$location==buff.use,"d.cover.noveg.buff"], na.rm=T)
+  dat.uhi[i, "Tdiff.trees.city"] <- mean(city.summary[city.summary$location==0,"diff.trees"], na.rm=T)
+  dat.uhi[i, "Tdiff.veg.city"] <- mean(city.summary[city.summary$location==0,"diff.veg"], na.rm=T)
   dat.uhi[i, "Tdiff.trees2noveg.city"] <- mean(city.summary[city.summary$location==0,"diff.trees2noveg"], na.rm=T)
   dat.uhi[i, "Tdiff.trees2veg.city"] <- mean(city.summary[city.summary$location==0,"diff.trees2veg"], na.rm=T)
   dat.uhi[i, "Tdiff.veg2noveg.city"] <- mean(city.summary[city.summary$location==0,"diff.veg2noveg"], na.rm=T)
@@ -343,13 +368,23 @@ for(i in 1:nrow(dat.uhi)){
   ind.city <- which(dimnames(sum.trend.tree$coefficients)[[1]]==paste0("year:as.factor(location)",0))
   ind.buff <- which(dimnames(sum.trend.tree$coefficients)[[1]]==paste0("year:as.factor(location)",buff.use))
   
-  if(length(ind.city)>0) dat.uhi[i, "trend.cover.tree.city"] <- sum.trend.tree$coefficients[ind.city,1]
-  if(length(ind.buff)>0) dat.uhi[i, "trend.cover.tree.buff"] <- sum.trend.tree$coefficients[ind.buff,1]
-  if(length(ind.city)>0) dat.uhi[i, "trend.cover.veg.city"] <- sum.trend.veg$coefficients[ind.city,1]
-  if(length(ind.buff)>0) dat.uhi[i, "trend.cover.veg.buff"] <- sum.trend.veg$coefficients[ind.buff,1]
-  if(length(ind.city)>0) dat.uhi[i, "trend.cover.noveg.city"] <- sum.trend.noveg$coefficients[ind.city,1]
-  if(length(ind.buff)>0) dat.uhi[i, "trend.cover.noveg.buff"] <- sum.trend.noveg$coefficients[ind.buff,1]
-  
+  if(length(ind.city)>0){
+    dat.uhi[i, "trend.cover.tree.city"] <- sum.trend.tree$coefficients[ind.city,1]
+    dat.uhi[i, "trend.cover.veg.city"] <- sum.trend.veg$coefficients[ind.city,1]
+    dat.uhi[i, "trend.cover.noveg.city"] <- sum.trend.noveg$coefficients[ind.city,1]
+    dat.uhi[i, "p.trend.cover.tree.city"] <- sum.trend.tree$coefficients[ind.city,4]
+    dat.uhi[i, "p.trend.cover.veg.city"] <- sum.trend.veg$coefficients[ind.city,4]
+    dat.uhi[i, "p.trend.cover.noveg.city"] <- sum.trend.noveg$coefficients[ind.city,4]
+  } 
+  if(length(ind.buff)>0){
+    dat.uhi[i, "trend.cover.tree.buff"] <- sum.trend.tree$coefficients[ind.buff,1]
+    dat.uhi[i, "trend.cover.veg.buff"] <- sum.trend.veg$coefficients[ind.buff,1]
+    dat.uhi[i, "trend.cover.noveg.buff"] <- sum.trend.noveg$coefficients[ind.buff,1]
+    dat.uhi[i, "p.trend.cover.tree.buff"] <- sum.trend.tree$coefficients[ind.buff,4]
+    dat.uhi[i, "p.trend.cover.veg.buff"] <- sum.trend.veg$coefficients[ind.buff,4]
+    dat.uhi[i, "p.trend.cover.noveg.buff"] <- sum.trend.noveg$coefficients[ind.buff,4]
+    
+  } 
   
   # ----------
   
