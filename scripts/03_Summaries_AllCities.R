@@ -35,7 +35,7 @@ dat.uhi$Biome2 <- car::recode(dat.uhi$WWF_BIOME,
                               "'mangroves'='Tropical Forest'; 
                               'boreal forest/taiga'='Boreal'; 
                               'desert/xeric shrublands'='Desert'; 
-                              'flodded grassland/savanna'='Grassland/Savanna'; 
+                              'flooded grassland/savanna'='Grassland/Savanna'; 
                               'mediterranean'='Mediterranean'; 
                               'montane grassland/savanna'='Grassland/Savanna'; 
                               'temperate broadleaf/mixed forest'='Temperate Forest';
