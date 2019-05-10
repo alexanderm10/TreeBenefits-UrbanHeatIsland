@@ -55,11 +55,11 @@ hist(dat.uhi$prop.missing)
 hist(dat.uhi$prop.temp.n.lo)
 
 # Calculated urban heat island effect
-hist(dat.uhi$d.temp.summer.buff[!dat.filter])
-mean(dat.uhi$d.temp.summer.buff[!dat.filter], na.rm=T); sd(dat.uhi$d.temp.summer.buff[!dat.filter], na.rm=T)
-median(dat.uhi$d.temp.summer.buff[!dat.filter], na.rm=T)
-range(dat.uhi$d.temp.summer.buff[!dat.filter], na.rm=T)
-quantile(dat.uhi$d.temp.summer.buff[!dat.filter], c(0.025, 0.975), na.rm=T)
+hist(dat.uhi$d.temp.summer.buff[dat.filter])
+mean(dat.uhi$d.temp.summer.buff[dat.filter], na.rm=T); sd(dat.uhi$d.temp.summer.buff[dat.filter], na.rm=T)
+median(dat.uhi$d.temp.summer.buff[dat.filter], na.rm=T)
+range(dat.uhi$d.temp.summer.buff[dat.filter], na.rm=T)
+quantile(dat.uhi$d.temp.summer.buff[dat.filter], c(0.025, 0.975), na.rm=T)
 
 png(file.path(path.figs, "TreeBenefits_UrbanHeatIsland_WarmingEffect_City_Map.png"), height=4, width=8, units="in", res=220)
 world <- map_data("world")
@@ -103,25 +103,16 @@ median(dat.uhi$cover.tree.city[dat.filter], na.rm=T)
 range(dat.uhi$cover.tree.city[dat.filter], na.rm=T)
 quantile(dat.uhi$cover.tree.city[dat.filter], c(0.025, 0.975), na.rm=T)
 
+mean(dat.uhi$cover.veg.city[dat.filter], na.rm=T); sd(dat.uhi$cover.veg.city[dat.filter], na.rm=T)
+mean(dat.uhi$d.cover.veg.buff[dat.filter], na.rm=T); sd(dat.uhi$d.cover.veg.buff[dat.filter], na.rm=T)
+
+
 # city with highest cover
-dat.uhi[dat.uhi$cover.tree.city==max(dat.uhi$cover.tree.city[dat.filter], na.rm=T),]
-dat.uhi[dat.uhi$cover.tree.buff==max(dat.uhi$cover.tree.buff[dat.filter], na.rm=T),]
+dat.uhi[!is.na(dat.uhi$cover.tree.city) & dat.uhi$cover.tree.city==max(dat.uhi$cover.tree.city[dat.filter], na.rm=T),]
+dat.uhi[!is.na(dat.uhi$cover.tree.city) & dat.uhi$cover.tree.buff==max(dat.uhi$cover.tree.buff[dat.filter], na.rm=T),]
 
-dat.uhi[dat.uhi$cover.]
-dat.uhi[dat.uhi$d.cover.tree.buff==max(dat.uhi$d.cover.tree.buff[dat.filter], na.rm=T),]
-
-png(file.path(path.figs, "TreeBenefits_UrbanHeatIsland_TreeCover_City_Map.png"), height=4, width=8, units="in", res=220)
-world <- map_data("world")
-ggplot(data=dat.uhi) +
-  coord_equal(expand=0, ylim=c(-65,80)) +
-  geom_path(data=world, aes(x=long, y=lat, group=group)) +
-  geom_point(aes(x=LONGITUDE, y=LATITUDE, color=cover.tree.city), size=3) +
-  scale_colour_distiller(name="Mean Tree Cover", palette=rev("BrBG"), trans="reverse") +
-  # scale_color_gradient2(low="turquoise4", mid="wheat", high="sienna3", midpoint=0) +
-  # scale_color_gradient(low="003333", high="brown", midpoint=0) +
-  theme_bw() +
-  theme(legend.position="top")
-dev.off()
+# dat.uhi[dat.uhi$cover.]
+dat.uhi[!is.na(dat.uhi$cover.tree.city) & dat.uhi$d.cover.tree.buff==max(dat.uhi$d.cover.tree.buff[dat.filter], na.rm=T),]
 
 # Difference between buffer & urban tree cover
 t.test(dat.uhi$cover.tree.city, dat.uhi$cover.tree.buff, paired=T)
@@ -162,7 +153,7 @@ dev.off()
 
 
 # No difference in tree-cover trends in the urban vs. buffer
-t.test(dat.uhi$trend.cover.tree.city, dat.uhi$trend.cover.tree.buff, paired=T)
+t.test(dat.uhi$trend.cover.tree.city[dat.filter], dat.uhi$trend.cover.tree.buff[dat.filter], paired=T)
 t.test(dat.uhi$trend.cover.tree.city) # Close, but no significant regional trend
 hist(dat.uhi$trend.cover.tree.city)
 mean(dat.uhi$trend.cover.tree.city, na.rm=T); sd(dat.uhi$trend.cover.tree.city, na.rm=T)
@@ -170,33 +161,42 @@ median(dat.uhi$trend.cover.tree.city, na.rm=T)
 quantile(dat.uhi$trend.cover.tree.city, c(0.025, 0.975), na.rm=T)
 
 # Model Summary
-hist(dat.uhi$gam.r2)
-range(dat.uhi$gam.r2, na.rm=T)
-mean(dat.uhi$gam.r2, na.rm=T); sd(dat.uhi$gam.r2, na.rm=T)
+hist(dat.uhi$gam.r2[dat.filter])
+range(dat.uhi$gam.r2[dat.filter], na.rm=T)
+mean(dat.uhi$gam.r2[dat.filter], na.rm=T); sd(dat.uhi$gam.r2[dat.filter], na.rm=T)
 summary(dat.uhi$tree.slope.lin)
 summary(dat.uhi$elevation.slope[dat.filter]) # adiabatic laspe = -9.8˚C/km = -9.8e-3
 
 # Looking for significant 
 summary(dat.uhi$WWF_BIOME)
-dat.filter <- dat.uhi$prop.missing<0.25 & dat.uhi$prop.temp.n.lo<0.33 & !is.na(dat.uhi$gam.r2)
+dat.filter <- dat.uhi$prop.missing<0.25 & dat.uhi$prop.temp.n.lo<0.33 & !is.na(dat.uhi$gam.r2) & !is.na(dat.uhi$Biome2)
 tree.filter <- dat.uhi$cover.tree.90>10
 length(which(dat.filter)); length(which(tree.filter))
 
-cool.filter <- dat.filter & dat.uhi$tree.pval<0.05 & dat.uhi$Tdiff.trees2noveg.city>0
-warm.filter <- dat.filter & dat.uhi$tree.pval<0.05 & dat.uhi$Tdiff.trees2noveg.city<0
-cool.tree <- tree.filter & dat.uhi$tree.pval<0.05 & dat.uhi$Tdiff.trees2noveg.city>0
-warm.tree <- tree.filter & dat.uhi$tree.pval<0.05 & dat.uhi$Tdiff.trees2noveg.city<0
+cool.tree <- dat.filter & dat.uhi$tree.pval<0.05 & dat.uhi$Tdiff.trees2noveg.city>0
+warm.tree <- dat.filter & dat.uhi$tree.pval<0.05 & dat.uhi$Tdiff.trees2noveg.city<0
+cool.veg <- dat.filter & dat.uhi$veg.pval<0.05 & dat.uhi$Tdiff.veg2noveg.city>0
+warm.veg <- dat.filter & dat.uhi$veg.pval<0.05 & dat.uhi$Tdiff.veg2noveg.city<0
 # length(which(cool.tree))/length(which(tree.filter))
 summary(dat.uhi[dat.filter,])
-summary(dat.uhi[tree.filter,])
-summary(dat.uhi[cool.filter,])
-summary(dat.uhi[warm.filter,]) # 6 cities (so far)
+summary(dat.uhi[cool.tree,])
+summary(dat.uhi[warm.tree,]) # 6 cities (so far)
+summary(dat.uhi[cool.veg,])
+summary(dat.uhi[warm.veg,]) 
 summary(dat.uhi[dat.filter & dat.uhi$Tdiff.trees2noveg.city > 10,])
 
+summary(dat.uhi[dat.filter,"gam.r2"])
+
 # length(which(dat.uhi$tree.pval<0.05))/nrow(dat.uhi[,]) # Significant tree effect in 88% of ALL cities, even with bad data
-length(which(cool.filter | warm.filter))/length(which(dat.filter)) # Significant tree effect in 91% of cities
-length(which(cool.filter))/length(which(dat.filter)) # Significant tree cooling effect in 90% of cities
-length(which(warm.filter))/length(which(dat.filter)) # Significant tree warming in effect in 1% of cities
+length(which(cool.tree) | which(warm.tree))/length(which(dat.filter)) # Significant tree effect in 91% of cities
+length(which(cool.tree))/length(which(dat.filter)) # Significant tree cooling effect in 90% of cities
+length(which(warm.tree))/length(which(dat.filter)) # Significant tree warming in effect in 1% of cities
+length(which(cool.veg))/length(which(dat.filter)) # Significant tree cooling effect in 90% of cities
+length(which(warm.veg))/length(which(dat.filter)) # Significant tree warming in effect in 1% of cities
+
+mean(dat.uhi[dat.filter,"Tdiff.trees2veg.city"]/dat.uhi[dat.filter,"Tdiff.veg2noveg.city"])
+sd(dat.uhi[dat.filter,"Tdiff.trees2veg.city"]/dat.uhi[dat.filter,"Tdiff.veg2noveg.city"])
+
 
 # adding a tree filter
 # length(which((cool.tree | warm.tree)))/length(which(tree.filter)) # Significant tree effect in 89% of cities
@@ -204,15 +204,16 @@ length(which(warm.filter))/length(which(dat.filter)) # Significant tree warming 
 # length(which(warm.tree))/length(which(tree.filter)) # Significant tree cooling effect in 1% of cities
 
 # Seeing which tree has warming
-length(which(warm.filter))
-dat.uhi[warm.filter,] 
+length(which(warm.tree))
+dat.uhi[warm.tree,] 
 
-t.test(dat.uhi[cool.filter,"cover.tree.city"], dat.uhi[warm.filter,"cover.tree.city"])
-t.test(dat.uhi[cool.filter,"cover.tree.buff"], dat.uhi[warm.filter,"cover.tree.buff"])
-t.test(dat.uhi[cool.filter,"gam.r2"], dat.uhi[warm.filter,"gam.r2"])
+t.test(dat.uhi[cool.tree,"cover.tree.city"], dat.uhi[warm.tree,"cover.tree.city"])
+t.test(dat.uhi[cool.tree,"cover.tree.buff"], dat.uhi[warm.tree,"cover.tree.buff"])
+t.test(dat.uhi[cool.tree,"gam.r2"], dat.uhi[warm.tree,"gam.r2"])
 
 # Getting the Looking at estimated tree cooling
 hist(dat.uhi$Tdiff.trees2noveg.city[dat.filter])
+t.test(dat.uhi$Tdiff.trees2noveg.city[dat.filter])
 mean(dat.uhi$Tdiff.trees2noveg.city[dat.filter], na.rm=T); sd(dat.uhi$Tdiff.trees2noveg.city[dat.filter], na.rm=T)
 median(dat.uhi$Tdiff.trees2noveg.city[dat.filter], na.rm=T)
 quantile(dat.uhi$Tdiff.trees2noveg.city[dat.filter], c(0.025, 0.975), na.rm=T)
@@ -227,7 +228,6 @@ summary(dat.uhi)
 summary(dat.uhi$d.temp.summer.buff[dat.filter])
 mean(dat.uhi$d.temp.summer.buff[dat.filter], na.rm=T); sd(dat.uhi$d.temp.summer.buff[dat.filter], na.rm=T)  # Estimated 1.4˚C Urban Warming
 
-summary(dat.uhi$cover.tree.city[dat.filter])
 range(dat.uhi$Tdiff.trees2noveg.city[dat.filter], na.rm=T)
 mean(dat.uhi$Tdiff.trees2noveg.city[dat.filter], na.rm=T); sd(dat.uhi$Tdiff.trees2noveg.city[dat.filter], na.rm=T)  # Estimated 2.8˚C cooling from trees (SD 3.0)
 quantile(dat.uhi$Tdiff.trees2noveg.city[dat.filter], c(0.025, 0.975), na.rm=T)
@@ -236,14 +236,20 @@ range(dat.uhi$Tdiff.trees2noveg.city[dat.filter]/dat.uhi$cover.tree.city[dat.fil
 mean(dat.uhi$Tdiff.trees2noveg.city[dat.filter]/dat.uhi$cover.tree.city[dat.filter], na.rm=T); sd(dat.uhi$Tdiff.trees2noveg.city[dat.filter]/dat.uhi$cover.tree.city[dat.filter], na.rm=T)
 quantile(dat.uhi$Tdiff.trees2noveg.city[dat.filter]/dat.uhi$cover.tree.city[dat.filter], c(0.025, 0.975), na.rm=T)
 
+mean(dat.uhi$Tdiff.trees2noveg.city[dat.filter]/dat.uhi$d.temp.summer.buff[dat.filter], na.rm=T); sd(dat.uhi$Tdiff.trees2noveg.city[dat.filter]/dat.uhi$d.temp.summer.buff[dat.filter], na.rm=T)
+
+
 summary(dat.uhi$cover.veg.city[dat.filter])
+t.test(dat.uhi$Tdiff.veg2noveg.city[dat.filter])
 range(dat.uhi$Tdiff.veg2noveg.city[dat.filter], na.rm=T)
 mean(dat.uhi$Tdiff.veg2noveg.city[dat.filter], na.rm=T); sd(dat.uhi$Tdiff.veg2noveg.city[dat.filter], na.rm=T)
 quantile(dat.uhi$Tdiff.veg2noveg.city[dat.filter], c(0.025, 0.975), na.rm=T)
 
 range(dat.uhi$Tdiff.veg2noveg.city[dat.filter]/dat.uhi$cover.veg.city[dat.filter], na.rm=T)
 mean(dat.uhi$Tdiff.veg2noveg.city[dat.filter]/dat.uhi$cover.veg.city[dat.filter], na.rm=T); sd(dat.uhi$Tdiff.veg2noveg.city[dat.filter]/dat.uhi$cover.veg.city[dat.filter], na.rm=T)
-quantile(dat.uhi$Tdiff.veg2noveg.city[dat.filter]/dat.uhi$cover.veg.city, c(0.025, 0.975), na.rm=T)
+quantile(dat.uhi$Tdiff.veg2noveg.city[dat.filter]/dat.uhi$cover.veg.city[dat.filter], c(0.025, 0.975), na.rm=T)
+
+t.test(dat.uhi$Tdiff.trees2noveg.city[dat.filter], dat.uhi$Tdiff.veg2noveg.city[dat.filter])
 
 
 
