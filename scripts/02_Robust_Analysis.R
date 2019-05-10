@@ -287,23 +287,23 @@ for(i in 1:nrow(dat.uhi)){
   # Doing some summary statistics of the city data
   # -------------------------
   vars.agg <- c("temp.summer", "cover.tree", "cover.veg", "cover.noveg", "gam.pred", "diff.trees", "diff.veg",  "diff.trees2noveg", "diff.trees2veg", "diff.veg2noveg")
-  city.summary <- aggregate(dat.city[,vars.agg], 
-                            by=dat.city[,c("location", "year")],
-                            FUN=mean, na.rm=T)
+  # Calculating temperature deviation based off of the regional mean because the current method can be highly biased to uneven representation
+  city.mean <- aggregate(dat.city[,vars.agg],
+                         by=dat.city[,c("Name", "location", "x", "y")], 
+                         FUN=mean, na.rm=T)
+  summary(city.mean)
+  
+  city.summary <- aggregate(city.mean[,vars.agg], by=city.mean[,c("Name", "location")], FUN=mean, na.rm=T)
   summary(city.summary)
   
   vars.diff <- c("temp.summer", "cover.tree", "cover.veg", "cover.noveg")
-  for(YR in unique(city.summary$year)){
-    yr.ind <- which(city.summary$year==YR)
-    dat.ref <- city.summary[city.summary$year==YR & city.summary$location==0,]
+  dat.ref <- city.summary[city.summary$location==0,]
     
-    if(nrow(dat.ref)==0) next
-    
-    for(VAR in vars.diff){
-      city.summary[yr.ind, paste0("d.", VAR, ".buff")] <- city.summary[yr.ind,VAR] - dat.ref[,VAR]
-    }
+  for(VAR in vars.diff){
+    city.summary[, paste0("d.", VAR, ".buff")] <- city.summary[,VAR] - dat.ref[,VAR]
   }
-  summary(city.summary)
+  # city.summary
+  
   
   # ggplot(data=city.summary) +
   #   geom_bar(aes(x=as.factor(location), y=d.temp.summer.buff, fill=as.factor(location)), stat="identity", position="dodge")
@@ -330,36 +330,36 @@ for(i in 1:nrow(dat.uhi)){
   # ----------
   # Saving summary stats 
   # ----------
-  dat.uhi[i, "temp.summer.city"] <- mean(city.summary[city.summary$location==0,"temp.summer"], na.rm=T)
-  dat.uhi[i, "cover.noveg.city"] <- mean(city.summary[city.summary$location==0,"cover.noveg"], na.rm=T)
-  dat.uhi[i, "cover.veg.city"] <- mean(city.summary[city.summary$location==0,"cover.veg"], na.rm=T)
-  dat.uhi[i, "cover.tree.city"] <- mean(city.summary[city.summary$location==0,"cover.tree"], na.rm=T)
-  dat.uhi[i, "cover.noveg.buff"] <- mean(city.summary[city.summary$location==buff.use,"cover.noveg"], na.rm=T)
-  dat.uhi[i, "cover.veg.buff"] <- mean(city.summary[city.summary$location==buff.use,"cover.veg"], na.rm=T)
-  dat.uhi[i, "cover.tree.buff"] <- mean(city.summary[city.summary$location==buff.use,"cover.tree"], na.rm=T)
+  dat.uhi[i, "temp.summer.city"] <- city.summary[city.summary$location==0,"temp.summer"]
+  dat.uhi[i, "cover.noveg.city"] <- city.summary[city.summary$location==0,"cover.noveg"]
+  dat.uhi[i, "cover.veg.city"] <- city.summary[city.summary$location==0,"cover.veg"]
+  dat.uhi[i, "cover.tree.city"] <- city.summary[city.summary$location==0,"cover.tree"]
+  dat.uhi[i, "cover.noveg.buff"] <- city.summary[city.summary$location==buff.use,"cover.noveg"]
+  dat.uhi[i, "cover.veg.buff"] <- city.summary[city.summary$location==buff.use,"cover.veg"]
+  dat.uhi[i, "cover.tree.buff"] <- city.summary[city.summary$location==buff.use,"cover.tree"]
   
   # Regional tree cover stats
-  dat.uhi[i, "cover.tree.min"] <- min(city.summary[city.summary$location==0,"cover.tree"], na.rm=T)
-  dat.uhi[i, "cover.tree.10"] <- quantile(city.summary[city.summary$location==0,"cover.tree"], 0.1, na.rm=T)
-  dat.uhi[i, "cover.tree.med"] <- median(city.summary[city.summary$location==0,"cover.tree"], na.rm=T)
-  dat.uhi[i, "cover.tree.90"] <- quantile(city.summary[city.summary$location==0,"cover.tree"], 0.9, na.rm=T)
-  dat.uhi[i, "cover.tree.max"] <- max(city.summary[city.summary$location==0,"cover.tree"], na.rm=T)
+  dat.uhi[i, "cover.tree.min"] <- min(city.mean[city.mean$location==0,"cover.tree"], na.rm=T)
+  dat.uhi[i, "cover.tree.10"] <- quantile(city.mean[city.mean$location==0,"cover.tree"], 0.1, na.rm=T)
+  dat.uhi[i, "cover.tree.med"] <- median(city.mean[city.mean$location==0,"cover.tree"], na.rm=T)
+  dat.uhi[i, "cover.tree.90"] <- quantile(city.mean[city.mean$location==0,"cover.tree"], 0.9, na.rm=T)
+  dat.uhi[i, "cover.tree.max"] <- max(city.mean[city.mean$location==0,"cover.tree"], na.rm=T)
   
-  dat.uhi[i, "d.temp.summer.buff"] <- -mean(city.summary[city.summary$location==buff.use,"d.temp.summer.buff"], na.rm=T)
-  dat.uhi[i, "d.cover.tree.buff"] <- -mean(city.summary[city.summary$location==buff.use,"d.cover.tree.buff"], na.rm=T)
-  dat.uhi[i, "d.cover.veg.buff"] <- -mean(city.summary[city.summary$location==buff.use,"d.cover.veg.buff"], na.rm=T)
-  dat.uhi[i, "d.cover.noveg.buff"] <- -mean(city.summary[city.summary$location==buff.use,"d.cover.noveg.buff"], na.rm=T)
-  dat.uhi[i, "Tdiff.trees.city"] <- mean(city.summary[city.summary$location==0,"diff.trees"], na.rm=T)
-  dat.uhi[i, "Tdiff.veg.city"] <- mean(city.summary[city.summary$location==0,"diff.veg"], na.rm=T)
-  dat.uhi[i, "Tdiff.trees2noveg.city"] <- mean(city.summary[city.summary$location==0,"diff.trees2noveg"], na.rm=T)
-  dat.uhi[i, "Tdiff.trees2veg.city"] <- mean(city.summary[city.summary$location==0,"diff.trees2veg"], na.rm=T)
-  dat.uhi[i, "Tdiff.veg2noveg.city"] <- mean(city.summary[city.summary$location==0,"diff.veg2noveg"], na.rm=T)
+  dat.uhi[i, "d.temp.summer.buff"] <- -city.summary[city.summary$location==buff.use,"d.temp.summer.buff"]
+  dat.uhi[i, "d.cover.tree.buff"] <- -city.summary[city.summary$location==buff.use,"d.cover.tree.buff"]
+  dat.uhi[i, "d.cover.veg.buff"] <- -city.summary[city.summary$location==buff.use,"d.cover.veg.buff"]
+  dat.uhi[i, "d.cover.noveg.buff"] <- -city.summary[city.summary$location==buff.use,"d.cover.noveg.buff"]
+  dat.uhi[i, "Tdiff.trees.city"] <- city.summary[city.summary$location==0,"diff.trees"]
+  dat.uhi[i, "Tdiff.veg.city"] <- city.summary[city.summary$location==0,"diff.veg"]
+  dat.uhi[i, "Tdiff.trees2noveg.city"] <- city.summary[city.summary$location==0,"diff.trees2noveg"]
+  dat.uhi[i, "Tdiff.trees2veg.city"] <- city.summary[city.summary$location==0,"diff.trees2veg"]
+  dat.uhi[i, "Tdiff.veg2noveg.city"] <- city.summary[city.summary$location==0,"diff.veg2noveg"]
   
   # Quick calculation of veg trends
   # yr.min <- min(city.summary$year); yr.max <- max(city.summary$year)
-  trend.tree <- lm(cover.tree ~ year*as.factor(location)-year, data=city.summary[city.summary$location %in% c(0, buff.use),])
-  trend.veg <- lm(cover.veg ~ year*as.factor(location)-year, data=city.summary[city.summary$location %in% c(0, buff.use),])
-  trend.noveg <- lm(cover.noveg ~ year*as.factor(location)-year, data=city.summary[city.summary$location %in% c(0, buff.use),])
+  trend.tree <- lm(cover.tree ~ year*as.factor(location)-year, data=dat.city[dat.city$location %in% c(0, buff.use),])
+  trend.veg <- lm(cover.veg ~ year*as.factor(location)-year, data=dat.city[dat.city$location %in% c(0, buff.use),])
+  trend.noveg <- lm(cover.noveg ~ year*as.factor(location)-year, data=dat.city[dat.city$location %in% c(0, buff.use),])
   sum.trend.tree <- summary(trend.tree)
   sum.trend.veg <- summary(trend.veg)
   sum.trend.noveg <- summary(trend.noveg)
