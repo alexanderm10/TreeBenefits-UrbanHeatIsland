@@ -153,8 +153,17 @@ dev.off()
 
 
 # No difference in tree-cover trends in the urban vs. buffer
+# number of cities with statistical trend in tree cover
+length(which(dat.filter & dat.uhi$p.trend.cover.tree.city<0.05))/length(which(dat.filter)) # 70% of cities have a significant trend in tree cover, but it's mixed as to direction
+length(which(dat.filter & dat.uhi$p.trend.cover.veg.city<0.05))/length(which(dat.filter)) # 
+length(which(dat.filter & dat.uhi$p.trend.cover.noveg.city<0.05))/length(which(dat.filter)) # vast majority of cities have no trend in unvegetated cover
+
+hist(dat.uhi[dat.filter & dat.uhi$p.trend.cover.tree.city<0.05, "trend.cover.tree.city"]) # 
+hist(dat.uhi[dat.filter & dat.uhi$p.trend.cover.veg.city<0.05, "trend.cover.veg.city"]) # 
+hist(dat.uhi[dat.filter & dat.uhi$p.trend.cover.noveg.city<0.05, "trend.cover.noveg.city"]) # 
+
 t.test(dat.uhi$trend.cover.tree.city[dat.filter], dat.uhi$trend.cover.tree.buff[dat.filter], paired=T)
-t.test(dat.uhi$trend.cover.tree.city) # Close, but no significant regional trend
+t.test(dat.uhi$trend.cover.tree.city) # global trend towards slighly increased cover (0.1%/yr), but no real ecological significance
 hist(dat.uhi$trend.cover.tree.city)
 mean(dat.uhi$trend.cover.tree.city, na.rm=T); sd(dat.uhi$trend.cover.tree.city, na.rm=T)
 median(dat.uhi$trend.cover.tree.city, na.rm=T)
@@ -188,15 +197,16 @@ summary(dat.uhi[dat.filter & dat.uhi$Tdiff.trees2noveg.city > 10,])
 summary(dat.uhi[dat.filter,"gam.r2"])
 
 # length(which(dat.uhi$tree.pval<0.05))/nrow(dat.uhi[,]) # Significant tree effect in 88% of ALL cities, even with bad data
-length(which(cool.tree) | which(warm.tree))/length(which(dat.filter)) # Significant tree effect in 91% of cities
-length(which(cool.tree))/length(which(dat.filter)) # Significant tree cooling effect in 90% of cities
-length(which(warm.tree))/length(which(dat.filter)) # Significant tree warming in effect in 1% of cities
+length(which((cool.tree) | (warm.tree)))/length(which(dat.filter)) # Significant tree effect in 91% of cities
+length(which(cool.tree))/length(which(dat.filter)) # Significant tree cooling effect in 89% of cities
+length(which(warm.tree))/length(which(dat.filter)) # Significant tree warming in effect in 2% of cities
 length(which(cool.veg))/length(which(dat.filter)) # Significant tree cooling effect in 90% of cities
 length(which(warm.veg))/length(which(dat.filter)) # Significant tree warming in effect in 1% of cities
 
 mean(dat.uhi[dat.filter,"Tdiff.trees2veg.city"]/dat.uhi[dat.filter,"Tdiff.veg2noveg.city"])
 sd(dat.uhi[dat.filter,"Tdiff.trees2veg.city"]/dat.uhi[dat.filter,"Tdiff.veg2noveg.city"])
 
+dat.uhi[warm.tree,] # 3 Southern Great Lakes forests; 2 Cuaca Valley dry forests, plus a mongolian steppe
 
 # adding a tree filter
 # length(which((cool.tree | warm.tree)))/length(which(tree.filter)) # Significant tree effect in 89% of cities
