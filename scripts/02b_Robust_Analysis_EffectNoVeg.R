@@ -162,8 +162,8 @@ for(i in 1:nrow(dat.uhi)){
   # -------
   # Simple generalized additive models that work for a single year of data 
   # -------
-  mod.gam.lin <- gam(temp.summer ~ cover.tree + cover.veg + elevation + s(x,y) + as.factor(year)-1, data=dat.city[!dat.exclude,])
-  mod.gam.log <- gam(temp.summer ~ log(cover.tree) + log(cover.veg) + elevation + s(x,y) + as.factor(year)-1, data=dat.city[!dat.exclude,])
+  mod.gam.lin <- gam(temp.summer ~ cover.tree + cover.veg + cover.noveg + elevation + s(x,y) + as.factor(year)-1, data=dat.city[!dat.exclude,])
+  mod.gam.log <- gam(temp.summer ~ log(cover.tree) + log(cover.veg) +log(cover.noveg) + elevation + s(x,y) + as.factor(year)-1, data=dat.city[!dat.exclude,])
   # mod.gam.lin <- gam(temp.dev.summer2 ~ cover.tree + cover.veg + elevation + s(x,y) + as.factor(year), data=dat.city)
   # mod.gam.log <- gam(temp.dev.summer2 ~ log(cover.tree) + log(cover.veg) + elevation + s(x,y) + as.factor(year), data=dat.city)
   # AIC(mod.gam.lin, mod.gam.log)
@@ -200,13 +200,6 @@ for(i in 1:nrow(dat.uhi)){
   # sum.lin <- summary(mod.gam.lin$gam)
   # sum.log <- summary(mod.gam.log$gam)
   # -------
-  
-  dat.uhi[i, "tree.slope.lin"] <- sum.lin$p.coeff["cover.tree"]
-  dat.uhi[i, "tree.slope.log"] <- sum.log$p.coeff["log(cover.tree)"]
-  dat.uhi[i, "veg.slope.lin"] <- sum.lin$p.coeff["cover.veg"]
-  dat.uhi[i, "veg.slope.log"] <- sum.log$p.coeff["log(cover.veg)"]
-  # dat.uhi[i, "noveg.slope.lin"] <- sum.lin$p.coeff["cover.noveg"]
-  # dat.uhi[i, "noveg.slope.log"] <- sum.log$p.coeff["log(cover.noveg)"]
   
   # if(sum.lin$r.sq >= sum.log$r.sq) {
   if(max(abs(dat.city$res.lin), na.rm=T) <= max(abs(dat.city$res.log), na.rm=T)) {

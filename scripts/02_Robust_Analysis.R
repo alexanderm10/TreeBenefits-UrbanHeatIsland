@@ -205,7 +205,7 @@ for(i in 1:nrow(dat.uhi)){
   
   # if(sum.lin$r.sq >= sum.log$r.sq) {
   if(max(abs(dat.city$res.lin), na.rm=T) <= max(abs(dat.city$res.log), na.rm=T)) {
-      mod.gam <- mod.gam.lin
+    mod.gam <- mod.gam.lin
     
     dat.uhi[i, "model.type"] <- "linear"
     dat.uhi[i, "gam.r2"] <- sum.lin$r.sq
