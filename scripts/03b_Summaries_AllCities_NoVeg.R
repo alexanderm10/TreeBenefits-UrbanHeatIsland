@@ -1,12 +1,12 @@
 library(ggplot2); library(RColorBrewer)
-# path.figs <- "../figures/v6_vegonly"
-path.figs <- "/Volumes/GoogleDrive/My Drive/TreeBenefits_UrbanHeatIsland/figures/veg_only"
+# path.figs <- "../figures/v6_Effect_NoVeg"
+path.figs <- "/Volumes/GoogleDrive/My Drive/TreeBenefits_UrbanHeatIsland/figures/Effect_noVeg"
 dir.create(path.figs, recursive=T, showWarnings=F)
 
 # --------------------------------------------------------------
 # Look at output
 # --------------------------------------------------------------
-dat.uhi <- read.csv("../data_processed/analysis_cities_summary_sdei_v6.csv")
+dat.uhi <- read.csv("../data_processed/analysis_cities_summary_sdei_v6_noveg.csv")
 dat.filter <- dat.uhi$prop.missing<0.33 & dat.uhi$prop.temp.n.lo<0.33
 
 # Fix some biome mis-specifications
@@ -204,7 +204,7 @@ summary(dat.uhi[cool.tree,])
 summary(dat.uhi[warm.tree,]) # 6 cities (so far)
 summary(dat.uhi[cool.veg,])
 summary(dat.uhi[warm.veg,]) 
-summary(dat.uhi[dat.filter & dat.uhi$Tdiff.trees2noveg.city > 20,])
+summary(dat.uhi[dat.filter & dat.uhi$Tdiff.trees2noveg.city > 10,])
 
 summary(dat.uhi[dat.filter,"gam.r2"])
 
