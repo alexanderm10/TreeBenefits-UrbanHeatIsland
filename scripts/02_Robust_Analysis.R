@@ -67,6 +67,8 @@ for(i in 1:nrow(dat.uhi)){
   # i=which(dat.uhi$NAME=="MEDELLIN")
   # i=which(dat.uhi$NAME=="Tokyo")
   # i=which(dat.uhi$NAME=="Nashville-Davidson")
+  # i=which(dat.uhi$NAME=="Atlanta")
+  # i=which(dat.uhi$NAME=="Cuernavaca")
   
   
   setTxtProgressBar(pb, i)
@@ -96,11 +98,11 @@ for(i in 1:nrow(dat.uhi)){
   if(nrow(dat.city)==0) next
   
   # ggplot(data=dat.city) +
-  #   geom_histogram(aes(x=temp.dev.summer2, fill=year))
+  #   geom_histogram(aes(x=temp.summer, fill=year))
   # ggplot(data=dat.city) +
   #   facet_wrap(~year) +
   #   coord_equal() +
-  #   geom_raster(aes(x=x, y=y, fill=temp.dev.summer2)) +
+  #   geom_raster(aes(x=x, y=y, fill=temp.summer)) +
   #   theme(legend.position="top")
 
   # Remove impossible values and outliers
@@ -141,11 +143,11 @@ for(i in 1:nrow(dat.uhi)){
   
   # dim(dat.city)
   
-  # ggplot(data=dat.city[city.filter,]) +
+  # ggplot(data=dat.city[,]) +
   #   facet_wrap(~year) +
   #   coord_equal() +
   #   geom_raster(aes(x=x, y=y, fill=temp.summer))
-  # ggplot(data=dat.city[city.filter,]) +
+  # ggplot(data=dat.city[,]) +
   #   facet_wrap(~year) +
   #   coord_equal() +
   #   geom_raster(aes(x=x, y=y, fill=cover.tree))
@@ -162,14 +164,30 @@ for(i in 1:nrow(dat.uhi)){
   # -------
   # Simple generalized additive models that work for a single year of data 
   # -------
-  mod.gam.lin <- gam(temp.summer ~ cover.tree + cover.veg + cover.noveg + elevation + s(x,y) + as.factor(year)-1, data=dat.city[!dat.exclude,])
-  mod.gam.log <- gam(temp.summer ~ log(cover.tree) + log(cover.veg) + log(cover.noveg) + elevation + s(x,y) + as.factor(year)-1, data=dat.city[!dat.exclude,])
+  mod.gam.lin <- gam(temp.summer ~ cover.tree + cover.veg + elevation + s(x,y) + as.factor(year)-1, data=dat.city[!dat.exclude,])
+  mod.gam.log <- gam(temp.summer ~ log(cover.tree) + log(cover.veg) + elevation + s(x,y) + as.factor(year)-1, data=dat.city[!dat.exclude,])
   # mod.gam.lin <- gam(temp.dev.summer2 ~ cover.tree + cover.veg + elevation + s(x,y) + as.factor(year), data=dat.city)
   # mod.gam.log <- gam(temp.dev.summer2 ~ log(cover.tree) + log(cover.veg) + elevation + s(x,y) + as.factor(year), data=dat.city)
-  # AIC(mod.gam.lin, mod.gam.log)
+  
 
   sum.lin <- summary(mod.gam.lin)
   sum.log <- summary(mod.gam.log)
+  
+  dat.city$pred.lin <- predict(mod.gam.lin, newdata=dat.city)
+  dat.city$pred.log <- predict(mod.gam.log, newdata=dat.city)
+  dat.city$res.lin <- dat.city$pred.lin - dat.city$temp.summer
+  dat.city$res.log <- dat.city$pred.log - dat.city$temp.summer
+  dat.uhi[i, "R2.lin"] <- sum.lin$r.sq
+  dat.uhi[i, "R2.log"] <- sum.log$r.sq
+  
+  # range(dat.city$res.lin, na.rm=T); range(dat.city$res.log, na.rm=T)
+  # mean(dat.city$res.lin, na.rm=T); sd(dat.city$res.lin, na.rm=T)
+  # mean(dat.city$res.log, na.rm=T); sd(dat.city$res.log, na.rm=T)
+  # plot(pred.log ~ pred.lin, data=dat.city)
+  # plot(pred.lin ~ temp.summer, data=dat.city)
+  # plot(pred.log ~ temp.summer, data=dat.city)
+  # AIC(mod.gam.lin, mod.gam.log)
+  # sum.lin$r.sq; sum.log$r.sq
   # -------
   
   # -------
@@ -185,15 +203,9 @@ for(i in 1:nrow(dat.uhi)){
   # sum.log <- summary(mod.gam.log$gam)
   # -------
   
-  dat.uhi[i, "tree.slope.lin"] <- sum.lin$p.coeff["cover.tree"]
-  dat.uhi[i, "tree.slope.log"] <- sum.log$p.coeff["log(cover.tree)"]
-  dat.uhi[i, "veg.slope.lin"] <- sum.lin$p.coeff["cover.veg"]
-  dat.uhi[i, "veg.slope.log"] <- sum.log$p.coeff["log(cover.veg)"]
-  # dat.uhi[i, "noveg.slope.lin"] <- sum.lin$p.coeff["cover.noveg"]
-  # dat.uhi[i, "noveg.slope.log"] <- sum.log$p.coeff["log(cover.noveg)"]
-  
-  if(sum.lin$r.sq >= sum.log$r.sq) {
-    mod.gam <- mod.gam.lin
+  # if(sum.lin$r.sq >= sum.log$r.sq) {
+  if(max(abs(dat.city$res.lin), na.rm=T) <= max(abs(dat.city$res.log), na.rm=T)) {
+      mod.gam <- mod.gam.lin
     
     dat.uhi[i, "model.type"] <- "linear"
     dat.uhi[i, "gam.r2"] <- sum.lin$r.sq

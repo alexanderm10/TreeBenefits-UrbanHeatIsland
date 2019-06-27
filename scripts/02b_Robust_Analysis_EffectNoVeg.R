@@ -170,6 +170,22 @@ for(i in 1:nrow(dat.uhi)){
   
   sum.lin <- summary(mod.gam.lin)
   sum.log <- summary(mod.gam.log)
+  
+  dat.city$pred.lin <- predict(mod.gam.lin, newdata=dat.city)
+  dat.city$pred.log <- predict(mod.gam.log, newdata=dat.city)
+  dat.city$res.lin <- dat.city$pred.lin - dat.city$temp.summer
+  dat.city$res.log <- dat.city$pred.log - dat.city$temp.summer
+  dat.uhi[i, "R2.lin"] <- sum.lin$r.sq
+  dat.uhi[i, "R2.log"] <- sum.log$r.sq
+  
+  # range(dat.city$res.lin, na.rm=T); range(dat.city$res.log, na.rm=T)
+  # mean(dat.city$res.lin, na.rm=T); sd(dat.city$res.lin, na.rm=T)
+  # mean(dat.city$res.log, na.rm=T); sd(dat.city$res.log, na.rm=T)
+  # plot(pred.log ~ pred.lin, data=dat.city)
+  # plot(pred.lin ~ temp.summer, data=dat.city)
+  # plot(pred.log ~ temp.summer, data=dat.city)
+  # AIC(mod.gam.lin, mod.gam.log)
+  # sum.lin$r.sq; sum.log$r.sq
   # -------
   
   # -------
@@ -192,7 +208,8 @@ for(i in 1:nrow(dat.uhi)){
   # dat.uhi[i, "noveg.slope.lin"] <- sum.lin$p.coeff["cover.noveg"]
   # dat.uhi[i, "noveg.slope.log"] <- sum.log$p.coeff["log(cover.noveg)"]
   
-  if(sum.lin$r.sq >= sum.log$r.sq) {
+  # if(sum.lin$r.sq >= sum.log$r.sq) {
+  if(max(abs(dat.city$res.lin), na.rm=T) <= max(abs(dat.city$res.log), na.rm=T)) {
     mod.gam <- mod.gam.lin
     
     dat.uhi[i, "model.type"] <- "linear"
