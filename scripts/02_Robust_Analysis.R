@@ -57,7 +57,7 @@ filter.outliers <- function(DAT, n.sigma=6, max.iters=10){
 # New plan for quantifying effects of trees on UHI: 
 # apply mean temperature of treeless area to whole area and calculate the difference
 # Set some thresholds for analyses
-n.lo = 2
+n.lo = 2 # Minimum number of time points used to describe that summer's temperature
 buff.use = 10
 
 pb <- txtProgressBar(min=0, max=nrow(dat.uhi), style=3)
@@ -173,10 +173,10 @@ for(i in 1:nrow(dat.uhi)){
   sum.lin <- summary(mod.gam.lin)
   sum.log <- summary(mod.gam.log)
   
-  dat.city$pred.lin <- predict(mod.gam.lin, newdata=dat.city)
-  dat.city$pred.log <- predict(mod.gam.log, newdata=dat.city)
-  dat.city$res.lin <- dat.city$pred.lin - dat.city$temp.summer
-  dat.city$res.log <- dat.city$pred.log - dat.city$temp.summer
+  dat.city$pred.lin[!dat.exclude] <- predict(mod.gam.lin, newdata=dat.city[!dat.exclude,])
+  dat.city$pred.log[!dat.exclude] <- predict(mod.gam.log, newdata=dat.city[!dat.exclude,])
+  dat.city$res.lin <- dat.city$temp.summer - dat.city$pred.lin 
+  dat.city$res.log  <- dat.city$temp.summer - dat.city$pred.log 
   dat.uhi[i, "R2.lin"] <- sum.lin$r.sq
   dat.uhi[i, "R2.log"] <- sum.log$r.sq
   
@@ -230,7 +230,7 @@ for(i in 1:nrow(dat.uhi)){
 
   gam.summary <- summary(mod.gam)
   dat.city$gam.pred <- predict(mod.gam, newdata=dat.city)
-  dat.city$gam.resid[!dat.exclude] <- resid(mod.gam)
+  dat.city$gam.resid <- dat.city$temp.summer - dat.city$gam.pred
   # plot(mod.gam)
   
   png(file.path(path.dat, "cities_full_sdei_v6", "analysis_all_years", paste0(dat.uhi$NAME[i], "_GAM_qaqc.png")), height=6, width=6, units="in", res=120)
