@@ -165,20 +165,20 @@ for(i in 1:nrow(dat.uhi)){
   # Simple generalized additive models that work for a single year of data 
   # -------
   mod.gam.lin <- gam(temp.summer ~ cover.tree + cover.veg + elevation + s(x,y) + as.factor(year)-1, data=dat.city[!dat.exclude,])
-  mod.gam.log <- gam(temp.summer ~ log(cover.tree) + log(cover.veg) + elevation + s(x,y) + as.factor(year)-1, data=dat.city[!dat.exclude,])
+  # mod.gam.log <- gam(temp.summer ~ log(cover.tree) + log(cover.veg) + elevation + s(x,y) + as.factor(year)-1, data=dat.city[!dat.exclude,])
   # mod.gam.lin <- gam(temp.dev.summer2 ~ cover.tree + cover.veg + elevation + s(x,y) + as.factor(year), data=dat.city)
   # mod.gam.log <- gam(temp.dev.summer2 ~ log(cover.tree) + log(cover.veg) + elevation + s(x,y) + as.factor(year), data=dat.city)
   
 
   sum.lin <- summary(mod.gam.lin)
-  sum.log <- summary(mod.gam.log)
+  # sum.log <- summary(mod.gam.log)
   
   dat.city$pred.lin[!dat.exclude] <- predict(mod.gam.lin, newdata=dat.city[!dat.exclude,])
-  dat.city$pred.log[!dat.exclude] <- predict(mod.gam.log, newdata=dat.city[!dat.exclude,])
+  # dat.city$pred.log[!dat.exclude] <- predict(mod.gam.log, newdata=dat.city[!dat.exclude,])
   dat.city$res.lin <- dat.city$temp.summer - dat.city$pred.lin 
-  dat.city$res.log  <- dat.city$temp.summer - dat.city$pred.log 
+  # dat.city$res.log  <- dat.city$temp.summer - dat.city$pred.log 
   dat.uhi[i, "R2.lin"] <- sum.lin$r.sq
-  dat.uhi[i, "R2.log"] <- sum.log$r.sq
+  # dat.uhi[i, "R2.log"] <- sum.log$r.sq
   
   # range(dat.city$res.lin, na.rm=T); range(dat.city$res.log, na.rm=T)
   # mean(dat.city$res.lin, na.rm=T); sd(dat.city$res.lin, na.rm=T)
@@ -204,29 +204,32 @@ for(i in 1:nrow(dat.uhi)){
   # -------
   
   # if(sum.lin$r.sq >= sum.log$r.sq) {
-  if(max(abs(dat.city$res.lin), na.rm=T) <= max(abs(dat.city$res.log), na.rm=T)) {
+  # if(max(abs(dat.city$res.lin), na.rm=T) <= max(abs(dat.city$res.log), na.rm=T)) {
     mod.gam <- mod.gam.lin
     
     dat.uhi[i, "model.type"] <- "linear"
     dat.uhi[i, "gam.r2"] <- sum.lin$r.sq
     dat.uhi[i, "gam.dev.exp"] <- sum.lin$dev.expl
+    dat.uhi[i, "tree.slope"] <- sum.lin$p.coeff["cover.tree"]
+    dat.uhi[i, "veg.slope"] <- sum.lin$p.coeff["cover.veg"]
+    dat.uhi[i, "noveg.slope"] <- sum.lin$p.coeff["cover.noveg"]
     dat.uhi[i, "elevation.slope"] <- sum.lin$p.coeff["elevation"]
     dat.uhi[i, "tree.pval"] <- sum.lin$p.pv["cover.tree"]
     dat.uhi[i, "veg.pval"] <- sum.lin$p.pv["cover.veg"]
     dat.uhi[i, "noveg.pval"] <- sum.lin$p.pv["cover.noveg"]
     
-  } else {
-    mod.gam <- mod.gam.log
+  # } else {
+    # mod.gam <- mod.gam.log
     
-    dat.uhi[i, "model.type"] <- "log-effect"
-    dat.uhi[i, "gam.r2"] <- sum.log$r.sq
-    dat.uhi[i, "gam.dev.exp"] <- sum.log$dev.expl
-    dat.uhi[i, "elevation.slope"] <- sum.log$p.coeff["elevation"]
-    dat.uhi[i, "tree.pval"] <- sum.log$p.pv["log(cover.tree)"]
-    dat.uhi[i, "veg.pval"] <- sum.log$p.pv["log(cover.noveg)"]
-    dat.uhi[i, "noveg.pval"] <- sum.log$p.pv["log(cover.veg)"]
+    # dat.uhi[i, "model.type"] <- "log-effect"
+    # dat.uhi[i, "gam.r2"] <- sum.log$r.sq
+    # dat.uhi[i, "gam.dev.exp"] <- sum.log$dev.expl
+    # dat.uhi[i, "elevation.slope"] <- sum.log$p.coeff["elevation"]
+    # dat.uhi[i, "tree.pval"] <- sum.log$p.pv["log(cover.tree)"]
+    # dat.uhi[i, "veg.pval"] <- sum.log$p.pv["log(cover.noveg)"]
+    # dat.uhi[i, "noveg.pval"] <- sum.log$p.pv["log(cover.veg)"]
     
-  }
+  # }
 
   gam.summary <- summary(mod.gam)
   dat.city$gam.pred <- predict(mod.gam, newdata=dat.city)
@@ -238,7 +241,7 @@ for(i in 1:nrow(dat.uhi)){
   plot(mod.gam)
   hist(dat.city$gam.resid)
   plot(gam.resid ~ gam.pred, data=dat.city); abline(h=0, col="red")
-  plot(temp.dev.summer ~ gam.pred, data=dat.city); abline(a=0, b=1, col="red")
+  plot(temp.summer ~ gam.pred, data=dat.city); abline(a=0, b=1, col="red")
   par(mfrow=c(1,1))
   dev.off()
   # ---------------------------

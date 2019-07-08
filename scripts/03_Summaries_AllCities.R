@@ -1,6 +1,6 @@
 library(ggplot2); library(RColorBrewer)
-# path.figs <- "../figures/v6_vegonly"
-path.figs <- "/Volumes/GoogleDrive/My Drive/TreeBenefits_UrbanHeatIsland/figures/veg_only"
+path.figs <- "../figures/v6_vegonly"
+# path.figs <- "/Volumes/GoogleDrive/My Drive/TreeBenefits_UrbanHeatIsland/figures/veg_only"
 dir.create(path.figs, recursive=T, showWarnings=F)
 
 # --------------------------------------------------------------
