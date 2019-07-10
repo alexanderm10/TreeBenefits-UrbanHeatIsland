@@ -222,6 +222,22 @@ png(file.path(path.figs, "TreeBenefits_UrbanHeatIsland_CoverType_Buffer_Map.png"
 map.buffer.cover
 dev.off()
 
+cover.comp <- stack(city.buffer[,c("cover.tree", "cover.veg", "cover.noveg")])
+names(cover.comp) <- c("cover", "type")
+cover.comp[,c("Name", "Biome2", "location", "cover.dom", "cool.tree", "cool.veg")] <- city.buffer[,c("Name", "Biome2", "location", "cover.dom", "cool.tree", "cool.veg")]
+cover.comp$trend <- stack(city.buffer[,c("trend.tree", "trend.veg", "trend.noveg")])[,1]
+summary(cover.comp)
+
+png(file.path(path.figs, "TreeBenefits_UrbanHeatIsland_DominantCover_CityBuff.png"), height=6, width=6, units="in", res=220)
+ggplot(data=city.buffer[!is.na(city.buffer$cover.dom),]) +
+  geom_bar(aes(x=cover.dom, fill=location), stat="count", position="dodge") +
+  scale_x_discrete(name="Dominant Cover Type") +
+  scale_y_continuous(name="# Cities", expand=c(0,0)) +
+  scale_fill_manual(values=c("#af8dc3", "#7fbf7b")) +
+  theme_bw() +
+  theme(legend.position=c(0.8, 0.8))
+dev.off()
+
 
 # comparing difference in cover 
 cover.comp2 <- stack(dat.uhi[dat.filter,c("d.cover.tree.buff", "d.cover.veg.buff", "d.cover.noveg.buff")])
@@ -341,10 +357,9 @@ warm.veg <- dat.filter & dat.uhi$veg.pval<0.05 & dat.uhi$veg.slope>0
 # length(which(cool.tree))/length(which(tree.filter))
 summary(dat.uhi[dat.filter,])
 summary(dat.uhi[cool.tree,])
-summary(dat.uhi[warm.tree,]) # 6 cities (so far)
+summary(dat.uhi[warm.tree,]) # only 1 city
 summary(dat.uhi[cool.veg,])
 summary(dat.uhi[warm.veg,]) 
-summary(dat.uhi[dat.filter & dat.uhi$Tdiff.trees2noveg.city > 10,])
 
 summary(dat.uhi[dat.filter,"gam.r2"])
 
@@ -435,6 +450,142 @@ ggplot(data=effect.comp[,]) +
         panel.background = element_rect(fill=NA, color="black"),
         panel.grid=element_blank())
 dev.off()
+
+
+# Creating a categorical, binned warming response
+dat.uhi$TreeEffect <- round(dat.uhi$Tdiff.trees2noveg.city*4)/4 # To the nearest 0.25 degree
+dat.uhi$TreeEffect2 <- round(dat.uhi$Tdiff.trees2noveg.city) # To the nearest degree
+summary(dat.uhi)
+length(unique(dat.uhi$TreeEffect))
+
+
+# bins <- 100
+# cols <- c("darkblue","darkred")
+# colGradient <- colorRampPalette(cols)
+# cut.cols <- colGradient(bins)
+# cuts <- cut(df$val,bins)
+# names(cuts) <- sapply(cuts,function(t) cut.cols[which(as.character(t) == levels(cuts))])
+# 
+effect.lims <- seq(-1*max(abs(dat.uhi$TreeEffect), na.rm=T), 1*max(abs(dat.uhi$TreeEffect), na.rm=T), by=0.5)
+effect.palette <- colorRampPalette(brewer.pal(11, "BrBG"))(length(effect.lims))
+
+effect.lims2 <- seq(-1*max(abs(dat.uhi$TreeEffect2), na.rm=T), 1*max(abs(dat.uhi$TreeEffect2), na.rm=T), by=1)
+effect.palette2 <- colorRampPalette(brewer.pal(11, "BrBG"))(length(effect.lims2))
+# length(unique())
+
+world <- map_data("world")
+map.tree.cool <- ggplot(data=dat.uhi) +
+  coord_equal(expand=0, ylim=c(-65,80)) +
+  geom_polygon(data=world, aes(x=long, y=lat, group=group), fill="gray50") +
+  geom_point(data=dat.uhi[!dat.filter,], aes(x=LONGITUDE, y=LATITUDE), size=1, color="gray70") +
+  geom_point(data=dat.uhi[dat.filter & dat.uhi$tree.pval>=0.05,], aes(x=LONGITUDE, y=LATITUDE), color="gray30", size=3) +
+  geom_point(data=dat.uhi[dat.filter & dat.uhi$tree.pval<0.05,], aes(x=LONGITUDE, y=LATITUDE, color=-Tdiff.trees2noveg.city), size=3) +
+  scale_color_gradient2(name="Tree\nEffect\n(deg. C)", low = "dodgerblue2", high = "red3", mid = "white", midpoint =0, limits=range(dat.uhi[dat.filter, c("Tdiff.trees2noveg.city", "Tdiff.veg2noveg.city")]*-1)) +
+  theme_bw() +
+  theme(legend.position=c(0.1,0.35),
+        legend.title=element_text(color="white", face="bold", size=rel(1.25)),
+        legend.text=element_text(color="white", size=rel(1.)),
+        legend.background=element_blank(),
+        panel.background = element_rect(fill="black"),
+        panel.grid = element_blank(),
+        axis.text=element_blank(),
+        axis.ticks=element_blank(),
+        axis.title=element_blank())
+
+map.veg.cool <- ggplot(data=dat.uhi) +
+  coord_equal(expand=0, ylim=c(-65,80)) +
+  geom_polygon(data=world, aes(x=long, y=lat, group=group), fill="gray50") +
+  geom_point(data=dat.uhi[!dat.filter,], aes(x=LONGITUDE, y=LATITUDE), size=1, color="gray70") +
+  geom_point(data=dat.uhi[dat.filter & dat.uhi$veg.pval>=0.05,], aes(x=LONGITUDE, y=LATITUDE), color="gray30", size=3) +
+  geom_point(data=dat.uhi[dat.filter & dat.uhi$veg.pval<0.05,], aes(x=LONGITUDE, y=LATITUDE, color=-Tdiff.veg2noveg.city), size=3) +
+  scale_color_gradient2(name="Other Veg.\nEffect\n(deg. C)", low = "dodgerblue2", high = "red3", mid = "white", midpoint=0, limits=range(dat.uhi[dat.filter, c("Tdiff.trees2noveg.city", "Tdiff.veg2noveg.city")]*-1)) +
+  theme_bw() +
+  theme(legend.position=c(0.1,0.35),
+        legend.title=element_text(color="white", face="bold", size=rel(1.25)),
+        legend.text=element_text(color="white", size=rel(1.)),
+        legend.background=element_blank(),
+        panel.background = element_rect(fill="black"),
+        panel.grid = element_blank(),
+        axis.text=element_blank(),
+        axis.ticks=element_blank(),
+        axis.title=element_blank())
+
+
+png(file.path(path.figs, "TreeBenefits_UrbanHeatIsland_Effects_Multiplot_Map_GAM.png"), height=7.5, width=8, units="in", res=220)
+cowplot::plot_grid(map.tree.cool, map.veg.cool, ncol=1)
+dev.off()
+
+png(file.path(path.figs, "TreeBenefits_UrbanHeatIsland_Effects_Trees_Map_GAM.png"), height=3.25, width=8, units="in", res=220)
+map.tree.cool
+dev.off()
+
+png(file.path(path.figs, "TreeBenefits_UrbanHeatIsland_Effects_Veg_Map_GAM.png"), height=3.25, width=8, units="in", res=220)
+map.veg.cool
+dev.off()
+
+
+
+# Comparing cooling effects of the urban heat island effect
+summary(dat.uhi)
+dat.uhi$Temp_NoVeg <- dat.uhi$d.temp.summer.buff + dat.uhi$Tdiff.trees2noveg.city + dat.uhi$Tdiff.veg2noveg.city
+veg.efffects <- stack(dat.uhi[dat.filter,c("d.temp.summer.buff", "Tdiff.trees2noveg.city", "Tdiff.veg2noveg.city", "Temp_NoVeg")])
+veg.efffects[,c("Name", "Biome2", "LATITUDE", "LONGITUDE")] <- dat.uhi[dat.filter, c("NAME", "Biome2", "LATITUDE", "LONGITUDE")]
+veg.efffects$ind <- car::recode(veg.efffects$ind, "'d.temp.summer.buff'='Urban Effect (Observed)'; 'Tdiff.trees2noveg.city'='Tree Effect'; 'Tdiff.veg2noveg.city'='Other Veg Effect'; 'Temp_NoVeg'='No Veg (Modeled)'")
+veg.efffects$values <- ifelse(veg.efffects$ind %in% c("Urban Effect (Observed)", "No Veg (Modeled)"), veg.efffects$values, -veg.efffects$values)
+veg.efffects$ind <- factor(veg.efffects$ind, levels=c("Urban Effect (Observed)", "Tree Effect", "Other Veg Effect", "No Veg (Modeled)"))
+summary(veg.efffects)
+
+
+png(file.path(path.figs, "TreeBenefits_UrbanHeatIsland_WarmingEffects_Veg_Map.png"), height=8, width=8, units="in", res=220)
+world <- map_data("world")
+ggplot(data=veg.efffects[veg.efffects$ind %in% c("Tree Effect", "Other Veg Effect"),]) +
+  facet_grid(ind~.) +
+  coord_equal(expand=0, ylim=c(-65,80)) +
+  geom_polygon(data=world, aes(x=long, y=lat, group=group), fill="gray50") +
+  geom_point(aes(x=LONGITUDE, y=LATITUDE, color=values), size=3) +
+  scale_colour_distiller(name="Effect\non Temperature\n(deg. C)", palette="BrBG", limits=c(-1,1)*max(abs(veg.efffects$values[veg.efffects$ind %in% c("Tree Effect", "Other Veg Effect")]), na.rm=T)) +
+  # scale_color_gradient2(low="turquoise4", mid="wheat", high="sienna3", midpoint=0) +
+  # scale_color_gradient(low="003333", high="brown", midpoint=0) +
+  theme_bw() +
+  theme(legend.position="top",
+        panel.background=element_rect(fill="black"),
+        panel.grid = element_blank())
+dev.off()
+
+
+png(file.path(path.figs, "TreeBenefits_UrbanHeatIsland_WarmingEffects_Histograms_Biome.png"), height=6, width=6, units="in", res=220)
+ggplot(data=veg.efffects) +
+  facet_grid(ind~.) +
+  geom_histogram(aes(x=values, fill=Biome2)) +
+  geom_vline(xintercept=0, linetype="dashed") +
+  scale_x_continuous(name="Temperature (deg. C)", expand=c(0,0)) +
+  scale_y_continuous(name="# of Cities", expand=c(0,0)) +
+  scale_fill_manual(name="Biome", values=paste(biome.pall$color)) +
+  theme(legend.position="top",
+        legend.title=element_text(size=rel(1.5), face="bold"),
+        legend.text=element_text(size=rel(1.25)),
+        axis.text = element_text(size=rel(1.25), color="black"),
+        axis.title=element_text(size=rel(1.25), face="bold"),
+        panel.background = element_rect(fill=NA, color="black"),
+        panel.grid=element_blank())
+dev.off()
+
+png(file.path(path.figs, "TreeBenefits_UrbanHeatIsland_WarmingEffects_Density.png"), height=6, width=6, units="in", res=220)
+ggplot(data=veg.efffects) +
+  # facet_grid(ind~.) +
+  geom_density(aes(x=values, fill=ind), alpha=0.5) +
+  geom_vline(xintercept=0, linetype="dashed") +
+  scale_x_continuous(name="Temperature (deg. C)", expand=c(0,0)) +
+  scale_y_continuous(name="Proportion of Cities", expand=c(0,0)) +
+  scale_fill_manual(values=c("black", "green3", "blue2", "red2")) +
+  theme_bw() +
+  theme(legend.position=c(0.65, 0.8),
+        legend.text = element_text(size=rel(1.5)),
+        # legend.title=element_text(size=rel(1.5), face="bold"),
+        legend.title=element_blank(),
+        panel.grid=element_blank()) 
+dev.off()
+# --------------------------------------------------------------
 
 
 
