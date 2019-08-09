@@ -66,13 +66,13 @@ summary(dat.uhi)
 dim(dat.uhi)
 dim(dat.uhi[dat.filter,])
 dim(dat.uhi[!dat.filter,])
+summary(dat.uhi[!dat.filter,])
 
 hist(dat.uhi$prop.missing)
 hist(dat.uhi$prop.temp.n.lo)
 
 hist(dat.uhi$tree.slope[dat.filter], main="Tree Slope")
 hist(dat.uhi$veg.slope[dat.filter], main="Veg Slope")
-hist(dat.uhi$noveg.slope[dat.filter], main="Non-Veg Slope")
 
 
 # ------------------------------------------------
