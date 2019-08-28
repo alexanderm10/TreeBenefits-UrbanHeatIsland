@@ -17,7 +17,7 @@ n.lo = 2 # Minimum number of time points used to describe that summer's temperat
 buff.use = 10
 
 pb <- txtProgressBar(min=0, max=nrow(dat.uhi), style=3)
-yr.process <- 2011:2015
+# yr.process <- 2011:2015
 for(i in 1:nrow(dat.uhi)){
   # i=which(dat.uhi$NAME=="Chicago")
   # i=which(dat.uhi$NAME=="MEDELLIN")
@@ -26,7 +26,13 @@ for(i in 1:nrow(dat.uhi)){
   # i=which(dat.uhi$NAME=="Atlanta")
   # i=which(dat.uhi$NAME=="Cuernavaca")
   
-  dat.city <- read.csv(file.path(path.dat, "cities_full_sdei_v6", "analysis_all_years", paste0(dat.uhi$NAME[i], "_data_full_analyzed.csv")))
+  setTxtProgressBar(pb, i)
+  path.city <- file.path(path.dat, "cities_full_sdei_v6", "analysis_all_years", paste0(dat.uhi$NAME[i], "_data_full_analyzed.csv"))
+  
+  if(!file.exists(path.city)) next
+  
+  dat.city <- read.csv(path.city)
+  dat.city <- dat.city[dat.city$location==0 & !is.na(dat.city$gam.pred),]
   summary(dat.city)
   dim(dat.city)
   
@@ -40,10 +46,13 @@ for(i in 1:nrow(dat.uhi)){
   # -- if we do, higher humidity where trees are and it's cooler
   # -- if we don't very similar humidty with higher by the lake
   dat.city$RH.adj <- qair2rh(dat.city$GLDAS.Qair, dat.city$temp.summer-273.16, dat.city$GLDAS.Psurf*0.01)*100
+  dat.city$RH.pred <- qair2rh(dat.city$GLDAS.Qair, dat.city$gam.pred-273.16, dat.city$GLDAS.Psurf*0.01)*100
+  dat.city$RH.notree <- qair2rh(dat.city$GLDAS.Qair, dat.city$pred.trees2noveg-273.16, dat.city$GLDAS.Psurf*0.01)*100
   summary(dat.city)
   
-  dat.city$Temp.Summer.C <- dat.city$temp.summer-273.16
-  dat.city$Twb.summer.adj <- calc.wetbulb(TEMP=dat.city$Temp.Summer.C, RH=dat.city$RH.adj)
+  # dat.city$Temp.Summer.C <- dat.city$temp.summer-273.16
+  dat.city$Twb.summer.adj <- calc.wetbulb(TEMP=dat.city$temp.summer-273.16, RH=dat.city$RH.adj)
+  dat.city$Twb.summer.pred <- calc.wetbulb(TEMP=dat.city$gam.pred-273.16, RH=dat.city$RH.adj)
   dat.city$Twb.summer.notree.adj <- calc.wetbulb(TEMP=dat.city$pred.trees2noveg-273.16, RH=dat.city$RH.adj)
   summary(dat.city)
   
@@ -73,4 +82,33 @@ for(i in 1:nrow(dat.uhi)){
 
   # Calculate the percentage of cells in the city that exceed the 35˚ threshold with and without trees
   # Note: need to calculate it per year and then average years
+  df.tmp <- data.frame(year=unique(dat.city$year))
+  
+  for(YR in unique(df.tmp$year)){
+    yr.ind <- which(df.tmp$year==YR)
+    
+    df.tmp[yr.ind, "Twb.obs"] <- mean(dat.city$Twb.summer.adj[dat.city$year==YR], na.rm=T)
+    df.tmp[yr.ind, "Twb.pred"] <- mean(dat.city$Twb.summer.pred[dat.city$year==YR], na.rm=T)
+    df.tmp[yr.ind, "Twb.tree2noveg"] <- mean(dat.city$Twb.summer.notree.adj[dat.city$year==YR], na.rm=T)
+    
+    df.tmp[yr.ind, "p.TwbAbv35.obs"] <- length(dat.city$Twb.summer.adj[dat.city$year==YR & dat.city$Twb.summer.adj>35 & !is.na(dat.city$Twb.summer.adj)])/length(dat.city$Twb.summer.adj[dat.city$year==YR & !is.na(dat.city$Twb.summer.adj)])
+    df.tmp[yr.ind, "p.TwbAbv35.pred"] <- length(dat.city$Twb.summer.pred[dat.city$year==YR & dat.city$Twb.summer.pred>35 & !is.na(dat.city$Twb.summer.pred)])/length(dat.city$Twb.summer.pred[dat.city$year==YR & !is.na(dat.city$Twb.summer.pred)])
+    df.tmp[yr.ind, "p.TwbAbv35.tree2noveg"] <- length(dat.city$Twb.summer.notree.adj[dat.city$year==YR & dat.city$Twb.summer.notree.adj>35 & !is.na(dat.city$Twb.summer.notree.adj)])/length(dat.city$Twb.summer.notree.adj[yr.ind & !is.na(dat.city$Twb.summer.notree.adj)])
+  }
+  
+  dat.uhi[i, "Twb.obs"] <- mean(df.tmp$Twb.obs, na.rm=T)
+  dat.uhi[i, "Twb.pred"] <- mean(df.tmp$Twb.pred, na.rm=T)
+  dat.uhi[i, "Twb.tree2noveg"] <- mean(df.tmp$Twb.tree2noveg, na.rm=T)
+  
+  dat.uhi[i, "p.TwbAbv35.obs"] <- mean(df.tmp$p.TwbAbv35.obs, na.rm=T)
+  dat.uhi[i, "p.TwbAbv35.pred"] <- mean(df.tmp$p.TwbAbv35.pred, na.rm=T)
+  dat.uhi[i, "p.TwbAbv35.tree2noveg"] <- mean(df.tmp$p.TwbAbv35.tree2noveg, na.rm=T)
+  
+  rm(dat.city)
 }
+summary(dat.uhi)
+dat.uhi$Twb35pred
+
+summary(dat.uhi[!is.na(dat.uhi$p.TwbAbv35.obs) & dat.uhi$p.TwbAbv35.tree2noveg>0,c("NAME", "WWF_ECO", "WWF_BIOME", "temp.summer.city", "p.TwbAbv35.obs", "p.TwbAbv35.tree2noveg")])
+
+dat.uhi[!is.na(dat.uhi$p.TwbAbv35.obs) & dat.uhi$p.TwbAbv35.tree2noveg>1e-3,c("NAME", "WWF_ECO", "WWF_BIOME", "temp.summer.city", "p.TwbAbv35.obs", "p.TwbAbv35.tree2noveg")]
