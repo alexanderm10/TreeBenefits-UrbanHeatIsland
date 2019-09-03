@@ -106,9 +106,102 @@ for(i in 1:nrow(dat.uhi)){
   
   rm(dat.city)
 }
+dat.uhi$diff.Twb.tree2noveg <- dat.uhi$Twb.tree2noveg - dat.uhi$Twb.pred
 summary(dat.uhi)
-dat.uhi$Twb35pred
 
-summary(dat.uhi[!is.na(dat.uhi$p.TwbAbv35.obs) & dat.uhi$p.TwbAbv35.tree2noveg>0,c("NAME", "WWF_ECO", "WWF_BIOME", "temp.summer.city", "p.TwbAbv35.obs", "p.TwbAbv35.tree2noveg")])
 
-dat.uhi[!is.na(dat.uhi$p.TwbAbv35.obs) & dat.uhi$p.TwbAbv35.tree2noveg>1e-3,c("NAME", "WWF_ECO", "WWF_BIOME", "temp.summer.city", "p.TwbAbv35.obs", "p.TwbAbv35.tree2noveg")]
+# -------------------------
+# Pulling in the data filtering from the other analyses
+# -------------------------
+dat.filter <- dat.uhi$prop.missing<0.33 & dat.uhi$prop.temp.n.lo<0.33
+
+# Fix some biome mis-specifications
+dat.uhi$WWF_ECO <- as.character(dat.uhi$WWF_ECO)
+dat.uhi$WWF_BIOME <- as.character(dat.uhi$WWF_BIOME)
+dat.uhi[is.na(dat.uhi$WWF_BIOME),]
+dat.uhi[!is.na(dat.uhi$WWF_BIOME) & dat.uhi$WWF_BIOME=="98",]
+
+# Ecoregions based on looking at them on a map on a websites
+dat.uhi[dat.uhi$NAME=="NewYork", c("WWF_ECO", "WWF_BIOME")] <- c("Northeastern coastal forests", "temperate broadleaf/mixed forest")
+dat.uhi[dat.uhi$NAME=="SanJose", c("WWF_ECO", "WWF_BIOME")] <- c("California interior chaparral and woodlands", "mediterranean")
+dat.uhi[dat.uhi$NAME=="VirginiaBeach", c("WWF_ECO", "WWF_BIOME")] <- c("Middle Atlantic coastal forests", "temperate coniferous forest")
+dat.uhi[dat.uhi$NAME=="as-Sib", c("WWF_ECO", "WWF_BIOME")] <- c("Gulf of Oman desert and semi-desert", "desert/xeric shrublands")
+dat.uhi[dat.uhi$NAME=="Genova", c("WWF_ECO", "WWF_BIOME")] <- c("Italian sclerophyllous and semi-deciduous forests", "mediterranean")
+dat.uhi[dat.uhi$NAME=="Itaquari", c("WWF_ECO", "WWF_BIOME")] <- c("Bahia coastal forests", "tropical moist broadleaf forest")
+dat.uhi[dat.uhi$NAME=="Maracaibo", c("WWF_ECO", "WWF_BIOME")] <- c("Guajira-Barranquilla xeric scrub", "desert/xeric shrublands")
+dat.uhi[dat.uhi$NAME=="Shenzhen", c("WWF_ECO", "WWF_BIOME")] <- c("South China-Vietnam subtropical evergreen forests", "tropical moist broadleaf forest")
+dat.uhi[dat.uhi$NAME=="Toronto", c("WWF_ECO", "WWF_BIOME")] <- c("Southern Great Lakes forests", "temperate broadleaf/mixed forest")
+dat.uhi[dat.uhi$NAME=="Rasht", c("WWF_ECO", "WWF_BIOME")] <- c("Caspian Hyrcanian mixed forests", "temperate coniferous forest")
+dat.uhi$WWF_ECO <- as.factor(dat.uhi$WWF_ECO)
+dat.uhi$WWF_BIOME <- as.factor(dat.uhi$WWF_BIOME)
+dat.uhi[dat.uhi$WWF_BIOME=="mangroves",]
+summary(dat.uhi$WWF_BIOME)
+
+
+# Lumping the biomes a bit more to make easier to see figures
+dat.uhi$Biome2 <- car::recode(dat.uhi$WWF_BIOME, 
+                              "'mangroves'='Tropical Forest'; 
+                              'boreal forest/taiga'='Boreal'; 
+                              'desert/xeric shrublands'='Desert'; 
+                              'flooded grassland/savanna'='Grassland/Savanna'; 
+                              'mediterranean'='Mediterranean'; 
+                              'montane grassland/savanna'='Grassland/Savanna'; 
+                              'temperate broadleaf/mixed forest'='Temperate Forest';
+                              'temperate coniferous forest'='Temperate Forest';
+                              'temperate grassland/savanna'='Grassland/Savanna'; 
+                              'tropical coniferous forest'='Tropical Forest'; 
+                              'tropical dry broadleaf forest'='Tropical Forest'; 
+                              'tropical grassland/savannas'='Grassland/Savanna';
+                              'tropical moist broadleaf forest'='Tropical Forest'")
+dat.uhi$Biome2 <- factor(dat.uhi$Biome2, levels=c("Desert", "Grassland/Savanna", "Mediterranean", "Tropical Forest", "Temperate Forest", "Boreal"))
+summary(dat.uhi)
+
+biome.pall = data.frame(biome=c("Desert", "Grassland/Savanna", "Mediterranean", "Tropical Forest", "Temperate Forest", "Boreal"),
+                        color=c("#D55E00", "#E69F00", "#CC79A7", "#009E73", "#56B4E9", "#0072B2"),
+                        color2=c("#8c510a", "#d8b365", "#f6e8c3", "#c7eae5", "#5ab4ac", "#01665e"))
+
+cat.3 <- data.frame(cover=c("tree", "other", "non-veg"),
+                    color=c("#1b9e77", "#7570b3", "#d95f02"),
+                    color2=c("#66c2a5", "#8da0cb", "#fc8d62"),
+                    color3=c("#018571", "#4dac26", "#e66101"),
+                    color4=c("#80cdc1", "#4dac26", "#fbd863"),
+                    color5=c("#1b9e77", "#4dac26", "#d95f02"),
+                    color6=c("#1b9e77", "#b2df8a", "#a6611a"))
+grad.tree <- c("#a6611a", "#dfc27d", "#f5f5f5", "#80cdc1", "#018571") # ends with teal
+grad.other <- c("#d01c8b", "#f1b6da", "#f7f7f7", "#b8e186", "#4dac26") # ends with green
+grad.bare <- c("#5e3c99", "#b2abd2", "#f7f7f7", "#fbd863", "#e66101") # Ends with orange
+
+# -------------------------
+
+
+
+
+
+summary(dat.uhi[dat.filter & !is.na(dat.uhi$p.TwbAbv35.obs) & dat.uhi$p.TwbAbv35.tree2noveg>0,c("NAME", "WWF_ECO", "WWF_BIOME", "temp.summer.city", "p.TwbAbv35.obs", "p.TwbAbv35.pred", "p.TwbAbv35.tree2noveg")])
+
+dat.uhi[dat.filter & !is.na(dat.uhi$p.TwbAbv35.obs) & dat.uhi$p.TwbAbv35.tree2noveg>1e-4,c("NAME", "WWF_ECO", "WWF_BIOME", "temp.summer.city", "p.TwbAbv35.obs", "p.TwbAbv35.pred", "p.TwbAbv35.tree2noveg")]
+
+
+dat.warm <- stack(dat.uhi[dat.filter,c("Tdiff.trees2noveg.city", "diff.Twb.tree2noveg")])
+dat.warm[,c("NAME", "WWF_ECO", "WWF_BIOME", "Biome2", "prop.missing", "prop.temp.n.lo")] <- dat.uhi[dat.filter,c("NAME", "WWF_ECO", "WWF_BIOME", "Biome2", "prop.missing", "prop.temp.n.lo")]
+dat.warm$type <- car::recode(dat.warm$ind, "'Tdiff.trees2noveg.city'='Dry Bulb'; 'diff.Twb.tree2noveg'='Wet Bulb'")
+summary(dat.warm)
+
+png(file.path(path.figs, "WarmingEffect_DryBulbWetBulb_Histogram_Biome.png"), height=4, width=8, units="in", res=220)
+ggplot(data=dat.warm) +
+  facet_grid(type~.) +
+  geom_histogram(aes(x=values, fill=Biome2)) +
+  geom_vline(xintercept=0, linetype="dashed") +
+  scale_x_continuous(name="Urban Warming (deg. C)") +
+  scale_y_continuous(name="# Cities", expand=c(0,0)) +
+  scale_fill_manual(name="Biome", values=paste(biome.pall$color)) +
+  theme(legend.position=c(0.8, 0.8),
+        legend.title=element_text(size=rel(1.5), face="bold"),
+        legend.text=element_text(size=rel(1.25)),
+        axis.text = element_text(size=rel(1.25), color="black"),
+        axis.title=element_text(size=rel(1.25), face="bold"),
+        panel.background = element_rect(fill=NA, color="black"),
+        panel.grid=element_blank(),
+        strip.text = element_text(size=rel(1.25), face="bold"))
+dev.off()
+ 
