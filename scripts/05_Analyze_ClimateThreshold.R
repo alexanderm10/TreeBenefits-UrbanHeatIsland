@@ -1,6 +1,7 @@
 # Analyzing how much trees push temperatures away from the 35˚C Wet Bulb Temperature Threshold
 library(ggplot2); library(RColorBrewer); library(nlme); library(mgcv); 
 path.dat <- "../data_processed/"
+path.figs <- "/Volumes/GoogleDrive/My Drive/TreeBenefits_UrbanHeatIsland/figures/veg_only"
 
 # Read in city summary dataset
 dat.uhi <- read.csv("../data_processed/analysis_cities_summary_sdei_v6.csv")
@@ -106,6 +107,7 @@ for(i in 1:nrow(dat.uhi)){
   
   rm(dat.city)
 }
+dat.uhi$temp.summer.city <- dat.uhi$temp.summer.city-273.16
 dat.uhi$diff.Twb.tree2noveg <- dat.uhi$Twb.tree2noveg - dat.uhi$Twb.pred
 summary(dat.uhi)
 
@@ -185,17 +187,18 @@ dat.uhi[dat.filter & !is.na(dat.uhi$p.TwbAbv35.obs) & dat.uhi$p.TwbAbv35.tree2no
 dat.warm <- stack(dat.uhi[dat.filter,c("Tdiff.trees2noveg.city", "diff.Twb.tree2noveg")])
 dat.warm[,c("NAME", "WWF_ECO", "WWF_BIOME", "Biome2", "prop.missing", "prop.temp.n.lo")] <- dat.uhi[dat.filter,c("NAME", "WWF_ECO", "WWF_BIOME", "Biome2", "prop.missing", "prop.temp.n.lo")]
 dat.warm$type <- car::recode(dat.warm$ind, "'Tdiff.trees2noveg.city'='Dry Bulb'; 'diff.Twb.tree2noveg'='Wet Bulb'")
+dat.warm$MeanTemp.trees <- stack(dat.uhi[dat.filter,c("temp.summer.city", "Twb.pred")])[,1]
 summary(dat.warm)
 
-png(file.path(path.figs, "WarmingEffect_DryBulbWetBulb_Histogram_Biome.png"), height=4, width=8, units="in", res=220)
+png(file.path(path.figs, "Temperature_DryBulbWetBulb_Histogram_Biome.png"), height=6, width=8, units="in", res=220)
 ggplot(data=dat.warm) +
   facet_grid(type~.) +
-  geom_histogram(aes(x=values, fill=Biome2)) +
-  geom_vline(xintercept=0, linetype="dashed") +
-  scale_x_continuous(name="Urban Warming (deg. C)") +
+  geom_histogram(aes(x=MeanTemp.trees, fill=Biome2)) +
+  geom_vline(xintercept=35, linetype="dashed") +
+  scale_x_continuous(name="Mean Summer Temperature (deg. C)") +
   scale_y_continuous(name="# Cities", expand=c(0,0)) +
   scale_fill_manual(name="Biome", values=paste(biome.pall$color)) +
-  theme(legend.position=c(0.8, 0.8),
+  theme(legend.position="top",
         legend.title=element_text(size=rel(1.5), face="bold"),
         legend.text=element_text(size=rel(1.25)),
         axis.text = element_text(size=rel(1.25), color="black"),
@@ -205,3 +208,21 @@ ggplot(data=dat.warm) +
         strip.text = element_text(size=rel(1.25), face="bold"))
 dev.off()
  
+
+png(file.path(path.figs, "WarmingEffect_DryBulbWetBulb_Histogram_Biome.png"), height=6, width=8, units="in", res=220)
+ggplot(data=dat.warm) +
+  facet_grid(type~.) +
+  geom_histogram(aes(x=values, fill=Biome2)) +
+  geom_vline(xintercept=0, linetype="dashed") +
+  scale_x_continuous(name="Urban Warming (deg. C)") +
+  scale_y_continuous(name="# Cities", expand=c(0,0)) +
+  scale_fill_manual(name="Biome", values=paste(biome.pall$color)) +
+  theme(legend.position="top",
+        legend.title=element_text(size=rel(1.5), face="bold"),
+        legend.text=element_text(size=rel(1.25)),
+        axis.text = element_text(size=rel(1.25), color="black"),
+        axis.title=element_text(size=rel(1.25), face="bold"),
+        panel.background = element_rect(fill=NA, color="black"),
+        panel.grid=element_blank(),
+        strip.text = element_text(size=rel(1.25), face="bold"))
+dev.off()
