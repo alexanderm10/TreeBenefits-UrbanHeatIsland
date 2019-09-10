@@ -3,3 +3,4 @@ figures/*
 scripts/.Rhistory
 data_raw/*
 scripts/.Rapp.history
+scripts/.RData

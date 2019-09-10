@@ -85,6 +85,20 @@ median(dat.uhi$d.temp.summer.buff[dat.filter], na.rm=T)
 range(dat.uhi$d.temp.summer.buff[dat.filter], na.rm=T)
 quantile(dat.uhi$d.temp.summer.buff[dat.filter], c(0.025, 0.975), na.rm=T)
 
+# UHI summary by biome
+warm.agg.mean <- aggregate(dat.uhi[dat.filter, c("temp.summer.city", "d.temp.summer.buff", "cover.tree.city", "cover.veg.city", "tree.slope", "veg.slope", "Tdiff.trees2noveg.city", "Tdiff.veg2noveg.city")],
+                      by=list(dat.uhi[dat.filter, "Biome2"]),
+                      FUN=mean)
+names(warm.agg.mean)[1] <- "Biome2"
+warm.agg.mean$temp.summer.city <- warm.agg.mean$temp.summer.city-273.16
+warm.agg.mean
+
+warm.agg.sd <- aggregate(dat.uhi[dat.filter, c("temp.summer.city", "d.temp.summer.buff", "cover.tree.city", "cover.veg.city", "tree.slope", "veg.slope", "Tdiff.trees2noveg.city", "Tdiff.veg2noveg.city")],
+                           by=list(dat.uhi[dat.filter, "Biome2"]),
+                           FUN=sd)
+names(warm.agg.sd)[1] <- "Biome2"
+warm.agg.sd
+
 world <- map_data("world")
 uhi.map <- ggplot(data=dat.uhi[dat.filter,]) +
   coord_equal(expand=0, ylim=c(-65,80)) +
@@ -151,6 +165,18 @@ quantile(dat.uhi$cover.tree.city[dat.filter], c(0.025, 0.975), na.rm=T)
 
 mean(dat.uhi$cover.veg.city[dat.filter], na.rm=T); sd(dat.uhi$cover.veg.city[dat.filter], na.rm=T)
 mean(dat.uhi$d.cover.veg.buff[dat.filter], na.rm=T); sd(dat.uhi$d.cover.veg.buff[dat.filter], na.rm=T)
+
+# Overall veg differences
+mean(dat.uhi$d.cover.tree.buff[dat.filter], na.rm=T); sd(dat.uhi$d.cover.tree.buff[dat.filter], na.rm=T)
+mean(dat.uhi$d.cover.veg.buff[dat.filter], na.rm=T); sd(dat.uhi$d.cover.veg.buff[dat.filter], na.rm=T)
+
+# Differences in arid biomes: Desert, Grassland/Savanna, Mediterranean
+mean(dat.uhi$d.cover.tree.buff[dat.filter & dat.uhi$Biome2 %in% c("Desert", "Grassland/Savanna", "Mediterranean")], na.rm=T); sd(dat.uhi$d.cover.tree.buff[dat.filter & dat.uhi$Biome2 %in% c("Desert", "Grassland/Savanna", "Mediterranean")], na.rm=T)
+mean(dat.uhi$d.cover.veg.buff[dat.filter & dat.uhi$Biome2 %in% c("Desert", "Grassland/Savanna", "Mediterranean")], na.rm=T); sd(dat.uhi$d.cover.veg.buff[dat.filter & dat.uhi$Biome2 %in% c("Desert", "Grassland/Savanna", "Mediterranean")], na.rm=T)
+
+# Differences in forest-dominated biomes
+mean(dat.uhi$d.cover.tree.buff[dat.filter & !dat.uhi$Biome2 %in% c("Desert", "Grassland/Savanna", "Mediterranean")], na.rm=T); sd(dat.uhi$d.cover.tree.buff[dat.filter & !dat.uhi$Biome2 %in% c("Desert", "Grassland/Savanna", "Mediterranean")], na.rm=T)
+mean(dat.uhi$d.cover.veg.buff[dat.filter & !dat.uhi$Biome2 %in% c("Desert", "Grassland/Savanna", "Mediterranean")], na.rm=T); sd(dat.uhi$d.cover.veg.buff[dat.filter & !dat.uhi$Biome2 %in% c("Desert", "Grassland/Savanna", "Mediterranean")], na.rm=T)
 
 
 # city with highest cover
@@ -444,12 +470,20 @@ mean(dat.uhi$Tdiff.veg2noveg.city[dat.filter]); sd(dat.uhi$Tdiff.veg2noveg.city[
 
 
 
+mean(dat.uhi$tree.slope[dat.filter]); sd(dat.uhi$tree.slope[dat.filter])
+summary(dat.uhi[dat.filter & dat.uhi$tree.pval<0.05,])
+
+dat.uhi[dat.filter & dat.uhi$veg.slope<dat.uhi$tree.slope,]
+
 # Comparing effects of different veg types
 names(dat.uhi)
 slope.comp <- stack(dat.uhi[dat.filter,c("tree.slope", "veg.slope")])
+names(slope.comp)[names(slope.comp)=="values"] <- c("slope")
 slope.comp$ind <- car::recode(slope.comp$ind, "'tree.slope'='Trees'; 'veg.slope'='Other Veg.'")
 slope.comp$val.p <- stack(dat.uhi[dat.filter,c("tree.pval", "veg.pval")])$values
-slope.comp[,c("Name", "Biome2")] <- dat.uhi[dat.filter, c("NAME", "Biome2")]
+slope.comp$cover <- stack(dat.uhi[dat.filter,c("cover.tree.city", "cover.veg.city")])$values
+slope.comp$sig <- as.factor(ifelse(slope.comp$val.p<0.05, "p<0.05", "N.S."))
+slope.comp[,c("Name", "Biome2", "temp.summer.city")] <- dat.uhi[dat.filter, c("NAME", "Biome2", "temp.summer.city")]
 slope.comp$ind <- factor(slope.comp$ind, levels=c("Trees", "Other Veg.", "No Veg."))
 summary(slope.comp)
 
@@ -462,11 +496,12 @@ ggplot(data=slope.comp[,]) +
   facet_grid(ind~.) +
   geom_text(data=slope.labels, aes(x=x-0.1, y=y, label=panel.label), size=6, fontface="bold", hjust=0) +
   geom_text(data=slope.labels, aes(x=x, y=y, label=ind), size=6, hjust=0) +
-  geom_histogram(aes(x=values, fill=Biome2)) +
+  geom_histogram(aes(x=slope, fill=Biome2, alpha=sig)) +
   geom_vline(xintercept=0, linetype="dashed") +
   scale_x_continuous(name="Effect Slope (deg C / % Cover)", expand=c(0,0)) +
   scale_y_continuous(name="# Cities", expand=c(0,0)) +
   scale_fill_manual(name="Biome", values=paste(biome.pall$color)) +
+  scale_alpha_manual(name="significance", values=c(0.4, 1)) +
   theme(legend.position="top",
         legend.title=element_text(size=rel(1.25), face="bold"),
         legend.text=element_text(size=rel(1)),
@@ -477,6 +512,49 @@ ggplot(data=slope.comp[,]) +
         panel.background = element_rect(fill=NA, color="black"),
         panel.grid=element_blank())
 dev.off()
+
+png(file.path(path.figs, "TreeBenefits_UrbanHeatIsland_WarmingEffects_Slopes_v_Cover_Biome.png"), height=6, width=6, units="in", res=220)
+ggplot(data=slope.comp[,]) +
+  facet_wrap(ind~., scales="free", ncol=1) +
+  geom_point(aes(x=cover, y=slope, color=Biome2, alpha=sig)) +
+  geom_hline(yintercept=0, linetype="dashed") +
+  scale_y_continuous(name="Effect Slope (deg C / % Cover)") +
+  scale_x_continuous(name="Mean Cover (%)") +
+  scale_color_manual(name="Biome", values=paste(biome.pall$color)) +
+  scale_alpha_manual(name="significance", values=c(0.4, 1)) +
+  theme(legend.position="right",
+        legend.title=element_text(size=rel(1.25), face="bold"),
+        legend.text=element_text(size=rel(1)),
+        legend.key = element_rect(fill=NA),
+        strip.background = element_blank(),
+        strip.text = element_text(size=rel(1.25), face="bold", color="black", hjust=0),
+        axis.text = element_text(size=rel(1), color="black"),
+        axis.title=element_text(size=rel(1.25), face="bold"),
+        panel.background = element_rect(fill=NA, color="black"),
+        panel.grid=element_blank())
+dev.off()
+
+png(file.path(path.figs, "TreeBenefits_UrbanHeatIsland_WarmingEffects_Slopes_v_Temp_Biome.png"), height=6, width=6, units="in", res=220)
+ggplot(data=slope.comp[,]) +
+  facet_wrap(ind~., scales="free", ncol=1) +
+  geom_point(aes(x=temp.summer.city-273.16, y=slope, color=Biome2, alpha=sig)) +
+  geom_hline(yintercept=0, linetype="dashed") +
+  scale_y_continuous(name="Effect Slope (deg C / % Cover)") +
+  scale_x_continuous(name="Mean Summer Temp (deg. C)") +
+  scale_color_manual(name="Biome", values=paste(biome.pall$color)) +
+  scale_alpha_manual(name="significance", values=c(0.4, 1)) +
+  theme(legend.position="right",
+        legend.title=element_text(size=rel(1.25), face="bold"),
+        legend.text=element_text(size=rel(1)),
+        legend.key = element_rect(fill=NA),
+        strip.background = element_blank(),
+        strip.text = element_text(size=rel(1.25), face="bold", color="black", hjust=0),
+        axis.text = element_text(size=rel(1), color="black"),
+        axis.title=element_text(size=rel(1.25), face="bold"),
+        panel.background = element_rect(fill=NA, color="black"),
+        panel.grid=element_blank())
+dev.off()
+
 
 mean(dat.uhi$tree.slope[dat.filter]); sd(dat.uhi$tree.slope[dat.filter])
 mean(dat.uhi$veg.slope[dat.filter]); sd(dat.uhi$veg.slope[dat.filter])
