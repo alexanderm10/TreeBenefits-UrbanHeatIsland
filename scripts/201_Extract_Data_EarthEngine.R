@@ -9,6 +9,7 @@ rgee::ee_Initialize(user = 'crollinson@mortonarb.org', drive=T)
 ##################### 
 # 0. Set up some choices for data quality thresholds
 ##################### 
+yr.analy <- 2001:2020
 thresh.sigma <- 6 # Use 6-sigma outliers for the data filtering\
 thresh.pts <- 50
 thresh.prop <- 0.5 # The proportion of data needed for a time point to be "good"; currenlty 0.5
@@ -384,9 +385,53 @@ print(citiesList$size()$getInfo())
   ## ----------------
   # Now calculate Temperature Deviations
   ## ----------------
+  tempCityAll <- tempCityAll$map(function(img){
+    tempMed <- img$select('LST_Day_1km')$reduceRegion(reducer=ee$Reducer$median(), geometry=cityNow$geometry(), scale=1e3)
+    tempDev <- img$select('LST_Day_1km')$subtract(ee$Number(tempMed$get('LST_Day_1km')))$rename('LST_Day_Dev')$toFloat()
+    return(img$addBands(tempDev))
+  })
+  # print("Temperature Deviation (Raw)", tempCityAll);
+  # Map$addLayer(tempCityAll$first()$select('LST_Day_Dev'), vizTempAnom, 'Surface Temperature - Anomaly');
+  # var devList = tempCityAll.toList(tempCityAll.size())
+  # Map.addLayer(ee.Image(devList.get(12)).select('LST_Day_Dev'), vizTempAnom, 'Surface Temperature - Anomaly');
+  ## ----------------
+  
   
   ## ----------------
+  # Now lets do our annual means
   ## ----------------
+  yrList <- ee$List$sequence(2001, 2020, 1)
+  tempYr <- yrList$map(ee_utils_pyfunc(function(i){
+    YR <- ee$Number(i);
+    START <- ee$Date$fromYMD(YR,1,1);
+    END <- ee$Date$fromYMD(YR,12,31);
+    lstYR <- tempCityAll$filter(ee$Filter$date(START, END))
+    # // var lstDev =  // make each layer an anomaly map
+    tempMean <- lstYR$select('LST_Day_1km')$reduce(ee$Reducer$mean())
+    tempDev <- lstYR$select('LST_Day_Dev')$reduce(ee$Reducer$mean())
+    tempAgg <- ee$Image(tempMean)$addBands(ee$Image(tempDev))
+
+     ## ADD YEAR AS A PROPERTY!!
+    tempAgg <- tempAgg$set(ee$Dictionary(list(Year=YR)))
+    # ee_print(tempAgg)
+    # Map$addLayer(tempAgg$select('LST_Day_1km_mean'), vizTempK, 'Mean Surface Temperature (K)');
+    # Map$addLayer(tempAgg$select('LST_Day_Dev_mean'), vizTempAnom, 'Mean Surface Temperature - Anomaly');
+    
+    return (tempAgg); # update to standardized once read
+    
+  }))
+  tempYr = ee$ImageCollection$fromImages(tempYr) # go ahead and overwrite it since we're just changing form
+  ee_print(tempYr)
+  
+  Map$addLayer(tempYr$select('LST_Day_1km_mean')$first(), vizTempK, 'Mean Surface Temperature (K)');
+  Map$addLayer(tempYr$select('LST_Day_Dev_mean')$first(), vizTempAnom, 'Mean Surface Temperature - Anomaly');
+  ## ----------------
+
+  ## ----------------
+  ## Calculate some of the simple stats & trends; store it in a data frame
+  ## ----------------
+  ## ----------------
+  
   
 # }
 
