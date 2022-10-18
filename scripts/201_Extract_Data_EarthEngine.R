@@ -1,11 +1,11 @@
 # Migrating the Trees & Urban Heat Island workflow to using Google Earht Engine
 
-library(rgee); library(raster); library(rgdal); library(terra)
+library(rgee); library(raster); library(terra)
 ee_check() # For some reason, it's important to run this before initalizing right now
 rgee::ee_Initialize(user = 'crollinson@mortonarb.org', drive=T)
 
 # chi <- readOGR("Chicago.shp")
-path.out <- "~/Desktop/UHI_Test"
+path.out <- "../data_raw/GoogleEarthEngine"
 if(!dir.exists(path.out)) dir.create(path.out, recursive=T)
 
 ##################### 
@@ -236,12 +236,13 @@ elev <- ee$Image('USGS/SRTMGL1_003')$select('elevation')
 
 
 # # I don't know why this is causing issues, but it is
-elevReproj <- elev$reduceResolution(reducer=ee$Reducer$mean())$reproject(projLST)
+# elevReproj <- elev$reduceResolution(reducer=ee$Reducer$mean())$reproject(projLST)
 # ee_print(elevReprojA)
-# 
-# elevReproj <- elev$reproject(projLST)
+
+# Need to use this version of reproject :shrug:
+elevReproj <- elev$reproject(projLST)
 elevReproj <- elevReproj$updateMask(vegMask)
-ee_print(elevReproj)
+# ee_print(elevReproj)
 # Map$addLayer(elevReproj$select("elevation"), list(min=-10, max=5e3))
 
 # Map$addLayer(elevReprojA$select("elevation"), list(min=-10, max=5e3))
@@ -264,7 +265,7 @@ ee_print(citiesTest)
 # Map$addLayer(citiesTest)
 
 
-# Figuring otu how many cities we have (2682 in all)
+# Figuring out how many cities we have (2682 in all)
 ncities <- citiesTest$size()$getInfo()
 # ncities <- citiesUse$size()$getInfo()
 
@@ -453,7 +454,7 @@ for(i in (seq_len(citiesList$length()$getInfo()) - 1)){
   # Map$addLayer(tempYrMean$select('LST_Day_1km_mean')$first(), vizTempK, 'Mean Surface Temperature (K)');
   
   
-  tempYDev <- yrList$map(ee_utils_pyfunc(function(j){
+  tempYrDev <- yrList$map(ee_utils_pyfunc(function(j){
     YR <- ee$Number(j);
     START <- ee$Date$fromYMD(YR,1,1);
     END <- ee$Date$fromYMD(YR,12,31);
