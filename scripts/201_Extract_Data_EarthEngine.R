@@ -5,6 +5,8 @@ ee_check() # For some reason, it's important to run this before initalizing righ
 rgee::ee_Initialize(user = 'crollinson@mortonarb.org', drive=T)
 
 # chi <- readOGR("Chicago.shp")
+path.out <- "~/Desktop/UHI_Test"
+if(!dir.exists(path.out)) dir.create(path.out, recursive=T)
 
 ##################### 
 # 0. Set up some choices for data quality thresholds
@@ -21,6 +23,10 @@ thresh.prop <- 0.5 # The proportion of data needed for a time point to be "good"
 ##################### 
 addTime <- function(image){
   return(image$addBands(image$metadata('system:time_start')$divide(1000 * 60 * 60 * 24 * 365)))
+}
+
+setYear <- function(img){
+  return(img$set("year", img$date()$get("year")))
 }
 
 setNPts <- function(img){
@@ -106,6 +112,12 @@ vizTempAnom <- list(
   palette=tempColors
 );
 
+trendviz = list(
+  bands='scale',
+  min=-3,
+  max=3,
+  palette=c('red', 'yellow', 'gray','cyan', 'blue'))
+
 ##################### 
 
 
@@ -139,12 +151,16 @@ citiesBuff <- citiesUse$map(function(f){f$buffer(10e3)})
 # 2.a.1 - Northern Hemisphere: July/August
 tempJulAug <- ee$ImageCollection('MODIS/006/MOD11A2')$filter(ee$Filter$dayOfYear(181, 240))$filter(ee$Filter$date("2001-01-01", "2020-12-31"))$map(addTime);
 tempJulAug <- tempJulAug$map(lstConvert)
+tempJulAug <- tempJulAug$map(setYear)
+# ee_print(tempJulAug)
+# tempJulAug$first()$propertyNames()$getInfo()
 # ee_print(tempJulAug$first())
 # Map$addLayer(tempJulAug$first()$select('LST_Day_1km'), vizTempK, "Jul/Aug Temperature")
 
 # 2.a.2 - Souther Hemisphere: Jan/Feb
 tempJanFeb <- ee$ImageCollection('MODIS/006/MOD11A2')$filter(ee$Filter$dayOfYear(1, 60))$filter(ee$Filter$date("2001-01-01", "2020-12-31"))$map(addTime);
 tempJanFeb <- tempJanFeb$map(lstConvert)
+tempJanFeb <- tempJulAug$map(setYear)
 # ee_print(tempJanFeb$first())
 
 # Filtering good LST Data --> note: we'll still do some outlier remover from each city
@@ -161,18 +177,13 @@ projLST = lstDayGoodNH$select("LST_Day_1km")$first()$projection()
 # -----------
 # 2.b MODIS Tree Data
 # -----------
-mod44b = ee$ImageCollection('MODIS/006/MOD44B')$filter(ee$Filter$date("2001-01-01", "2020-12-31"))
+mod44b <- ee$ImageCollection('MODIS/006/MOD44B')$filter(ee$Filter$date("2001-01-01", "2020-12-31"))
+mod44b <- mod44b$map(setYear)
 # ee_print(mod44b)
 # Map$addLayer(mod44b$select('Percent_Tree_Cover')$first(), vizTree, 'Percent Tree Cover')
 
-## This worked yesterday, but not today!  :shrug:
-# mod44bReproj = mod44b$map(function(img){
-#   return(img$reduceResolution({ 
-#     reducer=ee$Reducer$mean()
-#   }))$reproject(projLST)
-# })$map(addTime); # add year here!
 
-# This isn't working today.  No f*ng clue hwy
+# This seems to work, but seems to be very slow
 mod44bReproj = mod44b$map(function(img){
   return(img$reduceResolution(reducer=ee$Reducer$mean())$reproject(projLST))
 })$map(addTime); # add year here!
@@ -184,8 +195,8 @@ mod44bReproj = mod44b$map(function(img){
 
 # Create a noVeg Mask
 vegMask <- mod44bReproj$first()$select("Percent_Tree_Cover", "Percent_NonTree_Vegetation", "Percent_NonVegetated")$reduce('sum')$gt(50)$mask()
-ee_print(vegMask)
-Map$addLayer(vegMask)
+# ee_print(vegMask)
+# Map$addLayer(vegMask)
 
 # ee_print(mod44bReproj)
 ee_print(mod44bReproj$first())
@@ -225,10 +236,10 @@ elev <- ee$Image('USGS/SRTMGL1_003')$select('elevation')
 
 
 # # I don't know why this is causing issues, but it is
-elevReprojA <- elev$reduceResolution(reducer=ee$Reducer$mean())$reproject(projLST)
-ee_print(elevReprojA)
+elevReproj <- elev$reduceResolution(reducer=ee$Reducer$mean())$reproject(projLST)
+# ee_print(elevReprojA)
 # 
-elevReproj <- elev$reproject(projLST)
+# elevReproj <- elev$reproject(projLST)
 elevReproj <- elevReproj$updateMask(vegMask)
 ee_print(elevReproj)
 # Map$addLayer(elevReproj$select("elevation"), list(min=-10, max=5e3))
@@ -252,9 +263,6 @@ citiesTest <- citiesBuff$limit(10)
 ee_print(citiesTest)
 # Map$addLayer(citiesTest)
 
-# cityMask <- ee$Image$constant(1)$clip(citiesTest$geometry())$mask()
-# ee_print(cityMask)
-# Map$addLayer(cityMask$first())
 
 # Figuring otu how many cities we have (2682 in all)
 ncities <- citiesTest$size()$getInfo()
@@ -266,13 +274,21 @@ citiesList <- citiesUse$toList(ncities)
 print(citiesList$size()$getInfo())
 
 ### FOR LOOP STARTS HERE
-# for(i in (seq_len(citiesList$length()$getInfo()) - 1)){
   i=0
-  cityNow <- citiesBuff$filter('NAME=="Chicago"')
-  # cityNow <- ee$Feature(citiesList$get(i))
+# for(i in (seq_len(citiesList$length()$getInfo()) - 1)){
+  # cityNow <- citiesBuff$filter('NAME=="Chicago"')$first()
+  cityNow <- ee$Feature(citiesList$get(i))
+  # cityNow$first()$propertyNames()$getInfo()
+  cityID <- cityNow$get("ISOURBID")$getInfo()
+  # cityName <- cityNow$get("NAME")$getInfo()
   Map$centerObject(cityNow)
   Map$addLayer(cityNow)
 
+  pathCity <- file.path(path.out, cityID)
+  dir.create(file.path(pathCity, "elev"), recursive=T, showWarnings=F)
+  dir.create(file.path(pathCity, "VegCover"), recursive=T, showWarnings=F)
+  dir.create(file.path(pathCity, "LST_1km_Day"), recursive=T, showWarnings=F)
+  dir.create(file.path(pathCity, "LST_1km_Day_Dev"), recursive=T, showWarnings=F)
   # cityMask = ee$Image$constant(1)$clip(cityNow$geometry())$mask()
   # cityMask = ee$Image$constant(1)$clip(cityNow$geometry())$mask()
   # ee_print(cityMask)
@@ -290,6 +306,8 @@ print(citiesList$size()$getInfo())
   npts.elev <- npts.elev$getInfo()$elevation
   
   ### *** ###  If we don't have many points in the elevation file, skip the city
+  if(npts.elev<thresh.pts) next
+  # ee_imagecollection_to_local(ic=elevCity, region=cityNow$geometry(), scale=1e3, dsn=file.path(pathCity, "elev", paste0(cityID, "_elevation")))
   #-------
   
   
@@ -303,6 +321,7 @@ print(citiesList$size()$getInfo())
   })
   # ee_print(modCity);
   # Map$addLayer(modCity$select('Percent_Tree_Cover')$first(), vizTree, 'Percent Tree Cover');
+  # modCity$first()$get("year")$getInfo()
   #-------
   
   
@@ -310,7 +329,7 @@ print(citiesList$size()$getInfo())
   #-------
   # Now doing Land Surface Temperature
   #-------
-  cityLat <- cityNow$first()$get("LATITUDE")$getInfo()
+  cityLat <- cityNow$get("LATITUDE")$getInfo()
   
   if(cityLat>0) { tempHemi <- lstNHFinal} else { tempHemi <- lstSHFinal}
   # tempHemi
@@ -325,6 +344,7 @@ print(citiesList$size()$getInfo())
     return(tempNow)
   })
   # ee_print(tempCityAll)
+  # tempCityAll$first()$get("year")$getInfo()
   # Map$addLayer(tempCityAll$first()$select('LST_Day_1km'), vizTempK, "Raw Surface Temperature")
   
   ## ----------------
@@ -392,7 +412,7 @@ print(citiesList$size()$getInfo())
   })
   # print("Temperature Deviation (Raw)", tempCityAll);
   # Map$addLayer(tempCityAll$first()$select('LST_Day_Dev'), vizTempAnom, 'Surface Temperature - Anomaly');
-  # var devList = tempCityAll.toList(tempCityAll.size())
+  # devList = tempCityAll.toList(tempCityAll.size())
   # Map.addLayer(ee.Image(devList.get(12)).select('LST_Day_Dev'), vizTempAnom, 'Surface Temperature - Anomaly');
   ## ----------------
   
@@ -400,19 +420,22 @@ print(citiesList$size()$getInfo())
   ## ----------------
   # Now lets do our annual means
   ## ----------------
-  yrList <- ee$List$sequence(2001, 2020, 1)
-  tempYr <- yrList$map(ee_utils_pyfunc(function(i){
-    YR <- ee$Number(i);
+  # Only iterate through years with some data! 
+  yrList <- ee$List(tempCityAll$aggregate_array("year"))$distinct()
+  
+  tempYrMean <- yrList$map(ee_utils_pyfunc(function(j){
+    YR <- ee$Number(j);
     START <- ee$Date$fromYMD(YR,1,1);
     END <- ee$Date$fromYMD(YR,12,31);
     lstYR <- tempCityAll$filter(ee$Filter$date(START, END))
     # // var lstDev =  // make each layer an anomaly map
     tempMean <- lstYR$select('LST_Day_1km')$reduce(ee$Reducer$mean())
-    tempDev <- lstYR$select('LST_Day_Dev')$reduce(ee$Reducer$mean())
-    tempAgg <- ee$Image(tempMean)$addBands(ee$Image(tempDev))
+    # tempDev <- lstYR$select('LST_Day_Dev')$reduce(ee$Reducer$mean())
+    tempAgg <- ee$Image(tempMean)
 
      ## ADD YEAR AS A PROPERTY!!
-    tempAgg <- tempAgg$set(ee$Dictionary(list(Year=YR)))
+    tempAgg <- tempAgg$set(ee$Dictionary(list(year=YR)))
+    tempAgg <- tempAgg$set(ee$Dictionary(list(`system:index`=YR$format("%03d"))))
     # ee_print(tempAgg)
     # Map$addLayer(tempAgg$select('LST_Day_1km_mean'), vizTempK, 'Mean Surface Temperature (K)');
     # Map$addLayer(tempAgg$select('LST_Day_Dev_mean'), vizTempAnom, 'Mean Surface Temperature - Anomaly');
@@ -420,16 +443,84 @@ print(citiesList$size()$getInfo())
     return (tempAgg); # update to standardized once read
     
   }))
-  tempYr = ee$ImageCollection$fromImages(tempYr) # go ahead and overwrite it since we're just changing form
-  ee_print(tempYr)
+  tempYrMean <- ee$ImageCollection$fromImages(tempYrMean) # go ahead and overwrite it since we're just changing form
+  # ee_print(tempYrMean)
+  tempYrMean$first()$id()$getInfo()
+  # ee_print(tempYrMean$first()$id()$getInfo())
+  # Map$addLayer(tempYrMean$select('LST_Day_1km_mean')$first(), vizTempK, 'Mean Surface Temperature (K)');
   
-  Map$addLayer(tempYr$select('LST_Day_1km_mean')$first(), vizTempK, 'Mean Surface Temperature (K)');
-  Map$addLayer(tempYr$select('LST_Day_Dev_mean')$first(), vizTempAnom, 'Mean Surface Temperature - Anomaly');
+  
+  tempYDev <- yrList$map(ee_utils_pyfunc(function(j){
+    YR <- ee$Number(j);
+    START <- ee$Date$fromYMD(YR,1,1);
+    END <- ee$Date$fromYMD(YR,12,31);
+    lstYR <- tempCityAll$filter(ee$Filter$date(START, END))
+    tempDev <- lstYR$select('LST_Day_Dev')$reduce(ee$Reducer$mean())
+    tempAgg <- ee$Image(tempDev)$rename(ee$String(YR))
+    
+    ## ADD YEAR AS A PROPERTY!!
+    tempAgg <- tempAgg$set(ee$Dictionary(list(year=YR)))
+    tempAgg <- tempAgg$set(ee$Dictionary(list(`system:index`=YR$format("%03d"))))
+    # ee_print(tempAgg)
+    # Map$addLayer(tempAgg$select('LST_Day_1km_mean'), vizTempK, 'Mean Surface Temperature (K)');
+    # Map$addLayer(tempAgg$select('LST_Day_Dev_mean'), vizTempAnom, 'Mean Surface Temperature - Anomaly');
+    
+    return (tempAgg); # update to standardized once read
+    
+  }))
+  tempYrDev <- ee$ImageCollection$fromImages(tempYrDev) # go ahead and overwrite it since we're just changing form
+  # Map$addLayer(tempYr$select('LST_Day_Dev_mean')$first(), vizTempAnom, 'Mean Surface Temperature - Anomaly');
+
+    # ee_imagecollection_to_local(ic=tempYrMean, region=cityNow$geometry(), scale=1e3, dsn="~/Desktop/EarthEngine_TEST_")
+  # testRast <- ee_as_raster(tempYrMean$first())
+  # Map$addLayer(tempYr$select('LST_Day_1km_mean')$first(), vizTempK, 'Mean Surface Temperature (K)');
   ## ----------------
 
+  
+  
+  ## ----------------
+  ## Write everythign out here
+  ## ----------------
+  ee_as_raster(image=elevCity, region=cityNow$geometry(), scale=1e3, dsn=file.path(pathCity, "elev", paste0(cityID, "_elevation")))
+ 
+  ee_imagecollection_to_local(ic=modCity, region=cityNow$geometry(), scale=1e3, dsn=file.path(pathCity, "VegCover", paste0(cityID, "_vegetation_")))
+  ee_imagecollection_to_local(ic=tempYrMean, region=cityNow$geometry(), scale=1e3, dsn=file.path(pathCity, "LST_1km_Day", paste0(cityID, "_LSTday_")))
+  ee_imagecollection_to_local(ic=tempYrDev, region=cityNow$geometry(), scale=1e3, dsn=file.path(pathCity, "LST_1km_Day_Dev", paste0(cityID, "_LSTdev_")))
+  ## ----------------
+  
   ## ----------------
   ## Calculate some of the simple stats & trends; store it in a data frame
   ## ----------------
+  # # meanTree <- modCity$select("Percent_Tree_Cover")$reduce('mean')$reduceRegions(ee$Reducer$mean(), geometry=cityNow$geometry())
+  # trendTree <- modCity$select("system:time_start", "Percent_Tree_Cover")$reduce(ee$Reducer$linearFit())
+  # ee_print(trendTree)
+  
+  # Calcualte: 1) Mean Trend w/ SD; 2) % area increasing, decreasing
+  
+  #  Reducing the temporal trend to get regional averages, etc.
+  # minMaxDictionary <- trendTree$reduceRegion(
+  #   reducer=ee$Reducer$minMax(),
+  #   geometry=cityNow$geometry(),
+  #   scale=1e3
+  # );
+  # minMaxDictionary$getInfo()
+  # 
+  # meanDictionary <- trendTree$reduceRegion(
+  #   reducer=ee$Reducer$mean(),
+  #   geometry=cityNow$geometry(),
+  #   scale=1e3
+  # );
+  # meanDictionary$getInfo()
+  
+  # // var SlopeMinMax = trendTree.select('scale').reduceRegion(ee.Reducer.minMax())
+  # // print("slopeVals", SlopeMinMax)
+  # // print(trendTree.abs().select('scale').reducer(ee.Reducer.max()))
+  
+  # // visualizing the trend
+  # Map$addLayer(trendTree, trendviz, "Tree Trend")
+  
+  
+  # modallchi.select('system:time_start', "Percent_Tree_Cover").reduce(ee.Reducer.linearFit())
   ## ----------------
   
   
