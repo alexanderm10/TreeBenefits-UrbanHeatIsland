@@ -274,15 +274,18 @@ citiesList <- citiesUse$toList(ncities)
 print(citiesList$size()$getInfo())
 
 ### FOR LOOP STARTS HERE
-  i=0
-# for(i in (seq_len(citiesList$length()$getInfo()) - 1)){
+# i=0
+pb <- txtProgressBar(min=0, max=ncities, style=3)
+for(i in (seq_len(citiesList$length()$getInfo()) - 1)){
+  setTxtProgressBar(pb, i)
   # cityNow <- citiesBuff$filter('NAME=="Chicago"')$first()
   cityNow <- ee$Feature(citiesList$get(i))
   # cityNow$first()$propertyNames()$getInfo()
   cityID <- cityNow$get("ISOURBID")$getInfo()
-  # cityName <- cityNow$get("NAME")$getInfo()
-  Map$centerObject(cityNow)
-  Map$addLayer(cityNow)
+  cityName <- cityNow$get("NAME")$getInfo()
+  print(cityName)
+  # Map$centerObject(cityNow)
+  # Map$addLayer(cityNow)
 
   pathCity <- file.path(path.out, cityID)
   dir.create(file.path(pathCity, "elev"), recursive=T, showWarnings=F)
@@ -524,7 +527,7 @@ print(citiesList$size()$getInfo())
   ## ----------------
   
   
-# }
+}
 
 ### FOR LOOP ENDS HERE
 ##################### 
