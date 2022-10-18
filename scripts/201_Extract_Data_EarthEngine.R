@@ -449,7 +449,7 @@ for(i in (seq_len(citiesList$length()$getInfo()) - 1)){
   }))
   tempYrMean <- ee$ImageCollection$fromImages(tempYrMean) # go ahead and overwrite it since we're just changing form
   # ee_print(tempYrMean)
-  tempYrMean$first()$id()$getInfo()
+  # tempYrMean$first()$id()$getInfo()
   # ee_print(tempYrMean$first()$id()$getInfo())
   # Map$addLayer(tempYrMean$select('LST_Day_1km_mean')$first(), vizTempK, 'Mean Surface Temperature (K)');
   
@@ -460,7 +460,7 @@ for(i in (seq_len(citiesList$length()$getInfo()) - 1)){
     END <- ee$Date$fromYMD(YR,12,31);
     lstYR <- tempCityAll$filter(ee$Filter$date(START, END))
     tempDev <- lstYR$select('LST_Day_Dev')$reduce(ee$Reducer$mean())
-    tempAgg <- ee$Image(tempDev)$rename(ee$String(YR))
+    tempAgg <- ee$Image(tempDev)
     
     ## ADD YEAR AS A PROPERTY!!
     tempAgg <- tempAgg$set(ee$Dictionary(list(year=YR)))
