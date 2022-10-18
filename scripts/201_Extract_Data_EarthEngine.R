@@ -1,7 +1,7 @@
 # Migrating the Trees & Urban Heat Island workflow to using Google Earht Engine
 
 library(rgee); library(raster); library(rgdal); library(terra)
-# ee_check()
+ee_check() # For some reason, it's important to run this before initalizing right now
 rgee::ee_Initialize(user = 'crollinson@mortonarb.org', drive=T)
 
 # chi <- readOGR("Chicago.shp")
@@ -181,10 +181,39 @@ mod44bReproj = mod44b$map(function(img){
 # })$map(addTime); # add year here!
 
 
+# Create a noVeg Mask
+vegMask <- mod44bReproj$first()$select("Percent_Tree_Cover", "Percent_NonTree_Vegetation", "Percent_NonVegetated")$reduce('sum')$gt(50)$mask()
+ee_print(vegMask)
+Map$addLayer(vegMask)
+
 # ee_print(mod44bReproj)
 ee_print(mod44bReproj$first())
 # Map$addLayer(mod44bReproj$select('Percent_Tree_Cover')$first(), vizTree, 'Percent Tree Cover')
 # -----------
+
+# -----------
+# Update LST Data with the MODIS veg mask
+# -----------
+# Map$addLayer(lstDayGoodNH$first()$select('LST_Day_1km'), vizTempK, "GOOD Jul/Aug Temperature")
+lstNHmask <- lstDayGoodNH$map(function(IMG){IMG$updateMask(vegMask)})
+lstSHmask <- lstDayGoodSH$map(function(IMG){IMG$updateMask(vegMask)})
+
+# ee_print(lstNHmask$first()$select("LST_Day_1km"))
+lstNHFinal <- lstNHmask$map(function(IMG){
+  dat <- IMG$select("LST_Day_1km")$gt(0)
+  return(IMG$updateMask(dat))
+})
+
+lstSHFinal <- lstSHmask$map(function(IMG){
+  dat <- IMG$select("LST_Day_1km")$gt(0)
+  return(IMG$updateMask(dat))
+})
+
+# test$getInfo()
+# lstNHmasl2 <- lstNHmask
+# Map$addLayer(lstNHFinal$first()$select('LST_Day_1km'), vizTempK, "GOOD MASKED Jul/Aug Temperature")
+# -----------
+
 
 # -----------
 # 2.c  - Elevation (static = easy!)
@@ -194,11 +223,16 @@ elev <- ee$Image('USGS/SRTMGL1_003')$select('elevation')
 # Map$addLayer(elev, list(min=-10, max=5e3))
 
 
-# elevReproj <- elev$reduceResolution(reducer=ee$Reducer$mean())$reproject(projLST)
+# # I don't know why this is causing issues, but it is
+elevReprojA <- elev$reduceResolution(reducer=ee$Reducer$mean())$reproject(projLST)
+ee_print(elevReprojA)
 # 
 elevReproj <- elev$reproject(projLST)
-# # ee_print(elevReproj)
+elevReproj <- elevReproj$updateMask(vegMask)
+ee_print(elevReproj)
 # Map$addLayer(elevReproj$select("elevation"), list(min=-10, max=5e3))
+
+# Map$addLayer(elevReprojA$select("elevation"), list(min=-10, max=5e3))
 
 # -----------
 ##################### 
@@ -233,42 +267,24 @@ print(citiesList$size()$getInfo())
 ### FOR LOOP STARTS HERE
 # for(i in (seq_len(citiesList$length()$getInfo()) - 1)){
   i=0
-  # cityNow <- citiesUse$filter('NAME=="Chicago"')
-  cityNow <- ee$Feature(citiesList$get(i))
+  cityNow <- citiesBuff$filter('NAME=="Chicago"')
+  # cityNow <- ee$Feature(citiesList$get(i))
   Map$centerObject(cityNow)
   Map$addLayer(cityNow)
 
   # cityMask = ee$Image$constant(1)$clip(cityNow$geometry())$mask()
-  cityMask = ee$Image$constant(1)$clip(cityNow$geometry())$mask()
+  # cityMask = ee$Image$constant(1)$clip(cityNow$geometry())$mask()
   # ee_print(cityMask)
-  
-  #-------
-  # Extracting vegetation cover
-  #-------
-  modCity <- mod44bReproj$map(function(img){
-    # First masking to Chicago
-    tmp <- img$mask(cityMask);
-    # then mask to get rid of pixels where our cover doesn't sum to most of our land ocver
-    tmp2 <- tmp$updateMask(tmp$select("Percent_Tree_Cover", "Percent_NonTree_Vegetation", "Percent_NonVegetated")
-                              $reduce('sum')$gt(50));
-    # for now just returning our cover stats, but we may want to add back in the the qaqc 
-    return(tmp2$select("system:time_start", "Percent_Tree_Cover", "Percent_NonTree_Vegetation", "Percent_NonVegetated"))
-  })
-  # ee_print(modCity);
-  # Map$addLayer(modCity$select('Percent_Tree_Cover')$first(), vizTree, 'Percent Tree Cover');
-  
-  # Updating our cityMask with MODIS veg data
-  cityMask <- cityMask$updateMask(modCity$first()$select("Percent_Tree_Cover", "Percent_NonTree_Vegetation", "Percent_NonVegetated")
-                                      $reduce('sum')$gt(50))
-  # Map$addLayer(cityMask)
-  #-------
   
   #-------
   # extracting elevation 
   #-------
-  elevCity <- elevReproj$updateMask(cityMask)
-  # Map$addLayer(elevCity, list(min=-10, max=5000))
+  # elevCity <- elevReproj$updateMask(cityMask)
+  elevCity <- elevReproj$clip(cityNow)
+  # Map$addLayer(elevCity, list(min=-10, max=500))
   
+  # elevNow <- elevCity$reduceRegion(reducer=ee$Reducer$mean(), geometry=cityNow$geometry(), scale=1e3)
+  # elevNow$getInfo()
   npts.elev <- elevCity$reduceRegion(reducer=ee$Reducer$count(), geometry=cityNow$geometry(), scale=1e3)
   npts.elev <- npts.elev$getInfo()$elevation
   
@@ -276,22 +292,35 @@ print(citiesList$size()$getInfo())
   #-------
   
   
+  #-------
+  # Extracting vegetation cover -- we've already masked places where veg/non-veg cover doesn't add up
+  #-------
+  modCity <- mod44bReproj$map(function(img){
+    # First masking to Chicago
+    tmp <- img$clip(cityNow);
+    return(tmp$select("system:time_start", "Percent_Tree_Cover", "Percent_NonTree_Vegetation", "Percent_NonVegetated"))
+  })
+  # ee_print(modCity);
+  # Map$addLayer(modCity$select('Percent_Tree_Cover')$first(), vizTree, 'Percent Tree Cover');
+  #-------
+  
+  
   
   #-------
   # Now doing Land Surface Temperature
   #-------
-  cityLat <- cityNow$get("LATITUDE")$getInfo()
+  cityLat <- cityNow$first()$get("LATITUDE")$getInfo()
   
-  if(cityLat>0) { tempHemi <- lstDayGoodNH} else { tempHemi <- lstDayGoodSH}
+  if(cityLat>0) { tempHemi <- lstNHFinal} else { tempHemi <- lstSHFinal}
   # tempHemi
   
   # Map$addLayer(tempHemi$first()$select('LST_Day_1km'), vizTempK, "Raw Surface Temperature")
   
   # JUST GET AN MASK THE RAW DATA FIRST
   tempCityAll <- tempHemi$map(function(img){
-    tempNow <- img$updateMask(cityMask)
-    dat <- tempNow$gt(0)
-    tempNow <- tempNow$updateMask(dat)
+    tempNow <- img$clip(cityNow)
+    # dat <- tempNow$gt(0)
+    # tempNow <- tempNow$updateMask(dat)
     return(tempNow)
   })
   # ee_print(tempCityAll)
@@ -302,7 +331,6 @@ print(citiesList$size()$getInfo())
   ##   -- because we can't compute means etc when there are no good values
   ##   -- resource from Ren https://gis.stackexchange.com/questions/276791/removing-images-based-on-band-threshold-using-google-earth-engine
   ## ----------------
-
   tempCityAll <- tempCityAll$map(setNPts)
   # ee_print(tempCityAll$first())
   # print(tempCityAll$first()$get("n_Pts")$getInfo())
@@ -311,6 +339,7 @@ print(citiesList$size()$getInfo())
   tempCityAll <- tempCityAll$filter(ee$Filter$gte("n_Pts", thresh.pts)) # have at least 50 points (see top of script)
   tempCityAll <- tempCityAll$filter(ee$Filter$gte("p_Pts", thresh.prop)) # Have at least 50% of the data
   # ee_print(tempCityAll)
+  # Map$addLayer(tempCityAll$first()$select('LST_Day_1km'), vizTempK, "Raw Surface Temperature")
   ## ----------------
   
   ## ----------------
@@ -318,12 +347,12 @@ print(citiesList$size()$getInfo())
   # #  NOTE : THIS DOESN"T WORK YET!
   # Once it DOES work, we can re-run the the setNPts
   ## ----------------
-  tempCityAll <- tempCityAll$map(function(img){
+  lstOutliers <- function(img){
     # Calculate the means & sds for the region
     tempStats <- img$select("LST_Day_1km")$reduceRegion(reducer=ee$Reducer$mean()$combine(
-                                        reducer2=ee$Reducer$stdDev(), sharedInputs=T),
-                                      geometry=cityNow$geometry(), scale=1e3)
-  
+      reducer2=ee$Reducer$stdDev(), sharedInputs=T),
+      geometry=cityNow$geometry(), scale=1e3)
+    
     # Cacluate the key numbers for our sanity
     tmean <- ee$Number(tempStats$get("LST_Day_1km_mean"))
     tsd <- ee$Number(tempStats$get("LST_Day_1km_stdDev"))
@@ -334,10 +363,12 @@ print(citiesList$size()$getInfo())
     dat.hi <- img$lte(tmean$add(thresh))
     img <- img$updateMask(dat.low)
     img <- img$updateMask(dat.hi)
-
+    
     # Map$addLayer(tempNow$select('LST_Day_1km'), vizTempK, "Raw Surface Temperature")
     return(img)
-  })
+  }
+  
+  tempCityAll <- tempCityAll$map(lstOutliers)
   # ee_print(tempCityAll)
   # Map$addLayer(tempCityAll$first()$select('LST_Day_1km'), vizTempK, "Raw Surface Temperature")
   
