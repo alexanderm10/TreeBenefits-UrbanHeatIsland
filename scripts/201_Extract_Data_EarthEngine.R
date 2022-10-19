@@ -199,7 +199,7 @@ vegMask <- mod44bReproj$first()$select("Percent_Tree_Cover", "Percent_NonTree_Ve
 # Map$addLayer(vegMask)
 
 # ee_print(mod44bReproj)
-ee_print(mod44bReproj$first())
+# ee_print(mod44bReproj$first())
 # Map$addLayer(mod44bReproj$select('Percent_Tree_Cover')$first(), vizTree, 'Percent Tree Cover')
 # -----------
 
@@ -274,8 +274,8 @@ ncities <- citiesTest$size()$getInfo()
 citiesList <- citiesUse$toList(ncities)
 print(citiesList$size()$getInfo())
 
-elevCities <- elevReproj$clipToCollection(citiesTest)
-Map$addLayer(elevCities, list(min=0, max=5000))
+# elevCities <- elevReproj$clipToCollection(citiesTest)
+# Map$addLayer(elevCities, list(min=0, max=5000))
 # elevCities <- citiesTest$map(function(feat){
 #   return(elevReproj$clip(feat))
 # })
@@ -296,11 +296,11 @@ for(i in (seq_len(citiesList$length()$getInfo()) - 1)){
   # Map$centerObject(cityNow)
   # Map$addLayer(cityNow)
 
-  pathCity <- file.path(path.out, cityID)
-  dir.create(file.path(pathCity, "elev"), recursive=T, showWarnings=F)
-  dir.create(file.path(pathCity, "VegCover"), recursive=T, showWarnings=F)
-  dir.create(file.path(pathCity, "LST_1km_Day"), recursive=T, showWarnings=F)
-  dir.create(file.path(pathCity, "LST_1km_Day_Dev"), recursive=T, showWarnings=F)
+  # pathCity <- file.path(path.out, cityID)
+  # dir.create(file.path(pathCity, "elev"), recursive=T, showWarnings=F)
+  # dir.create(file.path(pathCity, "VegCover"), recursive=T, showWarnings=F)
+  # dir.create(file.path(pathCity, "LST_1km_Day"), recursive=T, showWarnings=F)
+  # dir.create(file.path(pathCity, "LST_1km_Day_Dev"), recursive=T, showWarnings=F)
   # cityMask = ee$Image$constant(1)$clip(cityNow$geometry())$mask()
   # cityMask = ee$Image$constant(1)$clip(cityNow$geometry())$mask()
   # ee_print(cityMask)
@@ -319,6 +319,13 @@ for(i in (seq_len(citiesList$length()$getInfo()) - 1)){
   
   ### *** ###  If we don't have many points in the elevation file, skip the city
   if(npts.elev<thresh.pts) next
+  
+  # Save elevation only if it's worth our while
+  export.elev <- ee_image_to_drive(image=elevCity, fileNamePrefix=paste0(cityID, "_elevation"), folder="UHI_Analysis_Output", timePrefix=F)
+  export.elev$start()
+  # ee_monitoring(export.elev)
+  
+  
   # ee_imagecollection_to_local(ic=elevCity, region=cityNow$geometry(), scale=1e3, dsn=file.path(pathCity, "elev", paste0(cityID, "_elevation")))
   #-------
   
@@ -326,16 +333,49 @@ for(i in (seq_len(citiesList$length()$getInfo()) - 1)){
   #-------
   # Extracting vegetation cover -- we've already masked places where veg/non-veg cover doesn't add up
   #-------
-  modCity <- mod44bReproj$map(function(img){
-    # First masking to Chicago
-    tmp <- img$clip(cityNow);
-    return(tmp$select("system:time_start", "Percent_Tree_Cover", "Percent_NonTree_Vegetation", "Percent_NonVegetated"))
-  })
-  # ee_print(modCity);
-  # Map$addLayer(modCity$select('Percent_Tree_Cover')$first(), vizTree, 'Percent Tree Cover');
-  # modCity$first()$get("year")$getInfo()
-  #-------
+  # modCity <- mod44bReproj$map(function(img){
+  #   # First masking to Chicago
+  #   tmp <- img$clip(cityNow);
+  #   return(tmp$select("system:time_start", "Percent_Tree_Cover", "Percent_NonTree_Vegetation", "Percent_NonVegetated"))
+  # })
+
+  yrMod <- ee$List(mod44bReproj$aggregate_array("year"))$distinct()
+  yrString <- ee$List(paste(yrMod$getInfo()))
+  # yrMod$getInfo()
   
+  # treeCity <- mod44bReproj$select("Percent_Tree_Cover")$clip(cityNow)
+  treeCity <- mod44bReproj$select("Percent_Tree_Cover")$map(function(img){
+    return(img$clip(cityNow))
+  })
+  # ee_print(treeCity)
+  treeCity <- ee$ImageCollection$toBands(treeCity)$rename(yrString)
+  # ee_print(treeCity)
+  # Map$addLayer(treeCity$select('2020_Percent_Tree_Cover'), vizTree, 'Percent Tree Cover')
+  export.tree <- ee_image_to_drive(image=treeCity, fileNamePrefix=paste0(cityID, "_Vegetation_PercentTree"), folder="UHI_Analysis_Output", timePrefix=F)
+  export.tree$start()
+  
+  
+  
+  vegCity <- mod44bReproj$select("Percent_NonTree_Vegetation")$map(function(img){
+    return(img$clip(cityNow))
+  })
+  # ee_print(treeCity)
+  vegCity <- ee$ImageCollection$toBands(vegCity)$rename(yrString)
+  # ee_print(vegCity)
+  export.veg <- ee_image_to_drive(image=vegCity, fileNamePrefix=paste0(cityID, "_Vegetation_PercentOtherVeg"), folder="UHI_Analysis_Output", timePrefix=F)
+  export.veg$start()
+  
+  bareCity <- mod44bReproj$select("Percent_NonVegetated")$map(function(img){
+    return(img$clip(cityNow))
+  })
+  # ee_print(treeCity)
+  bareCity <- ee$ImageCollection$toBands(bareCity)$rename(yrString)
+  # ee_print(bareCity)
+  
+  export.bare <- ee_image_to_drive(image=bareCity, fileNamePrefix=paste0(cityID, "_Vegetation_PercentNoVeg"), folder="UHI_Analysis_Output", timePrefix=F)
+  export.bare$start()
+  
+  #-------
   
   
   #-------
@@ -434,6 +474,7 @@ for(i in (seq_len(citiesList$length()$getInfo()) - 1)){
   ## ----------------
   # Only iterate through years with some data! 
   yrList <- ee$List(tempCityAll$aggregate_array("year"))$distinct()
+  yrString2 <- ee$List(paste(yrList$getInfo()))
   
   tempYrMean <- yrList$map(ee_utils_pyfunc(function(j){
     YR <- ee$Number(j);
@@ -456,10 +497,13 @@ for(i in (seq_len(citiesList$length()$getInfo()) - 1)){
     
   }))
   tempYrMean <- ee$ImageCollection$fromImages(tempYrMean) # go ahead and overwrite it since we're just changing form
+  tempYrMean <- ee$ImageCollection$toBands(tempYrMean)$rename(yrString2)
   # ee_print(tempYrMean)
-  # tempYrMean$first()$id()$getInfo()
-  # ee_print(tempYrMean$first()$id()$getInfo())
   # Map$addLayer(tempYrMean$select('LST_Day_1km_mean')$first(), vizTempK, 'Mean Surface Temperature (K)');
+  
+  export.TempMean <- ee_image_to_drive(image=tempYrMean, fileNamePrefix=paste0(cityID, "_LST_Day_Tmean"), folder="UHI_Analysis_Output", timePrefix=F)
+  export.TempMean$start()
+  
   
   
   tempYrDev <- yrList$map(ee_utils_pyfunc(function(j){
@@ -481,6 +525,11 @@ for(i in (seq_len(citiesList$length()$getInfo()) - 1)){
     
   }))
   tempYrDev <- ee$ImageCollection$fromImages(tempYrDev) # go ahead and overwrite it since we're just changing form
+  tempYrDev <- ee$ImageCollection$toBands(tempYrDev)$rename(yrString2)
+  
+  export.TempDev <- ee_image_to_drive(image=tempYrDev, fileNamePrefix=paste0(cityID, "_LST_Day_Tdev"), folder="UHI_Analysis_Output", timePrefix=F)
+  export.TempDev$start()
+  
   # Map$addLayer(tempYr$select('LST_Day_Dev_mean')$first(), vizTempAnom, 'Mean Surface Temperature - Anomaly');
 
     # ee_imagecollection_to_local(ic=tempYrMean, region=cityNow$geometry(), scale=1e3, dsn="~/Desktop/EarthEngine_TEST_")
@@ -494,14 +543,14 @@ for(i in (seq_len(citiesList$length()$getInfo()) - 1)){
   ## Write everythign out here
   ## ----------------
   # ee_as_raster(image=elevCity, region=cityNow$geometry(), scale=1e3, dsn=file.path(pathCity, "elev", paste0(cityID, "_elevation")))
-  export.elev <- ee_image_to_drive(image=elevCity, fileNamePrefix =paste0(cityID, "_elevation"), folder="rgee_test")
-  export.elev$start()
-  ee_monitoring(export.elev)
+  
+ 
+
   
   
-  ee_imagecollection_to_local(ic=modCity, region=cityNow$geometry(), scale=1e3, dsn=file.path(pathCity, "VegCover", paste0(cityID, "_vegetation_")))
-  ee_imagecollection_to_local(ic=tempYrMean, region=cityNow$geometry(), scale=1e3, dsn=file.path(pathCity, "LST_1km_Day", paste0(cityID, "_LSTday_")))
-  ee_imagecollection_to_local(ic=tempYrDev, region=cityNow$geometry(), scale=1e3, dsn=file.path(pathCity, "LST_1km_Day_Dev", paste0(cityID, "_LSTdev_")))
+  # ee_imagecollection_to_local(ic=modCity, region=cityNow$geometry(), scale=1e3, dsn=file.path(pathCity, "VegCover", paste0(cityID, "_vegetation_")))
+  # ee_imagecollection_to_local(ic=tempYrMean, region=cityNow$geometry(), scale=1e3, dsn=file.path(pathCity, "LST_1km_Day", paste0(cityID, "_LSTday_")))
+  # ee_imagecollection_to_local(ic=tempYrDev, region=cityNow$geometry(), scale=1e3, dsn=file.path(pathCity, "LST_1km_Day_Dev", paste0(cityID, "_LSTdev_")))
   ## ----------------
   
   ## ----------------
