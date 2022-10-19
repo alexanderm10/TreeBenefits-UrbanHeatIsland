@@ -274,6 +274,14 @@ ncities <- citiesTest$size()$getInfo()
 citiesList <- citiesUse$toList(ncities)
 print(citiesList$size()$getInfo())
 
+elevCities <- elevReproj$clipToCollection(citiesTest)
+Map$addLayer(elevCities, list(min=0, max=5000))
+# elevCities <- citiesTest$map(function(feat){
+#   return(elevReproj$clip(feat))
+# })
+# elevCities
+# Map$addLayer(elevCities$first(), list(min=-5, max=5000))
+
 ### FOR LOOP STARTS HERE
 # i=0
 pb <- txtProgressBar(min=0, max=ncities, style=3)
@@ -485,8 +493,12 @@ for(i in (seq_len(citiesList$length()$getInfo()) - 1)){
   ## ----------------
   ## Write everythign out here
   ## ----------------
-  ee_as_raster(image=elevCity, region=cityNow$geometry(), scale=1e3, dsn=file.path(pathCity, "elev", paste0(cityID, "_elevation")))
- 
+  # ee_as_raster(image=elevCity, region=cityNow$geometry(), scale=1e3, dsn=file.path(pathCity, "elev", paste0(cityID, "_elevation")))
+  export.elev <- ee_image_to_drive(image=elevCity, fileNamePrefix =paste0(cityID, "_elevation"), folder="rgee_test")
+  export.elev$start()
+  ee_monitoring(export.elev)
+  
+  
   ee_imagecollection_to_local(ic=modCity, region=cityNow$geometry(), scale=1e3, dsn=file.path(pathCity, "VegCover", paste0(cityID, "_vegetation_")))
   ee_imagecollection_to_local(ic=tempYrMean, region=cityNow$geometry(), scale=1e3, dsn=file.path(pathCity, "LST_1km_Day", paste0(cityID, "_LSTday_")))
   ee_imagecollection_to_local(ic=tempYrDev, region=cityNow$geometry(), scale=1e3, dsn=file.path(pathCity, "LST_1km_Day_Dev", paste0(cityID, "_LSTdev_")))
