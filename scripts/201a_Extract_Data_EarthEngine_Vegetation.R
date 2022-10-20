@@ -70,6 +70,9 @@ tempJulAug <- tempJulAug$map(setYear)
 # Map$addLayer(tempJulAug$first()$select('LST_Day_1km'), vizTempK, "Jul/Aug Temperature")
 
 projLST = tempJulAug$select("LST_Day_1km")$first()$projection()
+projCRS = projLST$crs()
+projTransform <- unlist(projLST$getInfo()$transform)
+
 # ee_print(projLST)
 # -----------
 
@@ -111,7 +114,7 @@ print(citiesUse$first()$propertyNames()$getInfo())
 ncities <- citiesUse$size()$getInfo()
 
 # To co all of them
-# citiesList <- citiesUse$toList(3)
+# citiesList <- citiesUse$toList(250)
 citiesList <- citiesUse$toList(ncities)
 print(citiesList$size()$getInfo())
 
@@ -119,7 +122,7 @@ print(citiesList$size()$getInfo())
 # i=0
 pb <- txtProgressBar(min=0, max=ncities, style=3)
 for(i in (seq_len(citiesList$length()$getInfo()) - 1)){
-  setTxtProgressBar(pb, i)
+  print(setTxtProgressBar(pb, i))
   # cityNow <- citiesUse$filter('NAME=="Chicago"')$first()
   cityNow <- ee$Feature(citiesList$get(i))
   # cityNow$first()$propertyNames()$getInfo()
@@ -149,7 +152,7 @@ for(i in (seq_len(citiesList$length()$getInfo()) - 1)){
     treeCity <- ee$ImageCollection$toBands(treeCity)$rename(yrString)
     # ee_print(treeCity)
     # Map$addLayer(treeCity$select('2020_Percent_Tree_Cover'), vizTree, 'Percent Tree Cover')
-    export.tree <- ee_image_to_drive(image=treeCity, fileNamePrefix=paste0(cityID, "_Vegetation_PercentTree"), folder=GoogleFolderSave, timePrefix=F, region=cityNow$geometry(), maxPixels=1e13, crs=projCRS, crsTransform=projTransform)
+    export.tree <- ee_image_to_drive(image=treeCity, description=paste0(cityID, "_Vegetation_PercentTree"), fileNamePrefix=paste0(cityID, "_Vegetation_PercentTree"), folder=GoogleFolderSave, timePrefix=F, region=cityNow$geometry(), maxPixels=5e6, crs=projCRS, crsTransform=projTransform)
     export.tree$start()
   } # End Tree Cover Layer
   
@@ -161,7 +164,7 @@ for(i in (seq_len(citiesList$length()$getInfo()) - 1)){
     # ee_print(treeCity)
     vegCity <- ee$ImageCollection$toBands(vegCity)$rename(yrString)
     # ee_print(vegCity)
-    export.veg <- ee_image_to_drive(image=vegCity, fileNamePrefix=paste0(cityID, "_Vegetation_PercentOtherVeg"), folder="UHI_Analysis_Output", timePrefix=F, region=cityNow$geometry(), maxPixels=1e13, crs=projCRS, crsTransform=projTransform)
+    export.veg <- ee_image_to_drive(image=vegCity, description=paste0(cityID, "_Vegetation_PercentOtherVeg"), fileNamePrefix=paste0(cityID, "_Vegetation_PercentOtherVeg"), folder="UHI_Analysis_Output", timePrefix=F, region=cityNow$geometry(), maxPixels=5e6, crs=projCRS, crsTransform=projTransform)
     export.veg$start()
   } # End Other Veg Cover Layer
 
@@ -174,7 +177,7 @@ for(i in (seq_len(citiesList$length()$getInfo()) - 1)){
     bareCity <- ee$ImageCollection$toBands(bareCity)$rename(yrString)
     # ee_print(bareCity)
     
-    export.bare <- ee_image_to_drive(image=bareCity, fileNamePrefix=paste0(cityID, "_Vegetation_PercentNoVeg"), folder=GoogleFolderSave, timePrefix=F, region=cityNow$geometry(), maxPixels=1e13, crs=projCRS, crsTransform=projTransform)
+    export.bare <- ee_image_to_drive(image=bareCity, description==paste0(cityID, "_Vegetation_PercentNoVeg"), fileNamePrefix=paste0(cityID, "_Vegetation_PercentNoVeg"), folder=GoogleFolderSave, timePrefix=F, region=cityNow$geometry(), maxPixels=5e6, crs=projCRS, crsTransform=projTransform)
     export.bare$start()
   } # End Write No Veg
   #-------
