@@ -260,14 +260,14 @@ elevReproj <- elevReproj$updateMask(vegMask)
 print(citiesUse$first()$propertyNames()$getInfo())
 
 # Trying the buffer outside of a loop
-citiesTest <- citiesBuff$limit(10)
-ee_print(citiesTest)
+# citiesTest <- citiesBuff$limit(10)
+# ncities <- citiesTest$size()$getInfo()
+# ee_print(citiesTest)
 # Map$addLayer(citiesTest)
 
 
 # Figuring out how many cities we have (2682 in all)
-ncities <- citiesTest$size()$getInfo()
-# ncities <- citiesUse$size()$getInfo()
+ncities <- citiesUse$size()$getInfo()
 
 # To co all of them
 # citiesList <- citiesUse$toList(3)
@@ -291,8 +291,8 @@ for(i in (seq_len(citiesList$length()$getInfo()) - 1)){
   cityNow <- ee$Feature(citiesList$get(i))
   # cityNow$first()$propertyNames()$getInfo()
   cityID <- cityNow$get("ISOURBID")$getInfo()
-  cityName <- cityNow$get("NAME")$getInfo()
-  print(cityName)
+  # cityName <- cityNow$get("NAME")$getInfo()
+  # print(cityName)
   # Map$centerObject(cityNow)
   # Map$addLayer(cityNow)
 
