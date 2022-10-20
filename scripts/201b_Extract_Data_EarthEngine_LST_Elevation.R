@@ -245,7 +245,7 @@ extractTempEE <- function(CITIES, TEMPERATURE, GoogleFolderSave, overwrite=F, ..
     if(npts.elev<thresh.pts) next
     
     # Save elevation only if it's worth our while -- Note: Still doing the extraction & computation first since we use it as our base
-    if(overwrite & !any(grepl(cityID, elev.done))){
+    if(overwrite | !any(grepl(cityID, elev.done))){
       export.elev <- ee_image_to_drive(image=elevCity, description=paste0(cityID, "_elevation"), fileNamePrefix=paste0(cityID, "_elevation"), folder=GoogleFolderSave, timePrefix=F)
       export.elev$start()
       # ee_monitoring(export.elev)
