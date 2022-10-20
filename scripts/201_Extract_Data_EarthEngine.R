@@ -294,7 +294,7 @@ for(i in (seq_len(citiesList$length()$getInfo()) - 1)){
   cityID <- cityNow$get("ISOURBID")$getInfo()
   # cityName <- cityNow$get("NAME")$getInfo()
   # print(cityName)
-  # Map$centerObject(cityNow)
+  Map$centerObject(cityNow) # NOTE: THIS IS REALLY IMPORTANT APPARENTLY!
   # Map$addLayer(cityNow)
   
   #-------

@@ -136,6 +136,8 @@ lstDayGoodSH <- tempJanFeb$map(lstMask)
 # Map$addLayer(lstDayGoodNH$first()$select('LST_Day_1km'), vizTempK, "GOOD Jul/Aug Temperature")
 # Map$addLayer(lstDayGoodSH$first()$select('LST_Day_1km'), vizTempK, "GOOD Jan/Feb Temperature")
 projLST = lstDayGoodNH$select("LST_Day_1km")$first()$projection()
+projCRS = projLST$crs()
+projTransform <- unlist(projLST$getInfo()$transform)
 # ee_print(projLST)
 # -----------
 
@@ -215,17 +217,17 @@ elevReproj <- elevReproj$updateMask(vegMask)
 # Cities needs to be an EarthEngine Feature List
 extractTempEE <- function(CITIES, TEMPERATURE, GoogleFolderSave, overwrite=F, ...){
   cityseq <- seq_len(CITIES$length()$getInfo())
-  pb <- txtProgressBar(min=0, max=max(ncities), style=3)
+  pb <- txtProgressBar(min=0, max=max(cityseq), style=3)
   for(i in (cityseq - 1)){
     print(setTxtProgressBar(pb, i))
     # cityNow <- citiesBuff$filter('NAME=="Chicago"')$first()
     cityNow <- ee$Feature(CITIES$get(i))
     # cityNow$first()$propertyNames()$getInfo()
     cityID <- cityNow$get("ISOURBID")$getInfo()
+    Map$centerObject(cityNow) # NOTE: THIS IS REALLY IMPORTANT APPARENTLY!
+    
     # cityName <- cityNow$get("NAME")$getInfo()
     # print(cityName)
-    Map$centerObject(cityNow)
-    cityBounds <- cityNow$geometry()$bounds()$getInfo()['coordinates']
     # Map$addLayer(cityNow)
     if(!overwrite & all(any(grepl(cityID, elev.done)), any(grepl(cityID, tmean.done)), any(grepl(cityID, tdev.done)))) next
     
@@ -247,13 +249,12 @@ extractTempEE <- function(CITIES, TEMPERATURE, GoogleFolderSave, overwrite=F, ..
     
     # Save elevation only if it's worth our while -- Note: Still doing the extraction & computation first since we use it as our base
     if(overwrite | !any(grepl(cityID, elev.done))){
-      export.elev <- ee_image_to_drive(image=elevCity, description=paste0(cityID, "_elevation"), fileNamePrefix=paste0(cityID, "_elevation"), folder=GoogleFolderSave, timePrefix=F, region=cityBounds, maxPixels=1e9)
+      export.elev <- ee_image_to_drive(image=elevCity, description=paste0(cityID, "_elevation"), fileNamePrefix=paste0(cityID, "_elevation"), folder=GoogleFolderSave, timePrefix=F, region=cityNow$geometry(), maxPixels=1e13, crs=projCRS, crsTransform=projTransform)
       export.elev$start()
       # ee_monitoring(export.elev)
     }
-    i#-------
-    
-    
+    #-------
+
     #-------
     # Now doing Land Surface Temperature
     #-------
@@ -369,10 +370,11 @@ extractTempEE <- function(CITIES, TEMPERATURE, GoogleFolderSave, overwrite=F, ..
     }))
     tempYrMean <- ee$ImageCollection$fromImages(tempYrMean) # go ahead and overwrite it since we're just changing form
     tempYrMean <- ee$ImageCollection$toBands(tempYrMean)$rename(yrString2)
+    tempYrMean <- tempYrMean$setDefaultProjection(projLST)
     # ee_print(tempYrMean)
     # Map$addLayer(tempYrMean$select('2020'), vizTempK, 'Mean Surface Temperature (K)');
     
-    export.TempMean <- ee_image_to_drive(image=tempYrMean, description=paste0(cityID, "_LST_Day_Tmean"), fileNamePrefix=paste0(cityID, "_LST_Day_Tmean"), folder=GoogleFolderSave, timePrefix=F, region=cityBounds, maxPixels=1e9)
+    export.TempMean <- ee_image_to_drive(image=tempYrMean, description=paste0(cityID, "_LST_Day_Tmean"), fileNamePrefix=paste0(cityID, "_LST_Day_Tmean"), folder=GoogleFolderSave, timePrefix=F, region=cityNow$geometry(), maxPixels=1e13, crs=projCRS, crsTransform=projTransform)
     export.TempMean$start()
     # ee_monitoring(export.TempMean)
     
@@ -397,15 +399,11 @@ extractTempEE <- function(CITIES, TEMPERATURE, GoogleFolderSave, overwrite=F, ..
     }))
     tempYrDev <- ee$ImageCollection$fromImages(tempYrDev) # go ahead and overwrite it since we're just changing form
     tempYrDev <- ee$ImageCollection$toBands(tempYrDev)$rename(yrString2)
+    tempYrDev <- tempYrDev$setDefaultProjection(projLST)
     
-    export.TempDev <- ee_image_to_drive(image=tempYrDev, description=paste0(cityID, "_LST_Day_Tdev"), fileNamePrefix=paste0(cityID, "_LST_Day_Tdev"), folder=GoogleFolderSave, timePrefix=F, region=cityBounds, maxPixels=1e9)
+    export.TempDev <- ee_image_to_drive(image=tempYrDev, description=paste0(cityID, "_LST_Day_Tdev"), fileNamePrefix=paste0(cityID, "_LST_Day_Tdev"), folder=GoogleFolderSave, timePrefix=F, region=cityNow$geometry(), maxPixels=1e13)
     export.TempDev$start()
     # ee_monitoring(export.TempDev)
-    
-    # Map$addLayer(tempYr$select('LST_Day_Dev_mean')$first(), vizTempAnom, 'Mean Surface Temperature - Anomaly');
-    
-    # testRast <- ee_as_raster(tempYrMean$first())
-    # Map$addLayer(tempYr$select('LST_Day_1km_mean')$first(), vizTempK, 'Mean Surface Temperature (K)');
     ## ----------------
   } # End Loop
   
@@ -420,8 +418,8 @@ extractTempEE <- function(CITIES, TEMPERATURE, GoogleFolderSave, overwrite=F, ..
 # 3.1 select the city
 print(citiesUse$first()$propertyNames()$getInfo())
 
-citiesNorth <- citiesBuff$filter(ee$Filter$gte('LATITUDE', 0))
-citiesSouth <- citiesBuff$filter(ee$Filter$lt('LATITUDE', 0))
+citiesNorth <- citiesUse$filter(ee$Filter$gte('LATITUDE', 0))
+citiesSouth <- citiesUse$filter(ee$Filter$lt('LATITUDE', 0))
 
 # Figuring out how many cities we have (2682 in all)
 ncitiesNorth <- citiesNorth$size()$getInfo()
@@ -436,8 +434,201 @@ citiesSouthList <- citiesUse$toList(ncitiesSouth)
 ### FOR LOOP STARTS HERE
 # i=0
 extractTempEE(CITIES=citiesSouthList, TEMPERATURE=lstSHFinal, GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
+
 extractTempEE(CITIES=citiesNorthList, TEMPERATURE=lstNHFinal, GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
 
 ### FOR LOOP ENDS HERE
 ##################### 
 
+
+# pb <- txtProgressBar(min=0, max=max(ncitiesSouth), style=3)
+# for(i in ((1:ncitiesSouth) - 1)){
+#   print(setTxtProgressBar(pb, i))
+#   # cityNow <- citiesBuff$filter('NAME=="Chicago"')$first()
+#   cityNow <- ee$Feature(citiesSouthList$get(i))
+#   # cityNow$first()$propertyNames()$getInfo()
+#   cityID <- cityNow$get("ISOURBID")$getInfo()
+#   # Map$centerObject(cityNow) # NOTE: THIS IS REALLY IMPORTANT APPARENTLY!
+#   
+#   # cityName <- cityNow$get("NAME")$getInfo()
+#   # print(cityName)
+#   # Map$addLayer(cityNow)
+#   if(!overwrite & all(any(grepl(cityID, elev.done)), any(grepl(cityID, tmean.done)), any(grepl(cityID, tdev.done)))) next
+#   
+#   
+#   #-------
+#   # extracting elevation 
+#   #-------
+#   # elevCity <- elevReproj$updateMask(cityMask)
+#   elevCity <- elevReproj$clip(cityNow)
+#   # Map$addLayer(elevCity, list(min=-10, max=500))
+#   
+#   # elevNow <- elevCity$reduceRegion(reducer=ee$Reducer$mean(), geometry=cityNow$geometry(), scale=1e3)
+#   # elevNow$getInfo()
+#   npts.elev <- elevCity$reduceRegion(reducer=ee$Reducer$count(), geometry=cityNow$geometry(), scale=1e3)
+#   npts.elev <- npts.elev$getInfo()$elevation
+#   
+#   ### *** ###  If we don't have many points in the elevation file, skip the city
+#   if(npts.elev<thresh.pts) next
+#   
+#   # Save elevation only if it's worth our while -- Note: Still doing the extraction & computation first since we use it as our base
+#   if(overwrite | !any(grepl(cityID, elev.done))){
+#     export.elev <- ee_image_to_drive(image=elevCity, description=paste0(cityID, "_elevation"), fileNamePrefix=paste0(cityID, "_elevation"), folder=GoogleFolderSave, timePrefix=F, region=cityNow$geometry(), maxPixels=1e13, crs=projCRS, crsTransform=projTransform)
+#     export.elev$start()
+#     # ee_monitoring(export.elev)
+#   }
+#   #-------
+#   
+#   #-------
+#   # Now doing Land Surface Temperature
+#   #-------
+#   # Map$addLayer(tempHemi$first()$select('LST_Day_1km'), vizTempK, "Raw Surface Temperature")
+#   
+#   # JUST GET AN MASK THE RAW DATA FIRST
+#   tempCityAll <- lstDayGoodSH$map(function(img){
+#     tempNow <- img$clip(cityNow)
+#     # dat <- tempNow$gt(0)
+#     # tempNow <- tempNow$updateMask(dat)
+#     return(tempNow)
+#   })
+#   # ee_print(tempCityAll)
+#   # tempCityAll$first()$get("year")$getInfo()
+#   # Map$addLayer(tempCityAll$first()$select('LST_Day_1km'), vizTempK, "Raw Surface Temperature")
+#   
+#   ## ----------------
+#   ## Need to remove layers that don't meet our requirements right off the bat
+#   ##   -- because we can't compute means etc when there are no good values
+#   ##   -- resource from Ren https://gis.stackexchange.com/questions/276791/removing-images-based-on-band-threshold-using-google-earth-engine
+#   ## ----------------
+#   tempCityAll <- tempCityAll$map(setNPts)
+#   # ee_print(tempCityAll$first())
+#   # print(tempCityAll$first()$get("n_Pts")$getInfo())
+#   # print(tempCityAll$first()$get("p_Pts")$getInfo())
+#   
+#   tempCityAll <- tempCityAll$filter(ee$Filter$gte("n_Pts", thresh.pts)) # have at least 50 points (see top of script)
+#   tempCityAll <- tempCityAll$filter(ee$Filter$gte("p_Pts", thresh.prop)) # Have at least 50% of the data
+#   # ee_print(tempCityAll)
+#   # Map$addLayer(tempCityAll$first()$select('LST_Day_1km'), vizTempK, "Raw Surface Temperature")
+#   ## ----------------
+#   
+#   ## ----------------
+#   # Now remove outliers
+#   # #  NOTE : THIS DOESN"T WORK YET!
+#   # Once it DOES work, we can re-run the the setNPts
+#   ## ----------------
+#   lstOutliers <- function(img){
+#     # Calculate the means & sds for the region
+#     tempStats <- img$select("LST_Day_1km")$reduceRegion(reducer=ee$Reducer$mean()$combine(
+#       reducer2=ee$Reducer$stdDev(), sharedInputs=T),
+#       geometry=cityNow$geometry(), scale=1e3)
+#     
+#     # Cacluate the key numbers for our sanity
+#     tmean <- ee$Number(tempStats$get("LST_Day_1km_mean"))
+#     tsd <- ee$Number(tempStats$get("LST_Day_1km_stdDev"))
+#     thresh <- tsd$multiply(thresh.sigma)
+#     
+#     # Do the filtering
+#     dat.low <- img$gte(tmean$subtract(thresh))
+#     dat.hi <- img$lte(tmean$add(thresh))
+#     img <- img$updateMask(dat.low)
+#     img <- img$updateMask(dat.hi)
+#     
+#     # Map$addLayer(tempNow$select('LST_Day_1km'), vizTempK, "Raw Surface Temperature")
+#     return(img)
+#   }
+#   
+#   tempCityAll <- tempCityAll$map(lstOutliers)
+#   # ee_print(tempCityAll)
+#   # Map$addLayer(tempCityAll$first()$select('LST_Day_1km'), vizTempK, "Raw Surface Temperature")
+#   
+#   tempCityAll <- tempCityAll$map(setNPts)
+#   # print(tempCityAll$first()$get("n_Pts")$getInfo())
+#   # print(tempCityAll$first()$get("p_Pts")$getInfo())
+#   
+#   tempCityAll <- tempCityAll$filter(ee$Filter$gte("n_Pts", thresh.pts)) # have at least 50 points (see top of script)
+#   tempCityAll <- tempCityAll$filter(ee$Filter$gte("p_Pts", thresh.prop)) # Have at least 50% of the data
+#   # ee_print(tempCityAll)
+#   ## ----------------
+#   
+#   ## ----------------
+#   # Now calculate Temperature Deviations
+#   ## ----------------
+#   tempCityAll <- tempCityAll$map(function(img){
+#     tempMed <- img$select('LST_Day_1km')$reduceRegion(reducer=ee$Reducer$median(), geometry=cityNow$geometry(), scale=1e3)
+#     tempDev <- img$select('LST_Day_1km')$subtract(ee$Number(tempMed$get('LST_Day_1km')))$rename('LST_Day_Dev')$toFloat()
+#     return(img$addBands(tempDev))
+#   })
+#   # print("Temperature Deviation (Raw)", tempCityAll);
+#   # Map$addLayer(tempCityAll$first()$select('LST_Day_Dev'), vizTempAnom, 'Surface Temperature - Anomaly');
+#   # devList = tempCityAll.toList(tempCityAll.size())
+#   # Map.addLayer(ee.Image(devList.get(12)).select('LST_Day_Dev'), vizTempAnom, 'Surface Temperature - Anomaly');
+#   ## ----------------
+#   
+#   
+#   ## ----------------
+#   # Now lets do our annual means
+#   ## ----------------
+#   # Only iterate through years with some data! 
+#   yrList <- ee$List(tempCityAll$aggregate_array("year"))$distinct()
+#   yrString2 <- ee$List(paste(yrList$getInfo()))
+#   
+#   tempYrMean <- yrList$map(ee_utils_pyfunc(function(j){
+#     YR <- ee$Number(j);
+#     START <- ee$Date$fromYMD(YR,1,1);
+#     END <- ee$Date$fromYMD(YR,12,31);
+#     lstYR <- tempCityAll$filter(ee$Filter$date(START, END))
+#     # // var lstDev =  // make each layer an anomaly map
+#     tempMean <- lstYR$select('LST_Day_1km')$reduce(ee$Reducer$mean())
+#     # tempDev <- lstYR$select('LST_Day_Dev')$reduce(ee$Reducer$mean())
+#     tempAgg <- ee$Image(tempMean)
+#     
+#     ## ADD YEAR AS A PROPERTY!!
+#     tempAgg <- tempAgg$set(ee$Dictionary(list(year=YR)))
+#     tempAgg <- tempAgg$set(ee$Dictionary(list(`system:index`=YR$format("%03d"))))
+#     # ee_print(tempAgg)
+#     # Map$addLayer(tempAgg$select('LST_Day_1km_mean'), vizTempK, 'Mean Surface Temperature (K)');
+#     # Map$addLayer(tempAgg$select('LST_Day_Dev_mean'), vizTempAnom, 'Mean Surface Temperature - Anomaly');
+#     
+#     return (tempAgg); # update to standardized once read
+#     
+#   }))
+#   tempYrMean <- ee$ImageCollection$fromImages(tempYrMean) # go ahead and overwrite it since we're just changing form
+#   tempYrMean <- ee$ImageCollection$toBands(tempYrMean)$rename(yrString2)
+#   tempYrMean <- tempYrMean$setDefaultProjection(projLST)
+#   # ee_print(tempYrMean)
+#   # Map$addLayer(tempYrMean$select('2020'), vizTempK, 'Mean Surface Temperature (K)');
+#   
+#   export.TempMean <- ee_image_to_drive(image=tempYrMean, description=paste0(cityID, "_LST_Day_Tmean"), fileNamePrefix=paste0(cityID, "_LST_Day_Tmean"), folder=GoogleFolderSave, timePrefix=F, region=cityNow$geometry(), maxPixels=1e13, crs=projCRS, crsTransform=projTransform)
+#   export.TempMean$start()
+#   # ee_monitoring(export.TempMean)
+#   
+#   
+#   tempYrDev <- yrList$map(ee_utils_pyfunc(function(j){
+#     YR <- ee$Number(j);
+#     START <- ee$Date$fromYMD(YR,1,1);
+#     END <- ee$Date$fromYMD(YR,12,31);
+#     lstYR <- tempCityAll$filter(ee$Filter$date(START, END))
+#     tempDev <- lstYR$select('LST_Day_Dev')$reduce(ee$Reducer$mean())
+#     tempAgg <- ee$Image(tempDev)
+#     
+#     ## ADD YEAR AS A PROPERTY!!
+#     tempAgg <- tempAgg$set(ee$Dictionary(list(year=YR)))
+#     tempAgg <- tempAgg$set(ee$Dictionary(list(`system:index`=YR$format("%03d"))))
+#     # ee_print(tempAgg)
+#     # Map$addLayer(tempAgg$select('LST_Day_1km_mean'), vizTempK, 'Mean Surface Temperature (K)');
+#     # Map$addLayer(tempAgg$select('LST_Day_Dev_mean'), vizTempAnom, 'Mean Surface Temperature - Anomaly');
+#     
+#     return (tempAgg); # update to standardized once read
+#     
+#   }))
+#   tempYrDev <- ee$ImageCollection$fromImages(tempYrDev) # go ahead and overwrite it since we're just changing form
+#   tempYrDev <- ee$ImageCollection$toBands(tempYrDev)$rename(yrString2)
+#   tempYrDev <- tempYrDev$setDefaultProjection(projLST)
+#   
+#   export.TempDev <- ee_image_to_drive(image=tempYrDev, description=paste0(cityID, "_LST_Day_Tdev"), fileNamePrefix=paste0(cityID, "_LST_Day_Tdev"), folder=GoogleFolderSave, timePrefix=F, region=cityNow$geometry(), maxPixels=1e13)
+#   export.TempDev$start()
+#   # ee_monitoring(export.TempDev)
+#   ## ----------------
+# } # End Loop
+# 
+# 
