@@ -133,7 +133,7 @@ citiesUse <- sdei$filter(ee$Filter$gte('ES00POP', 100e3))$filter(ee$Filter$gte('
 # ee_print(citiesUse) # Thsi function gets the summary stats; this gives us 2,682 cities
 
 # Use map to go ahead and create the buffer around everything
-citiesBuff <- citiesUse$map(function(f){f$buffer(10e3)})
+citiesUse <- citiesUse$map(function(f){f$buffer(10e3)})
 
 ## Just testing to make sure it works
 # popLarge <- citiesBuff$filter(ee$Filter$gte('ES00POP', 1e6))$filter(ee$Filter$gte('SQKM_FINAL', 1e2))
