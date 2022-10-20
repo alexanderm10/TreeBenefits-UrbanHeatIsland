@@ -1,11 +1,12 @@
 ## 
 ## NEED TO GO AHEAD AND SPLIT INTO N/S Cities since that matters here!!
 ## 
-# Migrating the Trees & Urban Heat Island workflow to using Google Earht Engine
+# Migrating the Trees & Urban Heat Island workflow to using Google Earth Engine
 
 library(rgee); library(raster); library(terra)
-ee_check() # For some reason, it's important to run this before initalizing right now
+ee_check() # For some reason, it's important to run this before initializing right now
 rgee::ee_Initialize(user = 'crollinson@mortonarb.org', drive=T)
+path.google <- "/Volumes/GoogleDrive/My Drive"
 GoogleFolderSave <- "UHI_Analysis_Output"
 
 elev.done <- dir(file.path(path.google, GoogleFolderSave), "elevation.tif")
@@ -19,6 +20,7 @@ yr.analy <- 2001:2020
 thresh.sigma <- 6 # Use 6-sigma outliers for the data filtering\
 thresh.pts <- 50
 thresh.prop <- 0.5 # The proportion of data needed for a time point to be "good"; currenlty 0.5
+overwrite=F
 ##################### 
 
 
@@ -95,7 +97,7 @@ citiesUse <- sdei$filter(ee$Filter$gte('ES00POP', 100e3))$filter(ee$Filter$gte('
 # ee_print(citiesUse) # Thsi function gets the summary stats; this gives us 2,682 cities
 
 # Use map to go ahead and create the buffer around everything
-citiesBuff <- citiesUse$map(function(f){f$buffer(10e3)})
+citiesUse <- citiesUse$map(function(f){f$buffer(10e3)})
 
 ## Just testing to make sure it works
 # popLarge <- citiesBuff$filter(ee$Filter$gte('ES00POP', 1e6))$filter(ee$Filter$gte('SQKM_FINAL', 1e2))
@@ -211,10 +213,11 @@ elevReproj <- elevReproj$updateMask(vegMask)
 
 ## Making the workflow a function that we can then feed N/S data to
 # Cities needs to be an EarthEngine Feature List
-extractTempEE <- function(CITIES, TEMPERATURE, GoogleFolder){
-  pb <- txtProgressBar(min=0, max=ncities, style=3)
-  for(i in (seq_len(CITIES$length()$getInfo()) - 1)){
-    setTxtProgressBar(pb, i)
+extractTempEE <- function(CITIES, TEMPERATURE, GoogleFolderSave, overwrite=F, ...){
+  cityseq <- seq_len(CITIES$length()$getInfo())
+  pb <- txtProgressBar(min=0, max=max(ncities), style=3)
+  for(i in (cityseq - 1)){
+    print(setTxtProgressBar(pb, i))
     # cityNow <- citiesBuff$filter('NAME=="Chicago"')$first()
     cityNow <- ee$Feature(CITIES$get(i))
     # cityNow$first()$propertyNames()$getInfo()
@@ -223,7 +226,7 @@ extractTempEE <- function(CITIES, TEMPERATURE, GoogleFolder){
     # print(cityName)
     # Map$centerObject(cityNow)
     # Map$addLayer(cityNow)
-    if(all(any(grepl(cityID, elev.done)), any(grepl(cityID, tmean.done)), any(grepl(cityID, tdev.done)))) next
+    if(!overwrite & all(any(grepl(cityID, elev.done)), any(grepl(cityID, tmean.done)), any(grepl(cityID, tdev.done)))) next
     
     
     #-------
@@ -242,8 +245,8 @@ extractTempEE <- function(CITIES, TEMPERATURE, GoogleFolder){
     if(npts.elev<thresh.pts) next
     
     # Save elevation only if it's worth our while -- Note: Still doing the extraction & computation first since we use it as our base
-    if(!any(grepl(cityID, tree.done))){
-      export.elev <- ee_image_to_drive(image=elevCity, fileNamePrefix=paste0(cityID, "_elevation"), folder=GoogleFolderSave, timePrefix=F)
+    if(overwrite & !any(grepl(cityID, elev.done))){
+      export.elev <- ee_image_to_drive(image=elevCity, description=paste0(cityID, "_elevation"), fileNamePrefix=paste0(cityID, "_elevation"), folder=GoogleFolderSave, timePrefix=F)
       export.elev$start()
       # ee_monitoring(export.elev)
     }
@@ -368,9 +371,9 @@ extractTempEE <- function(CITIES, TEMPERATURE, GoogleFolder){
     # ee_print(tempYrMean)
     # Map$addLayer(tempYrMean$select('LST_Day_1km_mean')$first(), vizTempK, 'Mean Surface Temperature (K)');
     
-    export.TempMean <- ee_image_to_drive(image=tempYrMean, fileNamePrefix=paste0(cityID, "_LST_Day_Tmean"), folder=GoogleFolderSave, timePrefix=F)
+    export.TempMean <- ee_image_to_drive(image=tempYrMean, description=paste0(cityID, "_LST_Day_Tmean"), fileNamePrefix=paste0(cityID, "_LST_Day_Tmean"), folder=GoogleFolderSave, timePrefix=F)
     export.TempMean$start()
-    
+    # ee_monitoring(export.TempMean)
     
     
     tempYrDev <- yrList$map(ee_utils_pyfunc(function(j){
@@ -394,8 +397,9 @@ extractTempEE <- function(CITIES, TEMPERATURE, GoogleFolder){
     tempYrDev <- ee$ImageCollection$fromImages(tempYrDev) # go ahead and overwrite it since we're just changing form
     tempYrDev <- ee$ImageCollection$toBands(tempYrDev)$rename(yrString2)
     
-    export.TempDev <- ee_image_to_drive(image=tempYrDev, fileNamePrefix=paste0(cityID, "_LST_Day_Tdev"), folder=GoogleFolderSave, timePrefix=F)
+    export.TempDev <- ee_image_to_drive(image=tempYrDev, description=paste0(cityID, "_LST_Day_Tdev"), fileNamePrefix=paste0(cityID, "_LST_Day_Tdev"), folder=GoogleFolderSave, timePrefix=F)
     export.TempDev$start()
+    # ee_monitoring(export.TempDev)
     
     # Map$addLayer(tempYr$select('LST_Day_Dev_mean')$first(), vizTempAnom, 'Mean Surface Temperature - Anomaly');
     
@@ -420,7 +424,7 @@ citiesSouth <- citiesBuff$filter(ee$Filter$lt('LATITUDE', 0))
 
 # Figuring out how many cities we have (2682 in all)
 ncitiesNorth <- citiesNorth$size()$getInfo()
-ncitieSouth <- citiesSouth$size()$getInfo()
+ncitiesSouth <- citiesSouth$size()$getInfo()
 
 # To co all of them
 # citiesList <- citiesUse$toList(3)
@@ -430,8 +434,8 @@ citiesSouthList <- citiesUse$toList(ncitiesSouth)
 
 ### FOR LOOP STARTS HERE
 # i=0
-extractTempEE(CITIES=citiesNorthList, TEMPERATURE=lstNHFinal, GoogleFolder = GoogleFolder)
-extractTempEE(CITIES=citiesSouthList, TEMPERATURE=lstSHFinal, GoogleFolder = GoogleFolder)
+extractTempEE(CITIES=citiesSouthList, TEMPERATURE=lstSHFinal, GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
+extractTempEE(CITIES=citiesNorthList, TEMPERATURE=lstNHFinal, GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
 
 ### FOR LOOP ENDS HERE
 ##################### 
