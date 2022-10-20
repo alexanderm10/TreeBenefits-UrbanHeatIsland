@@ -224,7 +224,8 @@ extractTempEE <- function(CITIES, TEMPERATURE, GoogleFolderSave, overwrite=F, ..
     cityID <- cityNow$get("ISOURBID")$getInfo()
     # cityName <- cityNow$get("NAME")$getInfo()
     # print(cityName)
-    # Map$centerObject(cityNow)
+    Map$centerObject(cityNow)
+    cityBounds <- cityNow$geometry()$bounds()$getInfo()['coordinates']
     # Map$addLayer(cityNow)
     if(!overwrite & all(any(grepl(cityID, elev.done)), any(grepl(cityID, tmean.done)), any(grepl(cityID, tdev.done)))) next
     
@@ -246,11 +247,11 @@ extractTempEE <- function(CITIES, TEMPERATURE, GoogleFolderSave, overwrite=F, ..
     
     # Save elevation only if it's worth our while -- Note: Still doing the extraction & computation first since we use it as our base
     if(overwrite | !any(grepl(cityID, elev.done))){
-      export.elev <- ee_image_to_drive(image=elevCity, description=paste0(cityID, "_elevation"), fileNamePrefix=paste0(cityID, "_elevation"), folder=GoogleFolderSave, timePrefix=F)
+      export.elev <- ee_image_to_drive(image=elevCity, description=paste0(cityID, "_elevation"), fileNamePrefix=paste0(cityID, "_elevation"), folder=GoogleFolderSave, timePrefix=F, region=cityBounds, maxPixels=1e9)
       export.elev$start()
       # ee_monitoring(export.elev)
     }
-    #-------
+    i#-------
     
     
     #-------
@@ -369,9 +370,9 @@ extractTempEE <- function(CITIES, TEMPERATURE, GoogleFolderSave, overwrite=F, ..
     tempYrMean <- ee$ImageCollection$fromImages(tempYrMean) # go ahead and overwrite it since we're just changing form
     tempYrMean <- ee$ImageCollection$toBands(tempYrMean)$rename(yrString2)
     # ee_print(tempYrMean)
-    # Map$addLayer(tempYrMean$select('LST_Day_1km_mean')$first(), vizTempK, 'Mean Surface Temperature (K)');
+    # Map$addLayer(tempYrMean$select('2020'), vizTempK, 'Mean Surface Temperature (K)');
     
-    export.TempMean <- ee_image_to_drive(image=tempYrMean, description=paste0(cityID, "_LST_Day_Tmean"), fileNamePrefix=paste0(cityID, "_LST_Day_Tmean"), folder=GoogleFolderSave, timePrefix=F)
+    export.TempMean <- ee_image_to_drive(image=tempYrMean, description=paste0(cityID, "_LST_Day_Tmean"), fileNamePrefix=paste0(cityID, "_LST_Day_Tmean"), folder=GoogleFolderSave, timePrefix=F, region=cityBounds, maxPixels=1e9)
     export.TempMean$start()
     # ee_monitoring(export.TempMean)
     
@@ -397,7 +398,7 @@ extractTempEE <- function(CITIES, TEMPERATURE, GoogleFolderSave, overwrite=F, ..
     tempYrDev <- ee$ImageCollection$fromImages(tempYrDev) # go ahead and overwrite it since we're just changing form
     tempYrDev <- ee$ImageCollection$toBands(tempYrDev)$rename(yrString2)
     
-    export.TempDev <- ee_image_to_drive(image=tempYrDev, description=paste0(cityID, "_LST_Day_Tdev"), fileNamePrefix=paste0(cityID, "_LST_Day_Tdev"), folder=GoogleFolderSave, timePrefix=F)
+    export.TempDev <- ee_image_to_drive(image=tempYrDev, description=paste0(cityID, "_LST_Day_Tdev"), fileNamePrefix=paste0(cityID, "_LST_Day_Tdev"), folder=GoogleFolderSave, timePrefix=F, region=cityBounds, maxPixels=1e9)
     export.TempDev$start()
     # ee_monitoring(export.TempDev)
     

@@ -17,6 +17,7 @@ yr.analy <- 2001:2020
 thresh.sigma <- 6 # Use 6-sigma outliers for the data filtering\
 thresh.pts <- 50
 thresh.prop <- 0.5 # The proportion of data needed for a time point to be "good"; currenlty 0.5
+overwrite=F
 ##################### 
 
 
@@ -125,10 +126,10 @@ for(i in (seq_len(citiesList$length()$getInfo()) - 1)){
   cityID <- cityNow$get("ISOURBID")$getInfo()
   # cityName <- cityNow$get("NAME")$getInfo()
   # print(cityName)
-  # Map$centerObject(cityNow)
+  Map$centerObject(cityNow)
   # Map$addLayer(cityNow)
   
-  if(all(any(grepl(cityID, tree.done)), any(grepl(cityID, other.done)), any(grepl(cityID, bare.done)))) next
+  if(!overwrite & all(any(grepl(cityID, tree.done)), any(grepl(cityID, other.done)), any(grepl(cityID, bare.done)))) next
   #-------
   
   
@@ -140,7 +141,7 @@ for(i in (seq_len(citiesList$length()$getInfo()) - 1)){
   # yrMod$getInfo()
   
   # Start Tree Cover Layer
-  if(!any(grepl(cityID, tree.done))){
+  if(overwrite | !any(grepl(cityID, tree.done))){
     treeCity <- mod44bReproj$select("Percent_Tree_Cover")$map(function(img){
       return(img$clip(cityNow))
     })
@@ -148,24 +149,24 @@ for(i in (seq_len(citiesList$length()$getInfo()) - 1)){
     treeCity <- ee$ImageCollection$toBands(treeCity)$rename(yrString)
     # ee_print(treeCity)
     # Map$addLayer(treeCity$select('2020_Percent_Tree_Cover'), vizTree, 'Percent Tree Cover')
-    export.tree <- ee_image_to_drive(image=treeCity, fileNamePrefix=paste0(cityID, "_Vegetation_PercentTree"), folder=GoogleFolderSave, timePrefix=F)
+    export.tree <- ee_image_to_drive(image=treeCity, fileNamePrefix=paste0(cityID, "_Vegetation_PercentTree"), folder=GoogleFolderSave, timePrefix=F, region=cityBounds, maxPixels=1e9)
     export.tree$start()
   } # End Tree Cover Layer
   
   # Start Other Veg Cover Layer
-  if(!any(grepl(cityID, tree.done))){
+  if(overwrite | !any(grepl(cityID, tree.done))){
     vegCity <- mod44bReproj$select("Percent_NonTree_Vegetation")$map(function(img){
       return(img$clip(cityNow))
     })
     # ee_print(treeCity)
     vegCity <- ee$ImageCollection$toBands(vegCity)$rename(yrString)
     # ee_print(vegCity)
-    export.veg <- ee_image_to_drive(image=vegCity, fileNamePrefix=paste0(cityID, "_Vegetation_PercentOtherVeg"), folder="UHI_Analysis_Output", timePrefix=F)
+    export.veg <- ee_image_to_drive(image=vegCity, fileNamePrefix=paste0(cityID, "_Vegetation_PercentOtherVeg"), folder="UHI_Analysis_Output", timePrefix=F, region=cityBounds, maxPixels=1e9)
     export.veg$start()
   } # End Other Veg Cover Layer
 
   # Start No Veg Cover layer
-  if(!any(grepl(cityID, tree.done))){
+  if(overwrite | !any(grepl(cityID, tree.done))){
     bareCity <- mod44bReproj$select("Percent_NonVegetated")$map(function(img){
       return(img$clip(cityNow))
     })
@@ -173,7 +174,7 @@ for(i in (seq_len(citiesList$length()$getInfo()) - 1)){
     bareCity <- ee$ImageCollection$toBands(bareCity)$rename(yrString)
     # ee_print(bareCity)
     
-    export.bare <- ee_image_to_drive(image=bareCity, fileNamePrefix=paste0(cityID, "_Vegetation_PercentNoVeg"), folder=GoogleFolderSave, timePrefix=F)
+    export.bare <- ee_image_to_drive(image=bareCity, fileNamePrefix=paste0(cityID, "_Vegetation_PercentNoVeg"), folder=GoogleFolderSave, timePrefix=F, region=cityBounds, maxPixels=1e9)
     export.bare$start()
   } # End Write No Veg
   #-------
