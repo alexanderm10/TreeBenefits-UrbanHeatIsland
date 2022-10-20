@@ -3,6 +3,7 @@
 library(rgee); library(raster); library(terra)
 ee_check() # For some reason, it's important to run this before initalizing right now
 rgee::ee_Initialize(user = 'crollinson@mortonarb.org', drive=T)
+GoogleFolderSave <- "UHI_Analysis_Output"
 
 # chi <- readOGR("Chicago.shp")
 path.out <- "../data_raw/GoogleEarthEngine"
@@ -295,15 +296,6 @@ for(i in (seq_len(citiesList$length()$getInfo()) - 1)){
   # print(cityName)
   # Map$centerObject(cityNow)
   # Map$addLayer(cityNow)
-
-  # pathCity <- file.path(path.out, cityID)
-  # dir.create(file.path(pathCity, "elev"), recursive=T, showWarnings=F)
-  # dir.create(file.path(pathCity, "VegCover"), recursive=T, showWarnings=F)
-  # dir.create(file.path(pathCity, "LST_1km_Day"), recursive=T, showWarnings=F)
-  # dir.create(file.path(pathCity, "LST_1km_Day_Dev"), recursive=T, showWarnings=F)
-  # cityMask = ee$Image$constant(1)$clip(cityNow$geometry())$mask()
-  # cityMask = ee$Image$constant(1)$clip(cityNow$geometry())$mask()
-  # ee_print(cityMask)
   
   #-------
   # extracting elevation 
@@ -321,24 +313,15 @@ for(i in (seq_len(citiesList$length()$getInfo()) - 1)){
   if(npts.elev<thresh.pts) next
   
   # Save elevation only if it's worth our while
-  export.elev <- ee_image_to_drive(image=elevCity, fileNamePrefix=paste0(cityID, "_elevation"), folder="UHI_Analysis_Output", timePrefix=F)
+  export.elev <- ee_image_to_drive(image=elevCity, fileNamePrefix=paste0(cityID, "_elevation"), folder=GoogleFolderSave, timePrefix=F)
   export.elev$start()
   # ee_monitoring(export.elev)
-  
-  
-  # ee_imagecollection_to_local(ic=elevCity, region=cityNow$geometry(), scale=1e3, dsn=file.path(pathCity, "elev", paste0(cityID, "_elevation")))
   #-------
   
   
   #-------
   # Extracting vegetation cover -- we've already masked places where veg/non-veg cover doesn't add up
   #-------
-  # modCity <- mod44bReproj$map(function(img){
-  #   # First masking to Chicago
-  #   tmp <- img$clip(cityNow);
-  #   return(tmp$select("system:time_start", "Percent_Tree_Cover", "Percent_NonTree_Vegetation", "Percent_NonVegetated"))
-  # })
-
   yrMod <- ee$List(mod44bReproj$aggregate_array("year"))$distinct()
   yrString <- ee$List(paste(yrMod$getInfo()))
   # yrMod$getInfo()
@@ -351,7 +334,7 @@ for(i in (seq_len(citiesList$length()$getInfo()) - 1)){
   treeCity <- ee$ImageCollection$toBands(treeCity)$rename(yrString)
   # ee_print(treeCity)
   # Map$addLayer(treeCity$select('2020_Percent_Tree_Cover'), vizTree, 'Percent Tree Cover')
-  export.tree <- ee_image_to_drive(image=treeCity, fileNamePrefix=paste0(cityID, "_Vegetation_PercentTree"), folder="UHI_Analysis_Output", timePrefix=F)
+  export.tree <- ee_image_to_drive(image=treeCity, fileNamePrefix=paste0(cityID, "_Vegetation_PercentTree"), folder=GoogleFolderSave, timePrefix=F)
   export.tree$start()
   
   
@@ -372,9 +355,8 @@ for(i in (seq_len(citiesList$length()$getInfo()) - 1)){
   bareCity <- ee$ImageCollection$toBands(bareCity)$rename(yrString)
   # ee_print(bareCity)
   
-  export.bare <- ee_image_to_drive(image=bareCity, fileNamePrefix=paste0(cityID, "_Vegetation_PercentNoVeg"), folder="UHI_Analysis_Output", timePrefix=F)
+  export.bare <- ee_image_to_drive(image=bareCity, fileNamePrefix=paste0(cityID, "_Vegetation_PercentNoVeg"), folder=GoogleFolderSave, timePrefix=F)
   export.bare$start()
-  
   #-------
   
   
@@ -501,7 +483,7 @@ for(i in (seq_len(citiesList$length()$getInfo()) - 1)){
   # ee_print(tempYrMean)
   # Map$addLayer(tempYrMean$select('LST_Day_1km_mean')$first(), vizTempK, 'Mean Surface Temperature (K)');
   
-  export.TempMean <- ee_image_to_drive(image=tempYrMean, fileNamePrefix=paste0(cityID, "_LST_Day_Tmean"), folder="UHI_Analysis_Output", timePrefix=F)
+  export.TempMean <- ee_image_to_drive(image=tempYrMean, fileNamePrefix=paste0(cityID, "_LST_Day_Tmean"), folder=GoogleFolderSave, timePrefix=F)
   export.TempMean$start()
   
   
@@ -527,12 +509,11 @@ for(i in (seq_len(citiesList$length()$getInfo()) - 1)){
   tempYrDev <- ee$ImageCollection$fromImages(tempYrDev) # go ahead and overwrite it since we're just changing form
   tempYrDev <- ee$ImageCollection$toBands(tempYrDev)$rename(yrString2)
   
-  export.TempDev <- ee_image_to_drive(image=tempYrDev, fileNamePrefix=paste0(cityID, "_LST_Day_Tdev"), folder="UHI_Analysis_Output", timePrefix=F)
+  export.TempDev <- ee_image_to_drive(image=tempYrDev, fileNamePrefix=paste0(cityID, "_LST_Day_Tdev"), folder=GoogleFolderSave, timePrefix=F)
   export.TempDev$start()
   
   # Map$addLayer(tempYr$select('LST_Day_Dev_mean')$first(), vizTempAnom, 'Mean Surface Temperature - Anomaly');
 
-    # ee_imagecollection_to_local(ic=tempYrMean, region=cityNow$geometry(), scale=1e3, dsn="~/Desktop/EarthEngine_TEST_")
   # testRast <- ee_as_raster(tempYrMean$first())
   # Map$addLayer(tempYr$select('LST_Day_1km_mean')$first(), vizTempK, 'Mean Surface Temperature (K)');
   ## ----------------
