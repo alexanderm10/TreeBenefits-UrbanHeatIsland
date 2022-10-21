@@ -9,10 +9,6 @@ rgee::ee_Initialize(user = 'crollinson@mortonarb.org', drive=T)
 path.google <- "/Volumes/GoogleDrive/My Drive"
 GoogleFolderSave <- "UHI_Analysis_Output"
 
-elev.done <- dir(file.path(path.google, GoogleFolderSave), "elevation.tif")
-tmean.done <- dir(file.path(path.google, GoogleFolderSave), "Tmean.tif")
-tdev.done <- dir(file.path(path.google, GoogleFolderSave), "Tdev.tif")
-
 ##################### 
 # 0. Set up some choices for data quality thresholds
 ##################### 
@@ -209,12 +205,12 @@ extractTempEE <- function(CITIES, TEMPERATURE, GoogleFolderSave, overwrite=F, ..
   cityseq <- seq_len(CITIES$length()$getInfo())
   pb <- txtProgressBar(min=0, max=max(cityseq), style=3)
   for(i in (cityseq - 1)){
-    print(setTxtProgressBar(pb, i))
+    setTxtProgressBar(pb, i)
     # cityNow <- citiesBuff$filter('NAME=="Chicago"')$first()
     cityNow <- ee$Feature(CITIES$get(i))
     # cityNow$first()$propertyNames()$getInfo()
     cityID <- cityNow$get("ISOURBID")$getInfo()
-    Map$centerObject(cityNow) # NOTE: THIS IS REALLY IMPORTANT APPARENTLY!
+    # Map$centerObject(cityNow) # NOTE: THIS IS REALLY IMPORTANT APPARENTLY!
     
     # cityName <- cityNow$get("NAME")$getInfo()
     # print(cityName)
@@ -419,6 +415,28 @@ extractTempEE <- function(CITIES, TEMPERATURE, GoogleFolderSave, overwrite=F, ..
 # 3.1 select the city
 print(citiesUse$first()$propertyNames()$getInfo())
 
+### Filter out sites that have been done!
+elev.done <- dir(file.path(path.google, GoogleFolderSave), "elevation.tif")
+tmean.done <- dir(file.path(path.google, GoogleFolderSave), "Tmean.tif")
+tdev.done <- dir(file.path(path.google, GoogleFolderSave), "Tdev.tif")
+
+# Check to make sure a city has all three layers; if it doesn't do it again
+citiesDone <- unlist(lapply(strsplit(elev.done, "_"), function(x){x[1]}))
+for(i in 1:length(citiesDone)){
+  cityCheck <- citiesDone[i] # Check by name because it's going to change number
+  cityDONE <- any(grepl(cityCheck, tmean.done)) & any(grepl(cityCheck, tdev.done))
+  if(cityDONE) next 
+  citiesDone <- citiesDone[citiesDone!=cityCheck]
+}
+length(citiesDone)
+
+for(i in 1:length(citiesDone)){
+  citiesUse <- citiesUse$filter(ee$Filter$neq('ISOURBID', citiesDone[i]))
+}
+# filterVec <- ee$Filter$neq('ISOURBID', citiesDone)
+ncitiesAll <- citiesUse$size()$getInfo()
+
+
 citiesNorth <- citiesUse$filter(ee$Filter$gte('LATITUDE', 0))
 citiesSouth <- citiesUse$filter(ee$Filter$lt('LATITUDE', 0))
 
@@ -430,10 +448,9 @@ ncitiesSouth <- citiesSouth$size()$getInfo()
 # citiesList <- citiesUse$toList(3)
 citiesNorthList <- citiesNorth$toList(ncitiesNorth)
 citiesSouthList <- citiesUse$toList(ncitiesSouth)
-# print(citiesList$size()$getInfo())
+# print(citiesSouthList$size()$getInfo())
 
-### FOR LOOP STARTS HERE
-# i=0
+
 extractTempEE(CITIES=citiesSouthList, TEMPERATURE=lstSHFinal, GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
 
 extractTempEE(CITIES=citiesNorthList, TEMPERATURE=lstNHFinal, GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
