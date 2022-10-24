@@ -436,10 +436,8 @@ if(!overwrite){
   for(i in 1:length(citiesDone)){
     citiesUse <- citiesUse$filter(ee$Filter$neq('ISOURBID', citiesDone[i]))
   }
+  ncitiesAll <- citiesUse$size()$getInfo()
 }
-# filterVec <- ee$Filter$neq('ISOURBID', citiesDone)
-ncitiesAll <- citiesUse$size()$getInfo()
-
 
 citiesNorth <- citiesUse$filter(ee$Filter$gte('LATITUDE', 0))
 citiesSouth <- citiesUse$filter(ee$Filter$lt('LATITUDE', 0))
