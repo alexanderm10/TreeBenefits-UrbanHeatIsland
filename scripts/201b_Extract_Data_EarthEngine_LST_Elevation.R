@@ -425,13 +425,14 @@ if(!overwrite){
   
   # Check to make sure a city has all three layers; if it doesn't do it again
   citiesDone <- unlist(lapply(strsplit(elev.done, "_"), function(x){x[1]}))
-  for(i in 1:length(citiesDone)){
-    cityCheck <- citiesDone[i] # Check by name because it's going to change number
-    cityDONE <- any(grepl(cityCheck, tmean.done)) & any(grepl(cityCheck, tdev.done))
-    if(cityDONE) next 
-    citiesDone <- citiesDone[citiesDone!=cityCheck]
-  }
-  # length(citiesDone)
+  if(length(citiesDone)>0){
+    for(i in 1:length(citiesDone)){
+      cityCheck <- citiesDone[i] # Check by name because it's going to change number
+      cityDONE <- any(grepl(cityCheck, tmean.done)) & any(grepl(cityCheck, tdev.done))
+      if(cityDONE) next 
+      citiesDone <- citiesDone[citiesDone!=cityCheck]
+    }
+  }# length(citiesDone)
   
   for(i in 1:length(citiesDone)){
     citiesUse <- citiesUse$filter(ee$Filter$neq('ISOURBID', citiesDone[i]))
@@ -449,9 +450,9 @@ ncitiesSouth <- citiesSouth$size()$getInfo()
 # To co all of them
 # citiesList <- citiesUse$toList(3)
 citiesNorthList <- citiesNorth$toList(ncitiesNorth)
-citiesSouthList <- citiesUse$toList(ncitiesSouth)
+citiesSouthList <- citiesSouth$toList(ncitiesSouth)
 # print(citiesSouthList$size()$getInfo())
-
+# Map$addLayer(citiesSouth)
 
 extractTempEE(CITIES=citiesSouthList, TEMPERATURE=lstSHFinal, GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
 
