@@ -105,14 +105,16 @@ tempJulAug <- tempJulAug$map(lstConvert)
 tempJulAug <- tempJulAug$map(setYear)
 # ee_print(tempJulAug)
 # tempJulAug$first()$propertyNames()$getInfo()
+# tempJulAug$first()$get("system:id")$getInfo()
 # ee_print(tempJulAug$first())
 # Map$addLayer(tempJulAug$first()$select('LST_Day_1km'), vizTempK, "Jul/Aug Temperature")
 
 # 2.a.2 - Souther Hemisphere: Jan/Feb
 tempJanFeb <- ee$ImageCollection('MODIS/006/MOD11A2')$filter(ee$Filter$dayOfYear(1, 60))$filter(ee$Filter$date("2001-01-01", "2020-12-31"))$map(addTime);
 tempJanFeb <- tempJanFeb$map(lstConvert)
-tempJanFeb <- tempJulAug$map(setYear)
-# ee_print(tempJanFeb$first())
+tempJanFeb <- tempJanFeb$map(setYear)
+# ee_print(tempJanFeb$bandNames()$getInfo())
+# tempJanFeb$first()$get("system:id")$getInfo()
 
 # Filtering good LST Data --> note: we'll still do some outlier remover from each city
 lstDayGoodNH <- tempJulAug$map(lstMask)
@@ -176,6 +178,7 @@ lstSHFinal <- lstSHmask$map(function(IMG){
 
 # lstNHmasl2 <- lstNHmask
 # Map$addLayer(lstNHFinal$first()$select('LST_Day_1km'), vizTempK, "GOOD MASKED Jul/Aug Temperature")
+# Map$addLayer(lstSHFinal$first()$select('LST_Day_1km'), vizTempK, "GOOD MASKED Jan/Feb Temperature")
 # -----------
 
 
@@ -449,10 +452,14 @@ ncitiesSouth <- citiesSouth$size()$getInfo()
 
 # To co all of them
 # citiesList <- citiesUse$toList(3)
-citiesNorthList <- citiesNorth$toList(ncitiesNorth)
-citiesSouthList <- citiesSouth$toList(ncitiesSouth)
+citiesNorthList <- citiesNorth$toList(ncitiesNorth) # 2346 total
+citiesSouthList <- citiesSouth$toList(ncitiesSouth) # 336 total
 # print(citiesSouthList$size()$getInfo())
 # Map$addLayer(citiesSouth)
+
+# lstSHFinal$first()$get("system:id")$getInfo()
+# lstNHFinal$first()$get("system:id")$getInfo()
+
 
 extractTempEE(CITIES=citiesSouthList, TEMPERATURE=lstSHFinal, GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
 
