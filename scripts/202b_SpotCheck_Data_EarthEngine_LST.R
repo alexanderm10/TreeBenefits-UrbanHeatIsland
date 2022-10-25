@@ -1,11 +1,23 @@
 library(raster); library(sp); library(terra)
 library(ggplot2)
 
-sdei <- read.csv("../data_raw/sdei-global-uhi-2013.csv")
+sdei <- read.csv("../sdei-global-uhi-2013.csv")
 sdei <- sdei[sdei$ES00POP>=100e3 & sdei$SQKM_FINAL>1e2,]
 dim(sdei)
+summary(sdei)
 
+summary(sdei[sdei$LATITUDE<0,])
+summary(as.factor(sdei$ISO3[sdei$LATITUDE<0]))
+sdei[sdei$ISO3=="ZAF", "NAME"]
 sdei[grep("AUS", sdei$ISOURBID),]
+
+
+path.google <- "/Volumes/GoogleDrive/My Drive/UHI_Analysis_Output"
+files.elev <- dir(path.google, "elevation")
+files.lst <- dir(path.google, "LST_Day_Tmean")
+files.tree <- dir(path.google, "PercentTree")
+files.veg <- dir(path.google, "PercentOtherVeg")
+length(files.elev); length(files.lst); length(files.tree); length(files.veg)
 
 lst.hobart <- brick("/Volumes/GoogleDrive/My Drive/UHI_Analysis_Output/AUS226_LST_Day_Tmean.tif")-273.15
 elev.hobart <- raster("/Volumes/GoogleDrive/My Drive/UHI_Analysis_Output/AUS226_elevation.tif")
