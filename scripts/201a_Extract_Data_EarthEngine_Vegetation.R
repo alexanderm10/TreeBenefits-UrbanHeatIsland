@@ -1,7 +1,7 @@
-# Migrating the Trees & Urban Heat Island workflow to using Google Earht Engine
+# Migrating the Trees & Urban Heat Island workflow to using Google Earth Engine
 
 library(rgee); library(raster); library(terra)
-ee_check() # For some reason, it's important to run this before initalizing right now
+ee_check() # For some reason, it's important to run this before initializing right now
 rgee::ee_Initialize(user = 'crollinson@mortonarb.org', drive=T)
 path.google <- "/Volumes/GoogleDrive/My Drive"
 GoogleFolderSave <- "UHI_Analysis_Output"
@@ -98,6 +98,73 @@ vegMask <- mod44bReproj$first()$select("Percent_Tree_Cover", "Percent_NonTree_Ve
 ##################### 
 
 
+extractVeg <- function(CITIES, VEGETATION, GoogleFolderSave, overwrite=F, ...){
+  # CITIES needs to be a list
+  # Vegetation should be the reprojected MODIS44b product with year added in
+  cityseq <- seq_len(CITIES$length()$getInfo())
+  pb <- txtProgressBar(min=0, max=max(cityseq), style=3)
+  for(i in (cityseq - 1)){
+    setTxtProgressBar(pb, i)
+    # cityNow <- citiesUse$filter('NAME=="Chicago"')$first()
+    cityNow <- ee$Feature(CITIES$get(i))
+    # cityNow$first()$propertyNames()$getInfo()
+    cityID <- cityNow$get("ISOURBID")$getInfo()
+    # cityName <- cityNow$get("NAME")$getInfo()
+    # print(cityName)
+    # Map$centerObject(cityNow) # NOTE: THIS IS REALLY IMPORTANT APPARENTLY!
+    # Map$addLayer(cityNow)
+    #-------
+    
+    
+    #-------
+    # Extracting vegetation cover -- we've already masked places where veg/non-veg cover doesn't add up
+    #-------
+    yrMod <- ee$List(VEGETATION$aggregate_array("year"))$distinct()
+    yrString <- ee$List(paste(yrMod$getInfo()))
+    # yrMod$getInfo()
+    
+    # Start Tree Cover Layer
+    if(overwrite | !any(grepl(cityID, tree.done))){
+      treeCity <- VEGETATION$select("Percent_Tree_Cover")$map(function(img){
+        return(img$clip(cityNow))
+      })
+      # ee_print(treeCity)
+      treeCity <- ee$ImageCollection$toBands(treeCity)$rename(yrString)
+      # ee_print(treeCity)
+      # Map$addLayer(treeCity$select('2020_Percent_Tree_Cover'), vizTree, 'Percent Tree Cover')
+      export.tree <- ee_image_to_drive(image=treeCity, description=paste0(cityID, "_Vegetation_PercentTree"), fileNamePrefix=paste0(cityID, "_Vegetation_PercentTree"), folder=GoogleFolderSave, timePrefix=F, region=cityNow$geometry(), maxPixels=5e6, crs=projCRS, crsTransform=projTransform)
+      export.tree$start()
+    } # End Tree Cover Layer
+    
+    # Start Other Veg Cover Layer
+    if(overwrite | !any(grepl(cityID, tree.done))){
+      vegCity <- VEGETATION$select("Percent_NonTree_Vegetation")$map(function(img){
+        return(img$clip(cityNow))
+      })
+      # ee_print(treeCity)
+      vegCity <- ee$ImageCollection$toBands(vegCity)$rename(yrString)
+      # ee_print(vegCity)
+      export.veg <- ee_image_to_drive(image=vegCity, description=paste0(cityID, "_Vegetation_PercentOtherVeg"), fileNamePrefix=paste0(cityID, "_Vegetation_PercentOtherVeg"), folder="UHI_Analysis_Output", timePrefix=F, region=cityNow$geometry(), maxPixels=5e6, crs=projCRS, crsTransform=projTransform)
+      export.veg$start()
+    } # End Other Veg Cover Layer
+    
+    # Start No Veg Cover layer
+    if(overwrite | !any(grepl(cityID, tree.done))){
+      bareCity <- VEGETATION$select("Percent_NonVegetated")$map(function(img){
+        return(img$clip(cityNow))
+      })
+      # ee_print(treeCity)
+      bareCity <- ee$ImageCollection$toBands(bareCity)$rename(yrString)
+      # ee_print(bareCity)
+      
+      export.bare <- ee_image_to_drive(image=bareCity, description=paste0(cityID, "_Vegetation_PercentNoVeg"), fileNamePrefix=paste0(cityID, "_Vegetation_PercentNoVeg"), folder=GoogleFolderSave, timePrefix=F, region=cityNow$geometry(), maxPixels=5e6, crs=projCRS, crsTransform=projTransform)
+      export.bare$start()
+    } # End Write No Veg
+    #-------
+    
+  }  
+}
+
 ##################### 
 # 3 . Start extracting data for each city
 # NOTE: This will need to become a loop, but lets get it working first
@@ -111,79 +178,52 @@ ncities <- citiesUse$size()$getInfo()
 
 # To co all of them
 # citiesList <- citiesUse$toList(250)
-citiesList <- citiesUse$toList(ncities)
-print(citiesList$size()$getInfo())
+# citiesList <- citiesUse$toList(ncities)
+# print(citiesList$size()$getInfo())
 
 ### FOR LOOP STARTS HERE
-tree.done <- dir(file.path(path.google, GoogleFolderSave), "PercentTree.tif")
-other.done <- dir(file.path(path.google, GoogleFolderSave), "PercentOtherVeg.tif")
-bare.done <- dir(file.path(path.google, GoogleFolderSave), "PercentNoVeg.tif")
 
-# i=0
-pb <- txtProgressBar(min=0, max=ncities, style=3)
-for(i in (seq_len(citiesList$length()$getInfo()) - 1)){
-  setTxtProgressBar(pb, i)
-  # cityNow <- citiesUse$filter('NAME=="Chicago"')$first()
-  cityNow <- ee$Feature(citiesList$get(i))
-  # cityNow$first()$propertyNames()$getInfo()
-  cityID <- cityNow$get("ISOURBID")$getInfo()
-  # cityName <- cityNow$get("NAME")$getInfo()
-  # print(cityName)
-  # Map$centerObject(cityNow) # NOTE: THIS IS REALLY IMPORTANT APPARENTLY!
-  # Map$addLayer(cityNow)
+# If we're not trying to overwrite our files, remove files that were already done
+if(!overwrite){
+  ### Filter out sites that have been done!
+  tree.done <- dir(file.path(path.google, GoogleFolderSave), "PercentTree.tif")
+  other.done <- dir(file.path(path.google, GoogleFolderSave), "PercentOtherVeg.tif")
+  bare.done <- dir(file.path(path.google, GoogleFolderSave), "PercentNoVeg.tif")
   
-  if(!overwrite & all(any(grepl(cityID, tree.done)), any(grepl(cityID, other.done)), any(grepl(cityID, bare.done)))) next
-  #-------
-  
-  
-  #-------
-  # Extracting vegetation cover -- we've already masked places where veg/non-veg cover doesn't add up
-  #-------
-  yrMod <- ee$List(mod44bReproj$aggregate_array("year"))$distinct()
-  yrString <- ee$List(paste(yrMod$getInfo()))
-  # yrMod$getInfo()
-  
-  # Start Tree Cover Layer
-  if(overwrite | !any(grepl(cityID, tree.done))){
-    treeCity <- mod44bReproj$select("Percent_Tree_Cover")$map(function(img){
-      return(img$clip(cityNow))
-    })
-    # ee_print(treeCity)
-    treeCity <- ee$ImageCollection$toBands(treeCity)$rename(yrString)
-    # ee_print(treeCity)
-    # Map$addLayer(treeCity$select('2020_Percent_Tree_Cover'), vizTree, 'Percent Tree Cover')
-    export.tree <- ee_image_to_drive(image=treeCity, description=paste0(cityID, "_Vegetation_PercentTree"), fileNamePrefix=paste0(cityID, "_Vegetation_PercentTree"), folder=GoogleFolderSave, timePrefix=F, region=cityNow$geometry(), maxPixels=5e6, crs=projCRS, crsTransform=projTransform)
-    export.tree$start()
-  } # End Tree Cover Layer
-  
-  # Start Other Veg Cover Layer
-  if(overwrite | !any(grepl(cityID, tree.done))){
-    vegCity <- mod44bReproj$select("Percent_NonTree_Vegetation")$map(function(img){
-      return(img$clip(cityNow))
-    })
-    # ee_print(treeCity)
-    vegCity <- ee$ImageCollection$toBands(vegCity)$rename(yrString)
-    # ee_print(vegCity)
-    export.veg <- ee_image_to_drive(image=vegCity, description=paste0(cityID, "_Vegetation_PercentOtherVeg"), fileNamePrefix=paste0(cityID, "_Vegetation_PercentOtherVeg"), folder="UHI_Analysis_Output", timePrefix=F, region=cityNow$geometry(), maxPixels=5e6, crs=projCRS, crsTransform=projTransform)
-    export.veg$start()
-  } # End Other Veg Cover Layer
-
-  # Start No Veg Cover layer
-  if(overwrite | !any(grepl(cityID, tree.done))){
-    bareCity <- mod44bReproj$select("Percent_NonVegetated")$map(function(img){
-      return(img$clip(cityNow))
-    })
-    # ee_print(treeCity)
-    bareCity <- ee$ImageCollection$toBands(bareCity)$rename(yrString)
-    # ee_print(bareCity)
+  # Check to make sure a city has all three layers; if it doesn't do it again
+  citiesDone <- unlist(lapply(strsplit(tree.done, "_"), function(x){x[1]}))
+  if(length(citiesDone)>0){
+    for(i in 1:length(citiesDone)){
+      cityCheck <- citiesDone[i] # Check by name because it's going to change number
+      cityDONE <- any(grepl(cityCheck, tree.done)) & any(grepl(cityCheck, other.done)) & any(grepl(cityCheck, bare.done))
+      if(cityDONE) next 
+      citiesDone <- citiesDone[citiesDone!=cityCheck]
+    }
     
-    export.bare <- ee_image_to_drive(image=bareCity, description=paste0(cityID, "_Vegetation_PercentNoVeg"), fileNamePrefix=paste0(cityID, "_Vegetation_PercentNoVeg"), folder=GoogleFolderSave, timePrefix=F, region=cityNow$geometry(), maxPixels=5e6, crs=projCRS, crsTransform=projTransform)
-    export.bare$start()
-  } # End Write No Veg
-  #-------
-
+    for(i in 1:length(citiesDone)){
+      citiesUse <- citiesUse$filter(ee$Filter$neq('ISOURBID', citiesDone[i]))
+    }
+  }
+  # length(citiesDone)
+  
+  ncitiesAll <- citiesUse$size()$getInfo()
 }
 
+citiesNorth <- citiesUse$filter(ee$Filter$gte('LATITUDE', 0))
+citiesSouth <- citiesUse$filter(ee$Filter$lt('LATITUDE', 0))
+
+# Figuring out how many cities we have (2682 in all)
+ncitiesNorth <- citiesNorth$size()$getInfo()
+ncitiesSouth <- citiesSouth$size()$getInfo()
+
+# To co all of them
+# citiesList <- citiesUse$toList(3)
+citiesNorthList <- citiesNorth$toList(ncitiesNorth) # 2346 total
+citiesSouthList <- citiesSouth$toList(ncitiesSouth) # 336 total
+
+extractVeg(CITIES=citiesSouthList, VEGETATION=mod44bReproj, GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
+
+extractVeg(CITIES=citiesNorthList, VEGETATION=mod44bReproj, GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
 ### FOR LOOP ENDS HERE
 ##################### 
 
