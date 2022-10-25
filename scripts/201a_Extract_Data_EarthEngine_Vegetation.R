@@ -209,21 +209,43 @@ if(!overwrite){
   ncitiesAll <- citiesUse$size()$getInfo()
 }
 
-citiesNorth <- citiesUse$filter(ee$Filter$gte('LATITUDE', 0))
-citiesSouth <- citiesUse$filter(ee$Filter$lt('LATITUDE', 0))
-
 # Figuring out how many cities we have (2682 in all)
-ncitiesNorth <- citiesNorth$size()$getInfo()
-ncitiesSouth <- citiesSouth$size()$getInfo()
+ncitiesSouth <- citiesSouth$size()$getInfo() # 336 cities
+ncitiesNorthW <- citiesNorthW$size()$getInfo() # 484 cities 
+ncitiesNorthE1 <- citiesNorthE1$size()$getInfo() # 982 cities
+ncitiesNorthE2 <- citiesNorthE2$size()$getInfo() # 880 cities
 
 # To co all of them
 # citiesList <- citiesUse$toList(3)
-citiesNorthList <- citiesNorth$toList(ncitiesNorth) # 2346 total
-citiesSouthList <- citiesSouth$toList(ncitiesSouth) # 336 total
+# North: 2346 total
+# print(citiesSouthList$size()$getInfo())
+# Map$addLayer(citiesSouth)
 
-extractVeg(CITIES=citiesSouthList, VEGETATION=mod44bReproj, GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
+# lstSHFinal$first()$get("system:id")$getInfo()
+# lstNHFinal$first()$get("system:id")$getInfo()
 
-extractVeg(CITIES=citiesNorthList, VEGETATION=mod44bReproj, GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
+if(ncitiesSouth>0){
+  citiesSouthList <- citiesSouth$toList(ncitiesSouth) 
+  extractVeg(CITIES=citiesSouthList, VEGETATION=mod44bReproj, GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
+}
+
+if(ncitiesNorthW>0){
+  citiesNorthWList <- citiesNorthW$toList(ncitiesNorthW) #  total
+  extractVeg(CITIES=citiesNorthWList, VEGETATION=mod44bReproj, GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
+}
+
+if(ncitiesNorthE1>0){
+  citiesNorthE1List <- citiesNorthE1$toList(ncitiesNorthE1) #  total
+  extractVeg(CITIES=citiesNorthE1List, VEGETATION=mod44bReproj, GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
+}
+
+if(ncitiesNorthE2>0){
+  citiesNorthE2List <- citiesNorthE2$toList(ncitiesNorthE2) #  total
+  extractVeg(CITIES=citiesNorthE2List, VEGETATION=mod44bReproj, GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
+  
+}
+
+
 ### FOR LOOP ENDS HERE
 ##################### 
 
