@@ -6,7 +6,23 @@ sdei <- sdei[sdei$ES00POP>=100e3 & sdei$SQKM_FINAL>1e2,]
 dim(sdei)
 summary(sdei)
 
+
+
+
 summary(sdei[sdei$LATITUDE<0,])
+summary(as.factor(sdei$ISO3[sdei$LATITUDE<0]))
+
+summary(sdei[sdei$LATITUDE>=0 & sdei$LONGITUDE<=0,])
+summary(as.factor(sdei$ISO3[sdei$LATITUDE>=0 & sdei$LONGITUDE<=0]))
+
+summary(sdei[sdei$LATITUDE>=0 & sdei$LONGITUDE>0 & sdei$LONGITUDE<=75,])
+summary(as.factor(sdei$ISO3[sdei$LATITUDE>=0 & sdei$LONGITUDE>0 & sdei$LONGITUDE<=75]))
+
+
+summary(sdei[sdei$LATITUDE>=0 & sdei$LONGITUDE>75,])
+summary(as.factor(sdei$ISO3[sdei$LATITUDE>=0 & sdei$LONGITUDE>75]))
+
+
 summary(as.factor(sdei$ISO3[sdei$LATITUDE<0]))
 sdei[sdei$ISO3=="ZAF", "NAME"]
 sdei[grep("AUS", sdei$ISOURBID),]
