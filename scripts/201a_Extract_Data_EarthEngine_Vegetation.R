@@ -193,13 +193,14 @@ if(!overwrite){
   # Check to make sure a city has all three layers; if it doesn't do it again
   citiesDone <- unlist(lapply(strsplit(tree.done, "_"), function(x){x[1]}))
   if(length(citiesDone)>0){
+    cityRemove <- vector()
     for(i in 1:length(citiesDone)){
       cityCheck <- citiesDone[i] # Check by name because it's going to change number
       cityDONE <- any(grepl(cityCheck, tree.done)) & any(grepl(cityCheck, other.done)) & any(grepl(cityCheck, bare.done))
-      if(cityDONE) next 
-      citiesDone <- citiesDone[citiesDone!=cityCheck]
+      if(!cityDONE) next 
+      cityRemove <- c(cityRemove, cityCheck)
     }
-    
+    citiesDone <- citiesDone[citiesDone %in% cityRemove]
     for(i in 1:length(citiesDone)){
       citiesUse <- citiesUse$filter(ee$Filter$neq('ISOURBID', citiesDone[i]))
     }
@@ -208,6 +209,14 @@ if(!overwrite){
   
   ncitiesAll <- citiesUse$size()$getInfo()
 }
+
+
+citiesSouth <- citiesUse$filter(ee$Filter$lt('LATITUDE', 0))
+citiesNorthW <- citiesUse$filter(ee$Filter$gte('LATITUDE', 0))$filter(ee$Filter$lte('LONGITUDE', 0))
+citiesNorthE1 <- citiesUse$filter(ee$Filter$gte('LATITUDE', 0))$filter(ee$Filter$gt('LONGITUDE', 0))$filter(ee$Filter$lte('LONGITUDE', 75))
+citiesNorthE2 <- citiesUse$filter(ee$Filter$gte('LATITUDE', 0))$filter(ee$Filter$gt('LONGITUDE', 75))
+
+
 
 # Figuring out how many cities we have (2682 in all)
 ncitiesSouth <- citiesSouth$size()$getInfo() # 336 cities
@@ -224,10 +233,11 @@ ncitiesNorthE2 <- citiesNorthE2$size()$getInfo() # 880 cities
 # lstSHFinal$first()$get("system:id")$getInfo()
 # lstNHFinal$first()$get("system:id")$getInfo()
 
-if(ncitiesSouth>0){
-  citiesSouthList <- citiesSouth$toList(ncitiesSouth) 
-  extractVeg(CITIES=citiesSouthList, VEGETATION=mod44bReproj, GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
-}
+# Cities South is still running
+# if(ncitiesSouth>0){
+#   citiesSouthList <- citiesSouth$toList(ncitiesSouth) 
+#   extractVeg(CITIES=citiesSouthList, VEGETATION=mod44bReproj, GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
+# }
 
 if(ncitiesNorthW>0){
   citiesNorthWList <- citiesNorthW$toList(ncitiesNorthW) #  total

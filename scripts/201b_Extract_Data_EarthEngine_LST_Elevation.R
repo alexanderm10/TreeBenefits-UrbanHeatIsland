@@ -429,13 +429,15 @@ if(!overwrite){
   # Check to make sure a city has all three layers; if it doesn't do it again
   citiesDone <- unlist(lapply(strsplit(elev.done, "_"), function(x){x[1]}))
   if(length(citiesDone)>0){
+  	cityRemove <- vector()
     for(i in 1:length(citiesDone)){
       cityCheck <- citiesDone[i] # Check by name because it's going to change number
       cityDONE <- any(grepl(cityCheck, tmean.done)) & any(grepl(cityCheck, tdev.done))
-      if(cityDONE) next 
-      citiesDone <- citiesDone[citiesDone!=cityCheck]
+      if(!cityDONE) next 
+      cityRemove <- c(cityRemove, cityCheck)
     }
     
+    citiesDone <- citiesDone[citiesDone %in% cityRemove]
     for(i in 1:length(citiesDone)){
       citiesUse <- citiesUse$filter(ee$Filter$neq('ISOURBID', citiesDone[i]))
     }
