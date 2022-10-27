@@ -5,7 +5,7 @@ library(mgcv)
 
 # file paths for where to put the processed data
 # path.cities <- "../data_processed/data_cities_all"
-path.cities <- "/Volumes/GoogleDrive/Shared drives/Urban Ecological Drought/Trees-UHI Manuscript/Analysis/data_processed"
+path.cities <- "/Volumes/GoogleDrive/Shared drives/Urban Ecological Drought/Trees-UHI Manuscript/Analysis/data_processed/data_cities_all"
 if(!dir.exists(path.cities)) dir.create(path.cities, recursive=T, showWarnings = F)
 file.cityAll.stats <- file.path(path.cities, "../city_stats_all.csv")
 
@@ -114,8 +114,19 @@ for(CITY in citiesAnalyze){
   if(nrow(biome)>0){ # Some aren't quite aligning-- we'll figure those out later
     if(nrow(biome)==1){
       cityAll.stats$biome[row.city] <- biome$biome.name
-    } else { stop("MORE THAN 1 ROW NEED TO FIGURE OUT!")}
-  }
+    } else { 
+      biome$area <- expanse(biome)
+      biome.sum <- aggregate(area ~ biome.name, data=biome, FUN=sum)
+      
+      if(nrow(biome.sum)>1){
+        cityAll.stats$biome[row.city] <- biome.sum$biome.name[biome.sum$area==max(biome.sum$area)]
+      } else {
+        cityAll.stats$biome[row.city] <- biome.sum$biome.name
+      }
+      
+      rm(biome.sum)
+    } # End if/else
+  } # End skipping biomes that don't exist
   elevCity <- raster(file.path(path.EEout, paste0(CITY, "_elevation.tif")))
   lstCity <- brick(file.path(path.EEout, paste0(CITY, "_LST_Day_Tmean.tif")))-273.15
   treeCity <- brick(file.path(path.EEout, paste0(CITY, "_Vegetation_PercentTree.tif")))
