@@ -218,7 +218,7 @@ for(CITY in citiesAnalyze){
   	setTxtProgressBar(pb.lms, i)
   	
   	# Skip any analysis if there's less than 10 years of data or our trend doesn't go to the last 5 years of our record
-  	if(length(rowsCity)<10 | max(valsCity$year[rowsCity])<=2015) next
+  	if(length(rowsCity)<5 | max(valsCity$year[rowsCity])<=2015) next
   	
   	trend.LST <- lm(LST_Day ~ year, data=valsCity[rowsCity,])
   	sum.LST <- summary(trend.LST)
