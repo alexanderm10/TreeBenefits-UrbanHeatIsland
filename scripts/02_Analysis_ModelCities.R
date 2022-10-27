@@ -5,7 +5,7 @@ library(mgcv)
 
 # file paths for where to put the processed data
 # path.cities <- "../data_processed/data_cities_all"
-path.cities <- "/Volumes/GoogleDrive/Shared drives/Urban Ecological Drought/Tree-UHI Analysis/data_processed"
+path.cities <- "/Volumes/GoogleDrive/Shared drives/Urban Ecological Drought/Trees-UHI Manuscript/Analysis/data_processed"
 if(!dir.exists(path.cities)) dir.create(path.cities, recursive=T, showWarnings = F)
 file.cityAll.stats <- file.path(path.cities, "../city_stats_all.csv")
 
@@ -93,7 +93,8 @@ cities.lst <- unlist(lapply(files.lst, FUN=function(x){strsplit(x, "_")[[1]][1]}
 cities.tree <- unlist(lapply(files.tree, FUN=function(x){strsplit(x, "_")[[1]][1]}))
 cities.veg <- unlist(lapply(files.veg, FUN=function(x){strsplit(x, "_")[[1]][1]}))
 
-citiesDone <- cities.elev[cities.elev %in% cities.lst & cities.elev %in% cities.tree & cities.elev %in% cities.veg]
+
+citiesDone <- cities.lst[cities.lst %in% cities.elev & cities.lst %in% cities.tree & cities.lst %in% cities.veg]
 length(citiesDone)
 
 # Now compare the done list to what needs to be analyzed
@@ -414,6 +415,6 @@ for(CITY in citiesAnalyze){
   write.csv(cityAll.stats, file.cityAll.stats, row.names=F)  # Write our city stats file each time in case it bonks
 
   # Remove a bunch of stuff for our own sanity
-  rm(elevCity, treeCity, vegCity, lstCity, modCity, valsCity, summaryCity, coordsCity, biome, sp.city, plot.corr.LST.Tree, plot.corr.LST.Veg, plot.corr.Tree.Veg, plot.lst.trend, plot.tree.trend, plot.veg.trend, plot.elev, plot.lst, plot.tree, plot.veg, veg.lst, veg.tree, tree.lst, veg.out, tree.out, lst,out, sum.corrTreeLST, sum.corrVegLST, sum.corrVegTree, sum.modCity)
+  rm(elevCity, treeCity, vegCity, lstCity, modCity, valsCity, summaryCity, coordsCity, biome, sp.city, plot.corr.LST.Tree, plot.corr.LST.Veg, plot.corr.Tree.Veg, plot.lst.trend, plot.tree.trend, plot.veg.trend, plot.elev, plot.lst, plot.tree, plot.veg, veg.lst, veg.tree, tree.lst, veg.out, tree.out, lst.out, sum.corrTreeLST, sum.corrVegLST, sum.corrVegTree, sum.modCity)
   
 }	
