@@ -106,13 +106,14 @@ for(CITY in citiesAnalyze){
   print(CITY)
   dir.create(file.path(path.cities, CITY), recursive = T, showWarnings = F)
   
-  sp.city <- sdei.urb[sdei.urb$ISOURBID==CITY, ]
+  sp.city <- buffer(sdei.urb[sdei.urb$ISOURBID==CITY, ], width=10e3)
   biome <- terra::intersect(ecoregions, sp.city)
   # data.frame(biome)
-  if(nrow(biome)==1){
-    cityAll.stats$biome[row.city] <- biome$biome.name
-  } else { stop("MORE THAN 1 ROW NEED TO FIGURE OUT!")}
-
+  if(nrow(biome)>0){ # Some aren't quite aligning-- we'll figure those out later
+    if(nrow(biome)==1){
+      cityAll.stats$biome[row.city] <- biome$biome.name
+    } else { stop("MORE THAN 1 ROW NEED TO FIGURE OUT!")}
+  }
   elevCity <- raster(file.path(path.EEout, paste0(CITY, "_elevation.tif")))
   lstCity <- brick(file.path(path.EEout, paste0(CITY, "_LST_Day_Tmean.tif")))-273.15
   treeCity <- brick(file.path(path.EEout, paste0(CITY, "_Vegetation_PercentTree.tif")))
@@ -203,6 +204,9 @@ for(CITY in citiesAnalyze){
   	rowsCity <- which(valsCity$location==summaryCity$location[i])
   	setTxtProgressBar(pb.lms, i)
   	
+  	# Skip any analysis if there's less than 10 years of data or our trend doesn't go to the last 5 years of our record
+  	if(length(rowsCity)<10 | max(valsCity$year[rowsCity])<=2015) next
+  	
   	trend.LST <- lm(LST_Day ~ year, data=valsCity[rowsCity,])
   	sum.LST <- summary(trend.LST)
   	summaryCity[i,c("LST.trend", "LST.p")] <- sum.LST$coefficients["year",c(1,4)]
@@ -222,7 +226,7 @@ for(CITY in citiesAnalyze){
   summary(summaryCity)
   write.csv(summaryCity, file.path(path.cities, CITY, paste0(CITY, "_CityStats_Pixels.csv")), row.names=F)
   
-  rm(trend.LST, trend.tree, trend.veg)
+  rm(trend.LST, trend.tree, trend.veg, sum.LST, sum.tree, sum.veg)
   
   # Making some plots with the summary data
   # proj.elev <- projection(elevCity)
@@ -406,8 +410,9 @@ for(CITY in citiesAnalyze){
   )
   dev.off()  
   
-  # Remove a bunch of stuff for our own sanity
-  rm(elevCity, treeCity, vegCity, lstCity, modCity, valsCity, summaryCity, coordsCity, biome, sp.city, plot.corr.LST.Tree, plot.corr.LST.Veg, plot.corr.Tree.Veg, plot.lst.trend, plot.tree.trend, plot.veg.trend, plot.elev, plot.lst, plot.tree, plot.veg)
-  
   write.csv(cityAll.stats, file.cityAll.stats, row.names=F)  # Write our city stats file each time in case it bonks
+
+  # Remove a bunch of stuff for our own sanity
+  rm(elevCity, treeCity, vegCity, lstCity, modCity, valsCity, summaryCity, coordsCity, biome, sp.city, plot.corr.LST.Tree, plot.corr.LST.Veg, plot.corr.Tree.Veg, plot.lst.trend, plot.tree.trend, plot.veg.trend, plot.elev, plot.lst, plot.tree, plot.veg, veg.lst, veg.tree, tree.lst, veg.out, tree.out, lst,out, sum.corrTreeLST, sum.corrVegLST, sum.corrVegTree, sum.modCity)
+  
 }	
