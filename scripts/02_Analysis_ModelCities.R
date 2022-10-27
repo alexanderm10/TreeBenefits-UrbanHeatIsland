@@ -3,10 +3,11 @@ library(ggplot2)
 library(mgcv)
 
 
-# file paths for 
-path.cities <- "../data_processed/data_cities_all"
+# file paths for where to put the processed data
+# path.cities <- "../data_processed/data_cities_all"
+path.cities <- "/Volumes/GoogleDrive/Shared drives/Urban Ecological Drought/Tree-UHI Analysis/data_processed"
 if(!dir.exists(path.cities)) dir.create(path.cities, recursive=T, showWarnings = F)
-file.cityAll.stats <- "../data_processed/city_stats_all.csv"
+file.cityAll.stats <- file.path(path.cities, "../city_stats_all.csv")
 
 # Path to where Earth Engine is saving the spatial extractions
 path.EEout <- "/Volumes/GoogleDrive/My Drive/UHI_Analysis_Output"
