@@ -75,6 +75,10 @@ lstMask <- function(img){
 ##################### 
 # 1. Load and select cities
 #####################
+sdei.df <- data.frame(vect("../data_raw/sdei-global-uhi-2013-shp/shp/sdei-global-uhi-2013.shp"))
+sdei.df <- sdei.df[sdei.df$ES00POP>=100e3 & sdei.df$SQKM_FINAL>=1e2,]
+cityIDsAll <- sdei.df$ISOURBID
+
 sdei <- ee$FeatureCollection('users/crollinson/sdei-global-uhi-2013');
 # print(sdei.first())
 
@@ -437,14 +441,17 @@ if(!overwrite){
       cityRemove <- c(cityRemove, cityCheck)
     }
     
-    citiesDone <- citiesDone[citiesDone %in% cityRemove]
-    for(i in 1:length(citiesDone)){
-      citiesUse <- citiesUse$filter(ee$Filter$neq('ISOURBID', citiesDone[i]))
-    }
+    # citiesDone <- citiesDone[citiesDone %in% cityRemove]
+    # for(i in 1:length(citiesDone)){
+    #   citiesUse <- citiesUse$filter(ee$Filter$neq('ISOURBID', citiesDone[i]))
+    # }
+  	cities.keep <- cityIDsAll[!cityIDsAll %in% cityRemove]
+  	
+  	citiesUse <- citiesUse$filter(ee$Filter$inList('ISOURBID', ee$List(cities.keep)))
   }# length(citiesDone)
-  
   ncitiesAll <- citiesUse$size()$getInfo()
-}
+  
+} # End remove cities loop
 
 citiesSouth <- citiesUse$filter(ee$Filter$lt('LATITUDE', 0))
 citiesNorthW <- citiesUse$filter(ee$Filter$gte('LATITUDE', 0))$filter(ee$Filter$lte('LONGITUDE', 0))
