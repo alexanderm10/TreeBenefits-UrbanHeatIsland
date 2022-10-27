@@ -1,3 +1,40 @@
+#NOTE NOTE NOTE: THIS HAS NOT BEEN UPDATED YET!!
+
+path.cities <- "/Volumes/GoogleDrive/Shared drives/Urban Ecological Drought/Trees-UHI Manuscript/Analysis/data_processed/data_cities_all"
+file.cityAll.stats <- file.path(path.cities, "../city_stats_all.csv")
+
+cityAll.stats <- read.csv(file.cityAll.stats)
+summary(cityAll.stats[!is.na(cityAll.stats$model.tree.slope),])
+
+unique(cityAll.stats$ISO3)
+
+# Quick summary of places with significant tree cover trends -- most places (so far) have been INCREASING in cover, but also still getting warmer on average; how much would these cities have warmed without their trees??  
+summary(cityAll.stats[!is.na(cityAll.stats$trend.tree.slope) & cityAll.stats$trend.tree.p<0.05,])
+
+
+# Currently no actual statistical correlation between these two though.
+plot(trend.LST.slope ~ trend.tree.slope, data=cityAll.stats[!is.na(cityAll.stats$trend.LST.slope),])
+slopes.lm <- lm(trend.LST.slope ~ trend.tree.slope, data=cityAll.stats[!is.na(cityAll.stats$trend.LST.slope),])
+summary(slopes.lm)
+
+slopes.lm.biome <- lm(trend.LST.slope ~ trend.tree.slope*biome, data=cityAll.stats[!is.na(cityAll.stats$trend.LST.slope),])
+anova(slopes.lm.biome)
+summary(slopes.lm.biome)
+
+
+# Trying to find Buenos Aires as an example to post in Slack
+# cityAll.stats[grep("AGO", cityAll.stats$ISOURBID),]
+cityAll.stats[grep("ARG", cityAll.stats$ISOURBID),c("ISOURBID", "NAME", "LATITUDE", "LONGITUDE", "ES00POP", "biome", "n.pixels", "model.R2adj", "model.tree.slope", "model.veg.slope")]
+cityAll.stats[grep("AUS", cityAll.stats$ISOURBID),c("ISOURBID", "NAME", "LATITUDE", "LONGITUDE", "ES00POP", "biome", "n.pixels", "model.R2adj", "model.tree.slope", "model.veg.slope")]
+usa <- cityAll.stats[grep("USA", cityAll.stats$ISOURBID),]
+usa[order(usa$ES00POP, decreasing=T),c("ISOURBID", "NAME", "ES00POP", "biome", "n.pixels")]
+# Useful Cities to know
+# Buenos Aires = "ARG66611"
+# Sydney = AUS66430
+
+
+
+
 library(ggplot2); library(RColorBrewer)
 # path.figs <- "../figures/v6_vegonly"
 path.figs <- "/Volumes/GoogleDrive/My Drive/TreeBenefits_UrbanHeatIsland/figures/veg_only"
