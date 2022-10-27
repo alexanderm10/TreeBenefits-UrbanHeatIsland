@@ -429,13 +429,15 @@ if(!overwrite){
   # Check to make sure a city has all three layers; if it doesn't do it again
   citiesDone <- unlist(lapply(strsplit(elev.done, "_"), function(x){x[1]}))
   if(length(citiesDone)>0){
+  	cityRemove <- vector()
     for(i in 1:length(citiesDone)){
       cityCheck <- citiesDone[i] # Check by name because it's going to change number
       cityDONE <- any(grepl(cityCheck, tmean.done)) & any(grepl(cityCheck, tdev.done))
-      if(cityDONE) next 
-      citiesDone <- citiesDone[citiesDone!=cityCheck]
+      if(!cityDONE) next 
+      cityRemove <- c(cityRemove, cityCheck)
     }
     
+    citiesDone <- citiesDone[citiesDone %in% cityRemove]
     for(i in 1:length(citiesDone)){
       citiesUse <- citiesUse$filter(ee$Filter$neq('ISOURBID', citiesDone[i]))
     }
@@ -450,10 +452,10 @@ citiesNorthE1 <- citiesUse$filter(ee$Filter$gte('LATITUDE', 0))$filter(ee$Filter
 citiesNorthE2 <- citiesUse$filter(ee$Filter$gte('LATITUDE', 0))$filter(ee$Filter$gt('LONGITUDE', 75))
 
 # Figuring out how many cities we have (2682 in all)
-ncitiesSouth <- citiesSouth$size()$getInfo() # 336 total
-ncitiesNorthW <- citiesNorthW$size()$getInfo()
-ncitiesNorthE1 <- citiesNorthE1$size()$getInfo()
-ncitiesNorthE2 <- citiesNorthE2$size()$getInfo()
+ncitiesSouth <- citiesSouth$size()$getInfo() # 336 cities
+ncitiesNorthW <- citiesNorthW$size()$getInfo() # 484 cities
+ncitiesNorthE1 <- citiesNorthE1$size()$getInfo() # 982 cities
+ncitiesNorthE2 <- citiesNorthE2$size()$getInfo() # 880 cities
 
 # To co all of them
 # citiesList <- citiesUse$toList(3)
@@ -464,23 +466,24 @@ ncitiesNorthE2 <- citiesNorthE2$size()$getInfo()
 # lstSHFinal$first()$get("system:id")$getInfo()
 # lstNHFinal$first()$get("system:id")$getInfo()
 
-if(ncitiesSouth>0){
-  citiesSouthList <- citiesSouth$toList(ncitiesSouth) 
-  extractTempEE(CITIES=citiesSouthList, TEMPERATURE=lstSHFinal, GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
-}
+# # Should have all run successfully!
+# if(ncitiesSouth>0){
+#   citiesSouthList <- citiesSouth$toList(ncitiesSouth) 
+#   extractTempEE(CITIES=citiesSouthList, TEMPERATURE=lstSHFinal, GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
+# }
 
 if(ncitiesNorthW>0){
-  citiesNorthWList <- citiesNorthW$toList(ncitiesNorthW) #  total
+  citiesNorthWList <- citiesNorthW$toList(ncitiesNorthW) 
   extractTempEE(CITIES=citiesNorthWList, TEMPERATURE=lstNHFinal, GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
 }
 
 if(ncitiesNorthE1>0){
-  citiesNorthE1List <- citiesNorthE1$toList(ncitiesNorthE1) #  total
+  citiesNorthE1List <- citiesNorthE1$toList(ncitiesNorthE1) 
   extractTempEE(CITIES=citiesNorthE1List, TEMPERATURE=lstNHFinal, GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
 }
 
 if(ncitiesNorthE2>0){
-  citiesNorthE2List <- citiesNorthE2$toList(ncitiesNorthE2) #  total
+  citiesNorthE2List <- citiesNorthE2$toList(ncitiesNorthE2) 
   extractTempEE(CITIES=citiesNorthE2List, TEMPERATURE=lstNHFinal, GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
 }
 ### FOR LOOP ENDS HERE
