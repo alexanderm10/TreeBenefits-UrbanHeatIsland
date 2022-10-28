@@ -218,7 +218,7 @@ for(CITY in citiesAnalyze){
   	setTxtProgressBar(pb.lms, i)
   	
   	# Skip any analysis if there's less than 10 years of data or our trend doesn't go to the last 5 years of our record
-  	if(length(rowsCity)<5 | max(valsCity$year[rowsCity])<=2015) next
+  	if(length(rowsCity)<10 | max(valsCity$year[rowsCity])<=2015) next
   	
   	trend.LST <- lm(LST_Day ~ year, data=valsCity[rowsCity,])
   	sum.LST <- summary(trend.LST)
@@ -248,7 +248,7 @@ for(CITY in citiesAnalyze){
   # sp.city3 <- st_transform(test, proj.elev)
   plot.lst <- ggplot(data=summaryCity[!is.na(summaryCity$LST.mean),]) +
     coord_equal() +
-    geom_raster(aes(x=x, y=y, fill=LST.mean)) +
+    geom_tile(aes(x=x, y=y, fill=LST.mean)) +
     # geom_sf(data=sp.city3, fill=NA) +
     scale_fill_gradientn(name="Summer\nTemp\n(deg. C)", colors=grad.temp) +
     theme(panel.background=element_rect(fill=NA, color="black"),
@@ -261,7 +261,7 @@ for(CITY in citiesAnalyze){
   plot.elev <- ggplot(data=summaryCity[!is.na(summaryCity$elevation),]) +
     coord_equal() +
     # geom_tile(aes(x=x2, y=y2, fill=temp.summer)) +
-    geom_raster(aes(x=x, y=y, fill=elevation)) +
+    geom_tile(aes(x=x, y=y, fill=elevation)) +
     # geom_path(data=city.sp, aes(x=long, y=lat, group=group)) +
     scale_fill_gradientn(name="Elevation\n(m)", colors=grad.elev) +
     theme(panel.background=element_rect(fill=NA, color="black"),
@@ -273,7 +273,7 @@ for(CITY in citiesAnalyze){
   
   plot.tree <- ggplot(data=summaryCity[!is.na(summaryCity$tree.mean),]) +
     coord_equal() +
-    geom_raster(aes(x=x, y=y, fill=tree.mean)) +
+    geom_tile(aes(x=x, y=y, fill=tree.mean)) +
     # geom_path(data=city.sp, aes(x=long, y=lat, group=group)) +
     scale_fill_gradientn(name="Tree\nCover\n(%)", colors=grad.tree, limits=c(0,100)) +
     theme(panel.background=element_rect(fill=NA, color="black"),
@@ -285,7 +285,7 @@ for(CITY in citiesAnalyze){
   
   plot.veg <- ggplot(data=summaryCity[!is.na(summaryCity$veg.mean),]) +
     coord_equal() +
-    geom_raster(aes(x=x, y=y, fill=veg.mean)) +
+    geom_tile(aes(x=x, y=y, fill=veg.mean)) +
     # geom_path(data=city.sp, aes(x=long, y=lat, group=group)) +
     scale_fill_gradientn(name="Other Veg\nCover (%)", colors=grad.other, limits=c(0,100)) +
     theme(panel.background=element_rect(fill=NA, color="black"),
@@ -302,130 +302,131 @@ for(CITY in citiesAnalyze){
   )
   dev.off()  
   
-  # cityAll.stats[row.city,]
-  # Calculate the stats for the trends in LST and veg cover
-  cityAll.stats$trend.LST.slope[row.city] <- mean(summaryCity$LST.trend, na.rm=T)
-  cityAll.stats$trend.LST.slope.sd[row.city] <- sd(summaryCity$LST.trend, na.rm=T)
-  LST.out <- t.test(summaryCity$LST.trend)
-  cityAll.stats$trend.LST.p[row.city] <- LST.out$p.value
+  if(length(which(!is.na(summaryCity$LST.trend)))>50){
+    # cityAll.stats[row.city,]
+    # Calculate the stats for the trends in LST and veg cover
+    cityAll.stats$trend.LST.slope[row.city] <- mean(summaryCity$LST.trend, na.rm=T)
+    cityAll.stats$trend.LST.slope.sd[row.city] <- sd(summaryCity$LST.trend, na.rm=T)
+    LST.out <- t.test(summaryCity$LST.trend)
+    cityAll.stats$trend.LST.p[row.city] <- LST.out$p.value
+    
+    cityAll.stats$trend.tree.slope[row.city] <- mean(summaryCity$tree.trend, na.rm=T)
+    cityAll.stats$trend.tree.slope.sd[row.city] <- sd(summaryCity$tree.trend, na.rm=T)
+    tree.out <- t.test(summaryCity$tree.trend)
+    cityAll.stats$trend.tree.p[row.city] <- tree.out$p.value
+    
+    cityAll.stats$trend.veg.slope[row.city] <- mean(summaryCity$veg.trend, na.rm=T)
+    cityAll.stats$trend.veg.slope.sd[row.city] <- sd(summaryCity$veg.trend, na.rm=T)
+    veg.out <- t.test(summaryCity$veg.trend)
+    cityAll.stats$trend.veg.p[row.city] <- veg.out$p.value
+    
+    # Creating and saving some maps of those trends
+    plot.lst.trend <- ggplot(data=summaryCity[!is.na(summaryCity$LST.trend),]) +
+      coord_equal() +
+      geom_tile(aes(x=x, y=y, fill=LST.trend)) +
+      # geom_sf(data=sp.city3, fill=NA) +
+      scale_fill_gradientn(name="Summer\nTemp\n(deg. C/yr)", colors=grad.temp) +
+      theme(panel.background=element_rect(fill=NA, color="black"),
+            panel.grid=element_blank(),
+            axis.ticks.length = unit(-0.5, "lines"),
+            axis.title=element_blank(),
+            axis.text.x=element_text(margin=margin(t=1.5, unit="lines"), color="black"),
+            axis.text.y=element_text(margin=margin(r=1.5, unit="lines"), color="black"))
+    
+    plot.tree.trend <- ggplot(data=summaryCity[!is.na(summaryCity$tree.trend),]) +
+      coord_equal() +
+      geom_tile(aes(x=x, y=y, fill=tree.trend)) +
+      # geom_path(data=city.sp, aes(x=long, y=lat, group=group)) +
+      scale_fill_gradientn(name="Tree\nCover\n(%/yr)", colors=grad.tree) +
+      theme(panel.background=element_rect(fill=NA, color="black"),
+            panel.grid=element_blank(),
+            axis.ticks.length = unit(-0.5, "lines"),
+            axis.title=element_blank(),
+            axis.text.x=element_text(margin=margin(t=1.5, unit="lines"), color="black"),
+            axis.text.y=element_text(margin=margin(r=1.5, unit="lines"), color="black"))
+    
+    plot.veg.trend <- ggplot(data=summaryCity[!is.na(summaryCity$veg.trend),]) +
+      coord_equal() +
+      geom_tile(aes(x=x, y=y, fill=veg.trend)) +
+      # geom_path(data=city.sp, aes(x=long, y=lat, group=group)) +
+      scale_fill_gradientn(name="Other Veg\nCover (%/yr)", colors=grad.other) +
+      theme(panel.background=element_rect(fill=NA, color="black"),
+            panel.grid=element_blank(),
+            axis.ticks.length = unit(-0.5, "lines"),
+            axis.title=element_blank(),
+            axis.text.x=element_text(margin=margin(t=1.5, unit="lines"), color="black"),
+            axis.text.y=element_text(margin=margin(r=1.5, unit="lines"), color="black"))
+    
+    
+    png(file.path(path.cities, CITY, paste0(CITY, "_CityStats_Maps_Trends.png")), height=8, width=8, units="in", res=120)
+    print(
+      cowplot::plot_grid(plot.lst.trend, NULL, plot.tree.trend, plot.veg.trend)
+    )
+    dev.off()  
+    
+    
+    # cityAll.stats[row.city,]
+    # Now calculating the correlations among variables
+    tree.lst <- lm(LST.trend ~ tree.trend, data=summaryCity)
+    sum.corrTreeLST <- summary(tree.lst)
+    cityAll.stats$corr.LST.tree.slope[row.city] <- sum.corrTreeLST$coefficients["tree.trend",1]
+    cityAll.stats$corr.LST.tree.p[row.city] <- sum.corrTreeLST$coefficients["tree.trend",4]
+    cityAll.stats$corr.LST.tree.Rsq[row.city]  <- sum.corrTreeLST$r.squared
+    
+    veg.lst <- lm(LST.trend ~ veg.trend, data=summaryCity)
+    sum.corrVegLST <- summary(veg.lst)
+    cityAll.stats$corr.LST.veg.slope[row.city] <- sum.corrVegLST$coefficients["veg.trend",1]
+    cityAll.stats$corr.LST.veg.p[row.city] <- sum.corrVegLST$coefficients["veg.trend",4]
+    cityAll.stats$corr.LST.veg.Rsq[row.city]  <- sum.corrVegLST$r.squared
   
-  cityAll.stats$trend.tree.slope[row.city] <- mean(summaryCity$tree.trend, na.rm=T)
-  cityAll.stats$trend.tree.slope.sd[row.city] <- sd(summaryCity$tree.trend, na.rm=T)
-  tree.out <- t.test(summaryCity$tree.trend)
-  cityAll.stats$trend.tree.p[row.city] <- tree.out$p.value
+    veg.tree <- lm(tree.trend ~ veg.trend, data=summaryCity)
+    sum.corrVegTree <- summary(veg.tree)
+    cityAll.stats$corr.tree.veg.slope[row.city] <- sum.corrVegTree$coefficients["veg.trend",1]
+    cityAll.stats$corr.tree.veg.p[row.city] <- sum.corrVegTree$coefficients["veg.trend",4]
+    cityAll.stats$corr.tree.veg.Rsq[row.city]  <- sum.corrVegTree$r.squared
+    
+    plot.corr.LST.Tree <- ggplot(data=summaryCity, aes(x=tree.trend, y=LST.trend)) +
+      geom_point() +
+      stat_smooth(method=lm, color="red", fill="red", alpha=0.2) +
+      labs(x="Tree Trend (%/yr)", y="LST Trend (deg. C/yr)") +
+      theme(panel.background=element_rect(fill=NA, color="black"),
+            panel.grid=element_blank(),
+            axis.ticks.length = unit(-0.5, "lines"),
+            axis.title=element_text(face="bold"),
+            axis.text.x=element_text(margin=margin(t=1.5, unit="lines"), color="black"),
+            axis.text.y=element_text(margin=margin(r=1.5, unit="lines"), color="black"))
+    
+    plot.corr.LST.Veg <- ggplot(data=summaryCity, aes(x=veg.trend, y=LST.trend)) +
+      geom_point() +
+      stat_smooth(method=lm, color="red", fill="red", alpha=0.2) +
+      labs(x="Other Veg Trend (%/yr)", y="LST Trend (deg. C/yr)") +
+      theme(panel.background=element_rect(fill=NA, color="black"),
+            panel.grid=element_blank(),
+            axis.ticks.length = unit(-0.5, "lines"),
+            axis.title=element_text(face="bold"),
+            axis.text.x=element_text(margin=margin(t=1.5, unit="lines"), color="black"),
+            axis.text.y=element_text(margin=margin(r=1.5, unit="lines"), color="black"))
   
-  cityAll.stats$trend.veg.slope[row.city] <- mean(summaryCity$veg.trend, na.rm=T)
-  cityAll.stats$trend.veg.slope.sd[row.city] <- sd(summaryCity$veg.trend, na.rm=T)
-  veg.out <- t.test(summaryCity$veg.trend)
-  cityAll.stats$trend.veg.p[row.city] <- veg.out$p.value
+    plot.corr.Tree.Veg <- ggplot(data=summaryCity, aes(x=veg.trend, y=tree.trend)) +
+      geom_point() +
+      stat_smooth(method=lm, color="red", fill="red", alpha=0.2) +
+      labs(x="Other Veg Trend (%/yr)", y="Tree Trend (%/yr)") +
+      theme(panel.background=element_rect(fill=NA, color="black"),
+            panel.grid=element_blank(),
+            axis.ticks.length = unit(-0.5, "lines"),
+            axis.title=element_text(face="bold"),
+            axis.text.x=element_text(margin=margin(t=1.5, unit="lines"), color="black"),
+            axis.text.y=element_text(margin=margin(r=1.5, unit="lines"), color="black"))
   
-  # Creating and saving some maps of those trends
-  plot.lst.trend <- ggplot(data=summaryCity[!is.na(summaryCity$LST.trend),]) +
-    coord_equal() +
-    geom_raster(aes(x=x, y=y, fill=LST.trend)) +
-    # geom_sf(data=sp.city3, fill=NA) +
-    scale_fill_gradientn(name="Summer\nTemp\n(deg. C/yr)", colors=grad.temp) +
-    theme(panel.background=element_rect(fill=NA, color="black"),
-          panel.grid=element_blank(),
-          axis.ticks.length = unit(-0.5, "lines"),
-          axis.title=element_blank(),
-          axis.text.x=element_text(margin=margin(t=1.5, unit="lines"), color="black"),
-          axis.text.y=element_text(margin=margin(r=1.5, unit="lines"), color="black"))
-  
-  plot.tree.trend <- ggplot(data=summaryCity[!is.na(summaryCity$tree.trend),]) +
-    coord_equal() +
-    geom_raster(aes(x=x, y=y, fill=tree.trend)) +
-    # geom_path(data=city.sp, aes(x=long, y=lat, group=group)) +
-    scale_fill_gradientn(name="Tree\nCover\n(%/yr)", colors=grad.tree) +
-    theme(panel.background=element_rect(fill=NA, color="black"),
-          panel.grid=element_blank(),
-          axis.ticks.length = unit(-0.5, "lines"),
-          axis.title=element_blank(),
-          axis.text.x=element_text(margin=margin(t=1.5, unit="lines"), color="black"),
-          axis.text.y=element_text(margin=margin(r=1.5, unit="lines"), color="black"))
-  
-  plot.veg.trend <- ggplot(data=summaryCity[!is.na(summaryCity$veg.trend),]) +
-    coord_equal() +
-    geom_raster(aes(x=x, y=y, fill=veg.trend)) +
-    # geom_path(data=city.sp, aes(x=long, y=lat, group=group)) +
-    scale_fill_gradientn(name="Other Veg\nCover (%/yr)", colors=grad.other) +
-    theme(panel.background=element_rect(fill=NA, color="black"),
-          panel.grid=element_blank(),
-          axis.ticks.length = unit(-0.5, "lines"),
-          axis.title=element_blank(),
-          axis.text.x=element_text(margin=margin(t=1.5, unit="lines"), color="black"),
-          axis.text.y=element_text(margin=margin(r=1.5, unit="lines"), color="black"))
-  
-  
-  png(file.path(path.cities, CITY, paste0(CITY, "_CityStats_Maps_Trends.png")), height=8, width=8, units="in", res=120)
-  print(
-    cowplot::plot_grid(plot.lst.trend, NULL, plot.tree.trend, plot.veg.trend)
-  )
-  dev.off()  
-  
-  
-  # cityAll.stats[row.city,]
-  # Now calculating the correlations among variables
-  tree.lst <- lm(LST.trend ~ tree.trend, data=summaryCity)
-  sum.corrTreeLST <- summary(tree.lst)
-  cityAll.stats$corr.LST.tree.slope[row.city] <- sum.corrTreeLST$coefficients["tree.trend",1]
-  cityAll.stats$corr.LST.tree.p[row.city] <- sum.corrTreeLST$coefficients["tree.trend",4]
-  cityAll.stats$corr.LST.tree.Rsq[row.city]  <- sum.corrTreeLST$r.squared
-  
-  veg.lst <- lm(LST.trend ~ veg.trend, data=summaryCity)
-  sum.corrVegLST <- summary(veg.lst)
-  cityAll.stats$corr.LST.veg.slope[row.city] <- sum.corrVegLST$coefficients["veg.trend",1]
-  cityAll.stats$corr.LST.veg.p[row.city] <- sum.corrVegLST$coefficients["veg.trend",4]
-  cityAll.stats$corr.LST.veg.Rsq[row.city]  <- sum.corrVegLST$r.squared
-
-  veg.tree <- lm(tree.trend ~ veg.trend, data=summaryCity)
-  sum.corrVegTree <- summary(veg.tree)
-  cityAll.stats$corr.tree.veg.slope[row.city] <- sum.corrVegTree$coefficients["veg.trend",1]
-  cityAll.stats$corr.tree.veg.p[row.city] <- sum.corrVegTree$coefficients["veg.trend",4]
-  cityAll.stats$corr.tree.veg.Rsq[row.city]  <- sum.corrVegTree$r.squared
-  
-  plot.corr.LST.Tree <- ggplot(data=summaryCity, aes(x=tree.trend, y=LST.trend)) +
-    geom_point() +
-    stat_smooth(method=lm, color="red", fill="red", alpha=0.2) +
-    labs(x="Tree Trend (%/yr)", y="LST Trend (deg. C/yr)") +
-    theme(panel.background=element_rect(fill=NA, color="black"),
-          panel.grid=element_blank(),
-          axis.ticks.length = unit(-0.5, "lines"),
-          axis.title=element_text(face="bold"),
-          axis.text.x=element_text(margin=margin(t=1.5, unit="lines"), color="black"),
-          axis.text.y=element_text(margin=margin(r=1.5, unit="lines"), color="black"))
-  
-  plot.corr.LST.Veg <- ggplot(data=summaryCity, aes(x=veg.trend, y=LST.trend)) +
-    geom_point() +
-    stat_smooth(method=lm, color="red", fill="red", alpha=0.2) +
-    labs(x="Other Veg Trend (%/yr)", y="LST Trend (deg. C/yr)") +
-    theme(panel.background=element_rect(fill=NA, color="black"),
-          panel.grid=element_blank(),
-          axis.ticks.length = unit(-0.5, "lines"),
-          axis.title=element_text(face="bold"),
-          axis.text.x=element_text(margin=margin(t=1.5, unit="lines"), color="black"),
-          axis.text.y=element_text(margin=margin(r=1.5, unit="lines"), color="black"))
-
-  plot.corr.Tree.Veg <- ggplot(data=summaryCity, aes(x=veg.trend, y=tree.trend)) +
-    geom_point() +
-    stat_smooth(method=lm, color="red", fill="red", alpha=0.2) +
-    labs(x="Other Veg Trend (%/yr)", y="Tree Trend (%/yr)") +
-    theme(panel.background=element_rect(fill=NA, color="black"),
-          panel.grid=element_blank(),
-          axis.ticks.length = unit(-0.5, "lines"),
-          axis.title=element_text(face="bold"),
-          axis.text.x=element_text(margin=margin(t=1.5, unit="lines"), color="black"),
-          axis.text.y=element_text(margin=margin(r=1.5, unit="lines"), color="black"))
-
-  png(file.path(path.cities, CITY, paste0(CITY, "_CityStats_Correlations_Trends.png")), height=8, width=8, units="in", res=120)
-  print(
-    cowplot::plot_grid(plot.corr.LST.Tree, plot.corr.LST.Veg, NULL, plot.corr.Tree.Veg)
-  )
-  dev.off()  
-  
+    png(file.path(path.cities, CITY, paste0(CITY, "_CityStats_Correlations_Trends.png")), height=8, width=8, units="in", res=120)
+    print(
+      cowplot::plot_grid(plot.corr.LST.Tree, plot.corr.LST.Veg, NULL, plot.corr.Tree.Veg)
+    )
+    dev.off()  
+  }
   write.csv(cityAll.stats, file.cityAll.stats, row.names=F)  # Write our city stats file each time in case it bonks
 
   # Remove a bunch of stuff for our own sanity
-  rm(elevCity, treeCity, vegCity, lstCity, modCity, valsCity, summaryCity, coordsCity, biome, sp.city, plot.corr.LST.Tree, plot.corr.LST.Veg, plot.corr.Tree.Veg, plot.lst.trend, plot.tree.trend, plot.veg.trend, plot.elev, plot.lst, plot.tree, plot.veg, veg.lst, veg.tree, tree.lst, veg.out, tree.out, lst.out, sum.corrTreeLST, sum.corrVegLST, sum.corrVegTree, sum.modCity)
+  rm(elevCity, treeCity, vegCity, lstCity, modCity, valsCity, summaryCity, coordsCity, biome, sp.city, plot.corr.LST.Tree, plot.corr.LST.Veg, plot.corr.Tree.Veg, plot.lst.trend, plot.tree.trend, plot.veg.trend, plot.elev, plot.lst, plot.tree, plot.veg, veg.lst, veg.tree, tree.lst, veg.out, tree.out, sum.corrTreeLST, sum.corrVegLST, sum.corrVegTree, sum.modCity)
   
 }	
