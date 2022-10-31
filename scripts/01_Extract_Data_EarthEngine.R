@@ -119,6 +119,12 @@ trendviz = list(
   max=3,
   palette=c('red', 'yellow', 'gray','cyan', 'blue'))
 
+elevVis = list(
+  min= 0,
+  max= 5000,
+  palette=c ('0000ff', '00ffff', 'ffff00', 'ff0000', 'ffffff')
+);
+
 ##################### 
 
 

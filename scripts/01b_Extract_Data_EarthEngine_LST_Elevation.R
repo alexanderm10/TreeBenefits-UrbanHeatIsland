@@ -113,7 +113,7 @@ tempJulAug <- tempJulAug$map(setYear)
 # ee_print(tempJulAug$first())
 # Map$addLayer(tempJulAug$first()$select('LST_Day_1km'), vizTempK, "Jul/Aug Temperature")
 
-# 2.a.2 - Souther Hemisphere: Jan/Feb
+# 2.a.2 - Southern Hemisphere: Jan/Feb
 tempJanFeb <- ee$ImageCollection('MODIS/006/MOD11A2')$filter(ee$Filter$dayOfYear(1, 60))$filter(ee$Filter$date("2001-01-01", "2020-12-31"))$map(addTime);
 tempJanFeb <- tempJanFeb$map(lstConvert)
 tempJanFeb <- tempJanFeb$map(setYear)
@@ -188,9 +188,14 @@ lstSHFinal <- lstSHmask$map(function(IMG){
 
 # -----------
 # 2.c  - Elevation (static = easy!)
+## NEED TO MOVE TO A DIFFERENT ELEVATION DATASET to get cities far N! 
+## var jaxa = ee.ImageCollection('JAXA/ALOS/AW3D30/V3_2');
+## var elev3 = jaxa.select('DSM');
+
 # -----------
-elev <- ee$Image('USGS/SRTMGL1_003')$select('elevation')
-# ee_print(elev)
+elev <- ee$ImageCollection('JAXA/ALOS/AW3D30/V3_2')$select("DSM")
+proj.elev <- elev$first()$select(0)$projection()
+elev <- elev$mosaic()$setDefaultProjection(proj.elev) # Mosaic everythign # ee_print(elev)
 # Map$addLayer(elev, list(min=-10, max=5e3))
 
 
@@ -227,21 +232,45 @@ extractTempEE <- function(CITIES, TEMPERATURE, GoogleFolderSave, overwrite=F, ..
     
     #-------
     # extracting elevation 
+    #  NOTE: Doing outlier removal because there are some known issues with a couple points: https://developers.google.com/earth-engine/datasets/catalog/JAXA_ALOS_AW3D30_V3_2
     #-------
     # elevCity <- elevReproj$updateMask(cityMask)
     elevCity <- elevReproj$clip(cityNow)
     # Map$addLayer(elevCity, list(min=-10, max=500))
     
-    # elevNow <- elevCity$reduceRegion(reducer=ee$Reducer$mean(), geometry=cityNow$geometry(), scale=1e3)
-    # elevNow$getInfo()
+    elevOutlier <- function(img){
+      # Calculate the means & sds for the region
+      elevStats <- img$select("DSM")$reduceRegion(reducer=ee$Reducer$mean()$combine(
+        reducer2=ee$Reducer$stdDev(), sharedInputs=T),
+        geometry=cityNow$geometry(), scale=1e3)
+      
+      # Cacluate the key numbers for our sanity
+      elevMean <- ee$Number(elevStats$get("DSM_mean"))
+      elevSD <- ee$Number(elevStats$get("DSM_stdDev"))
+      thresh <- elevSD$multiply(thresh.sigma)
+      
+      # Do the filtering
+      dat.low <- img$gte(elevMean$subtract(thresh))
+      dat.hi <- img$lte(elevMean$add(thresh))
+      img <- img$updateMask(dat.low)
+      img <- img$updateMask(dat.hi)
+      
+      # Map$addLayer(img$select('DSM'))
+      return(img)
+    }
+    elevCity <- elevOutlier(elevCity)
+    
     npts.elev <- elevCity$reduceRegion(reducer=ee$Reducer$count(), geometry=cityNow$geometry(), scale=1e3)
-    npts.elev <- npts.elev$getInfo()$elevation
+    npts.elev <- npts.elev$getInfo()$DSM
     
     ### *** ###  If we don't have many points in the elevation file, skip the city
-    if(npts.elev<thresh.pts) next
+    if(npts.elev<thresh.pts){ 
+      print(warning(paste("Not enough Elevation Points; skipping : ", cityID)))
+      next
+    }
     
     # Save elevation only if it's worth our while -- Note: Still doing the extraction & computation first since we use it as our base
-    if(overwrite | !any(grepl(cityID, elev.done))){
+    if(overwrite | !any(grepl(cityID, elev.done)) & npts.elev>=thresh.pts){
       export.elev <- ee_image_to_drive(image=elevCity, description=paste0(cityID, "_elevation"), fileNamePrefix=paste0(cityID, "_elevation"), folder=GoogleFolderSave, timePrefix=F, region=cityNow$geometry(), maxPixels=5e6, crs=projCRS, crsTransform=projTransform)
       export.elev$start()
       # ee_monitoring(export.elev)
@@ -459,9 +488,9 @@ citiesNorthE1 <- citiesUse$filter(ee$Filter$gte('LATITUDE', 0))$filter(ee$Filter
 citiesNorthE2 <- citiesUse$filter(ee$Filter$gte('LATITUDE', 0))$filter(ee$Filter$gt('LONGITUDE', 75))
 
 # Figuring out how many cities we have (2682 in all)
-ncitiesSouth <- citiesSouth$size()$getInfo() # 336 cities
-ncitiesNorthW <- citiesNorthW$size()$getInfo() # 484 cities
-ncitiesNorthE1 <- citiesNorthE1$size()$getInfo() # 982 cities
+ncitiesSouth <- citiesSouth$size()$getInfo() # 336 cities total 1 left
+ncitiesNorthW <- citiesNorthW$size()$getInfo() # 484 cities; 3 left
+ncitiesNorthE1 <- citiesNorthE1$size()$getInfo() # 982 cities; 740 left
 ncitiesNorthE2 <- citiesNorthE2$size()$getInfo() # 880 cities
 
 # To co all of them
@@ -473,17 +502,20 @@ ncitiesNorthE2 <- citiesNorthE2$size()$getInfo() # 880 cities
 # lstSHFinal$first()$get("system:id")$getInfo()
 # lstNHFinal$first()$get("system:id")$getInfo()
 
-# # Should have all run successfully!
+# # All except 1 ran successfully
 # if(ncitiesSouth>0){
 #   citiesSouthList <- citiesSouth$toList(ncitiesSouth) 
 #   extractTempEE(CITIES=citiesSouthList, TEMPERATURE=lstSHFinal, GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
 # }
 
-if(ncitiesNorthW>0){
-  citiesNorthWList <- citiesNorthW$toList(ncitiesNorthW) 
-  extractTempEE(CITIES=citiesNorthWList, TEMPERATURE=lstNHFinal, GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
-}
 
+# # All except 3 were run successfully
+# if(ncitiesNorthW>0){
+#   citiesNorthWList <- citiesNorthW$toList(ncitiesNorthW) 
+#   extractTempEE(CITIES=citiesNorthWList, TEMPERATURE=lstNHFinal, GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
+# }
+
+# Stalled; no error, but 30 min since last file 10% way in 98 cities in queue 8 a.m. 29 Oct 2022
 if(ncitiesNorthE1>0){
   citiesNorthE1List <- citiesNorthE1$toList(ncitiesNorthE1) 
   extractTempEE(CITIES=citiesNorthE1List, TEMPERATURE=lstNHFinal, GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
