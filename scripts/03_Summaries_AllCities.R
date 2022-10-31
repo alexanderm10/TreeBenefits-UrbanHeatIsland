@@ -6,10 +6,12 @@ file.cityAll.stats <- file.path(path.cities, "../city_stats_all.csv")
 cityAll.stats <- read.csv(file.cityAll.stats)
 summary(cityAll.stats[!is.na(cityAll.stats$model.tree.slope),])
 
-unique(cityAll.stats$ISO3)
+summary(as.factor(cityAll.stats$biome))
+# unique(cityAll.stats$ISO3)
 
 # Quick summary of places with significant tree cover trends -- most places (so far) have been INCREASING in cover, but also still getting warmer on average; how much would these cities have warmed without their trees??  
-summary(cityAll.stats[!is.na(cityAll.stats$trend.tree.slope) & cityAll.stats$trend.tree.p<0.05,])
+summary(cityAll.stats[!is.na(cityAll.stats$trend.tree.slope) & cityAll.stats$trend.tree.p<0.01,])
+summary(cityAll.stats[!is.na(cityAll.stats$model.tree.slope) & cityAll.stats$model.tree.p<0.01,])
 
 
 # Currently no actual statistical correlation between these two though.

@@ -108,25 +108,25 @@ for(CITY in citiesAnalyze){
   print(CITY)
   dir.create(file.path(path.cities, CITY), recursive = T, showWarnings = F)
   
-  sp.city <- buffer(sdei.urb[sdei.urb$ISOURBID==CITY, ], width=10e3)
-  biome <- terra::intersect(ecoregions, sp.city)
-  # data.frame(biome)
-  if(nrow(biome)>0){ # Some aren't quite aligning-- we'll figure those out later
-    if(nrow(biome)==1){
-      cityAll.stats$biome[row.city] <- biome$biome.name
-    } else { 
-      biome$area <- expanse(biome)
-      biome.sum <- aggregate(area ~ biome.name, data=biome, FUN=sum)
-      
-      if(nrow(biome.sum)>1){
-        cityAll.stats$biome[row.city] <- biome.sum$biome.name[biome.sum$area==max(biome.sum$area)]
-      } else {
-        cityAll.stats$biome[row.city] <- biome.sum$biome.name
-      }
-      
-      rm(biome.sum)
-    } # End if/else
-  } # End skipping biomes that don't exist
+  # sp.city <- buffer(sdei.urb[sdei.urb$ISOURBID==CITY, ], width=10e3)
+  # biome <- terra::intersect(ecoregions, sp.city)
+  # # data.frame(biome)
+  # if(nrow(biome)>0){ # Some aren't quite aligning-- we'll figure those out later
+  #   if(nrow(biome)==1){
+  #     cityAll.stats$biome[row.city] <- biome$biome.name
+  #   } else { 
+  #     biome$area <- expanse(biome)
+  #     biome.sum <- aggregate(area ~ biome.name, data=biome, FUN=sum)
+  #     
+  #     if(nrow(biome.sum)>1){
+  #       cityAll.stats$biome[row.city] <- biome.sum$biome.name[biome.sum$area==max(biome.sum$area)]
+  #     } else {
+  #       cityAll.stats$biome[row.city] <- biome.sum$biome.name
+  #     }
+  #     
+  #     rm(biome.sum)
+  #   } # End if/else
+  # } # End skipping biomes that don't exist
   elevCity <- raster(file.path(path.EEout, paste0(CITY, "_elevation.tif")))
   lstCity <- brick(file.path(path.EEout, paste0(CITY, "_LST_Day_Tmean.tif")))-273.15
   treeCity <- brick(file.path(path.EEout, paste0(CITY, "_Vegetation_PercentTree.tif")))
@@ -239,7 +239,7 @@ for(CITY in citiesAnalyze){
   summary(summaryCity)
   write.csv(summaryCity, file.path(path.cities, CITY, paste0(CITY, "_CityStats_Pixels.csv")), row.names=F)
   
-  rm(trend.LST, trend.tree, trend.veg, sum.LST, sum.tree, sum.veg)
+  # rm(trend.LST, trend.tree, trend.veg, sum.LST, sum.tree, sum.veg)
   
   # Making some plots with the summary data
   # proj.elev <- projection(elevCity)
@@ -427,6 +427,6 @@ for(CITY in citiesAnalyze){
   write.csv(cityAll.stats, file.cityAll.stats, row.names=F)  # Write our city stats file each time in case it bonks
 
   # Remove a bunch of stuff for our own sanity
-  rm(elevCity, treeCity, vegCity, lstCity, modCity, valsCity, summaryCity, coordsCity, biome, sp.city, plot.corr.LST.Tree, plot.corr.LST.Veg, plot.corr.Tree.Veg, plot.lst.trend, plot.tree.trend, plot.veg.trend, plot.elev, plot.lst, plot.tree, plot.veg, veg.lst, veg.tree, tree.lst, veg.out, tree.out, sum.corrTreeLST, sum.corrVegLST, sum.corrVegTree, sum.modCity)
+  # rm(elevCity, treeCity, vegCity, lstCity, modCity, valsCity, summaryCity, coordsCity, biome, sp.city, plot.corr.LST.Tree, plot.corr.LST.Veg, plot.corr.Tree.Veg, plot.lst.trend, plot.tree.trend, plot.veg.trend, plot.elev, plot.lst, plot.tree, plot.veg, veg.lst, veg.tree, tree.lst, veg.out, tree.out, sum.corrTreeLST, sum.corrVegLST, sum.corrVegTree, sum.modCity)
   
 }	
