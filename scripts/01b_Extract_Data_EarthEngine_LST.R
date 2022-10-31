@@ -220,59 +220,6 @@ extractTempEE <- function(CITIES, TEMPERATURE, GoogleFolderSave, overwrite=F, ..
     cityID <- cityNow$get("ISOURBID")$getInfo()
     # Map$centerObject(cityNow) # NOTE: THIS IS REALLY IMPORTANT APPARENTLY!
     
-    # cityName <- cityNow$get("NAME")$getInfo()
-    # print(cityName)
-    # Map$addLayer(cityNow)
-    # if(!overwrite & all(any(grepl(cityID, elev.done)), any(grepl(cityID, tmean.done)), any(grepl(cityID, tdev.done)))) next
-    
-    
-    #-------
-    # extracting elevation 
-    #  NOTE: Doing outlier removal because there are some known issues with a couple points: https://developers.google.com/earth-engine/datasets/catalog/JAXA_ALOS_AW3D30_V3_2
-    #-------
-    # elevCity <- elevReproj$updateMask(cityMask)
-    elevCity <- elevReproj$clip(cityNow)
-    # Map$addLayer(elevCity, list(min=-10, max=500))
-    
-    # MERIT is cleaned up and shouldn't need outliers removed
-    # elevOutlier <- function(img){
-    #   # Calculate the means & sds for the region
-    #   elevStats <- img$select("DSM")$reduceRegion(reducer=ee$Reducer$mean()$combine(
-    #     reducer2=ee$Reducer$stdDev(), sharedInputs=T),
-    #     geometry=cityNow$geometry(), scale=1e3)
-    #   
-    #   # Cacluate the key numbers for our sanity
-    #   elevMean <- ee$Number(elevStats$get("DSM_mean"))
-    #   elevSD <- ee$Number(elevStats$get("DSM_stdDev"))
-    #   thresh <- elevSD$multiply(thresh.sigma)
-    #   
-    #   # Do the filtering
-    #   dat.low <- img$gte(elevMean$subtract(thresh))
-    #   dat.hi <- img$lte(elevMean$add(thresh))
-    #   img <- img$updateMask(dat.low)
-    #   img <- img$updateMask(dat.hi)
-    #   
-    #   # Map$addLayer(img$select('DSM'))
-    #   return(img)
-    # }
-    # elevCity <- elevOutlier(elevCity)
-    # 
-    # npts.elev <- elevCity$reduceRegion(reducer=ee$Reducer$count(), geometry=cityNow$geometry(), scale=1e3)
-    # npts.elev <- npts.elev$getInfo()$DSM
-    
-    ### *** ###  If we don't have many points in the elevation file, skip the city
-    # if(npts.elev<thresh.pts){ 
-    #   print(warning(paste("Not enough Elevation Points; skipping : ", cityID)))
-    #   next
-    # }
-    
-    # Save elevation only if it's worth our while -- Note: Still doing the extraction & computation first since we use it as our base
-    if(overwrite | !any(grepl(cityID, elev.done))){
-      export.elev <- ee_image_to_drive(image=elevCity, description=paste0(cityID, "_elevation"), fileNamePrefix=paste0(cityID, "_elevation"), folder=GoogleFolderSave, timePrefix=F, region=cityNow$geometry(), maxPixels=5e6, crs=projCRS, crsTransform=projTransform)
-      export.elev$start()
-      # ee_monitoring(export.elev)
-    }
-    #-------
 
     #-------
     # Now doing Land Surface Temperature

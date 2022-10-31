@@ -9,10 +9,10 @@ GoogleFolderSave <- "UHI_Analysis_Output"
 ##################### 
 # 0. Set up some choices for data quality thresholds
 ##################### 
-yr.analy <- 2001:2020
-thresh.sigma <- 6 # Use 6-sigma outliers for the data filtering\
-thresh.pts <- 50
-thresh.prop <- 0.5 # The proportion of data needed for a time point to be "good"; currenlty 0.5
+# yr.analy <- 2001:2020
+# thresh.sigma <- 6 # Use 6-sigma outliers for the data filtering\
+# thresh.pts <- 50
+# thresh.prop <- 0.5 # The proportion of data needed for a time point to be "good"; currenlty 0.5
 overwrite=F
 ##################### 
 
@@ -20,13 +20,13 @@ overwrite=F
 ##################### 
 # 0. Set up helper functions
 ##################### 
-addTime <- function(image){
-  return(image$addBands(image$metadata('system:time_start')$divide(1000 * 60 * 60 * 24 * 365)))
-}
-
-setYear <- function(img){
-  return(img$set("year", img$date()$get("year")))
-}
+# addTime <- function(image){
+#   return(image$addBands(image$metadata('system:time_start')$divide(1000 * 60 * 60 * 24 * 365)))
+# }
+# 
+# setYear <- function(img){
+#   return(img$set("year", img$date()$get("year")))
+# }
 ##################### 
 
 
@@ -46,63 +46,25 @@ citiesUse <- sdei$filter(ee$Filter$gte('ES00POP', 100e3))$filter(ee$Filter$gte('
 
 # Use map to go ahead and create the buffer around everything
 citiesUse <- citiesUse$map(function(f){f$buffer(10e3)})
+# ee_print(citiesUse)
 
-## Just testing to make sure it works
-# popLarge <- citiesUse$filter(ee$Filter$gte('ES00POP', 1e6))$filter(ee$Filter$gte('SQKM_FINAL', 1e2))
-# ee_print(popLarge) # 389 cities
-# Map$addLayer(popLarge)
-# citiesBuff <- popLarge
 
-##################### 
+# projSDEI = citiesUse$geometry()$getInfo()
+# projCRS = citiesUse$geometry()$crs()
+# projTransform <- unlist(citiesUse$geometry()$crs())
 
 ##################### 
-# 2. Load in data layers 
+
+##################### 
+# 2. Load in data layers  -- we did all the reprojeciton etc. in step 1, so this should be faster now, 
 ####################
-# -----------
-# 2.a - Land Surface Temperature
-# -----------
-# 2.a.1 - Northern Hemisphere: July/August
-tempJulAug <- ee$ImageCollection('MODIS/006/MOD11A2')$filter(ee$Filter$dayOfYear(181, 240))$filter(ee$Filter$date("2001-01-01", "2020-12-31"))$map(addTime);
-tempJulAug <- tempJulAug$map(setYear)
-# ee_print(tempJulAug)
-# tempJulAug$first()$propertyNames()$getInfo()
-# ee_print(tempJulAug$first())
-# Map$addLayer(tempJulAug$first()$select('LST_Day_1km'), vizTempK, "Jul/Aug Temperature")
-
-projLST = tempJulAug$select("LST_Day_1km")$first()$projection()
-projCRS = projLST$crs()
-projTransform <- unlist(projLST$getInfo()$transform)
-
-# ee_print(projLST)
-# -----------
-
-# -----------
-# 2.b MODIS Tree Data
-# -----------
-mod44b <- ee$ImageCollection('MODIS/006/MOD44B')$filter(ee$Filter$date("2001-01-01", "2020-12-31"))
-mod44b <- mod44b$map(setYear)
-# ee_print(mod44b)
-# Map$addLayer(mod44b$select('Percent_Tree_Cover')$first(), vizTree, 'Percent Tree Cover')
-
-
-# This seems to work, but seems to be very slow
-mod44bReproj = mod44b$map(function(img){
-  return(img$reduceResolution(reducer=ee$Reducer$mean())$reproject(projLST))
-})$map(addTime); # add year here!
-
-# Create a noVeg Mask
-vegMask <- mod44bReproj$first()$select("Percent_Tree_Cover", "Percent_NonTree_Vegetation", "Percent_NonVegetated")$reduce('sum')$gt(50)$mask()
-# ee_print(vegMask)
-# Map$addLayer(vegMask)
-
-# ee_print(mod44bReproj)
-# ee_print(mod44bReproj$first())
-# Map$addLayer(mod44bReproj$select('Percent_Tree_Cover')$first(), vizTree, 'Percent Tree Cover')
-# -----------
+modTree <- ee$Image('users/crollinson/MOD44b_1km_Reproj_Percent_Tree_Cover')
+modVeg <- ee$Image('users/crollinson/MOD44b_1km_Reproj_Percent_NonTree_Vegetation')
+modBare <- ee$Image('users/crollinson/MOD44b_1km_Reproj_Percent_NonVegetated')
 ##################### 
 
 
-extractVeg <- function(CITIES, VEGETATION, GoogleFolderSave, overwrite=F, ...){
+extractVeg <- function(CITIES, TREE, VEG, BARE, GoogleFolderSave, overwrite=F, ...){
   # CITIES needs to be a list
   # Vegetation should be the reprojected MODIS44b product with year added in
   cityseq <- seq_len(CITIES$length()$getInfo())
@@ -123,33 +85,22 @@ extractVeg <- function(CITIES, VEGETATION, GoogleFolderSave, overwrite=F, ...){
     #-------
     # Extracting vegetation cover -- we've already masked places where veg/non-veg cover doesn't add up
     #-------
-    yrMod <- ee$List(VEGETATION$aggregate_array("year"))$distinct()
-    yrString <- ee$List(paste(yrMod$getInfo()))
-    # yrMod$getInfo()
-    
     # Start Tree Cover Layer
     if(overwrite | !any(grepl(cityID, tree.done))){
-      treeCity <- VEGETATION$select("Percent_Tree_Cover")$map(function(img){
-        return(img$clip(cityNow))
-      })
-      # ee_print(treeCity)
-      treeCity <- ee$ImageCollection$toBands(treeCity)$rename(yrString)
+      treeCity <- TREE$clip(cityNow)
       # ee_print(treeCity)
       # Map$addLayer(treeCity$select('2020_Percent_Tree_Cover'), vizTree, 'Percent Tree Cover')
-      export.tree <- ee_image_to_drive(image=treeCity, description=paste0(cityID, "_Vegetation_PercentTree"), fileNamePrefix=paste0(cityID, "_Vegetation_PercentTree"), folder=GoogleFolderSave, timePrefix=F, region=cityNow$geometry(), maxPixels=5e6, crs=projCRS, crsTransform=projTransform)
-      export.tree$start()
+      
+      exportTree <- ee_image_to_drive(image=treeCity, description=paste0(cityID, "_Vegetation_PercentTree"), fileNamePrefix=paste0(cityID, "_Vegetation_PercentTree"), folder=GoogleFolderSave, timePrefix=F, region=cityNow$geometry(), maxPixels=5e6, crs="EPSG:4326", scale=1e3, crsTransform=c(1,0,0,0,1,0))
+      exportTree$start()
     } # End Tree Cover Layer
     
     # Start Other Veg Cover Layer
     if(overwrite | !any(grepl(cityID, tree.done))){
-      vegCity <- VEGETATION$select("Percent_NonTree_Vegetation")$map(function(img){
-        return(img$clip(cityNow))
-      })
-      # ee_print(treeCity)
-      vegCity <- ee$ImageCollection$toBands(vegCity)$rename(yrString)
+      vegCity <- VEG$clip(cityNow)
       # ee_print(vegCity)
-      export.veg <- ee_image_to_drive(image=vegCity, description=paste0(cityID, "_Vegetation_PercentOtherVeg"), fileNamePrefix=paste0(cityID, "_Vegetation_PercentOtherVeg"), folder="UHI_Analysis_Output", timePrefix=F, region=cityNow$geometry(), maxPixels=5e6, crs=projCRS, crsTransform=projTransform)
-      export.veg$start()
+      exportVeg <- ee_image_to_drive(image=vegCity, description=paste0(cityID, "_Vegetation_PercentOtherVeg"), fileNamePrefix=paste0(cityID, "_Vegetation_PercentOtherVeg"), folder="UHI_Analysis_Output", timePrefix=F, region=cityNow$geometry(), maxPixels=5e6, crs="EPSG:4326", scale=1e3, crsTransform=c(1,0,0,0,1,0))
+      exportVeg$start()
     } # End Other Veg Cover Layer
     
     # Start No Veg Cover layer
@@ -161,7 +112,7 @@ extractVeg <- function(CITIES, VEGETATION, GoogleFolderSave, overwrite=F, ...){
       bareCity <- ee$ImageCollection$toBands(bareCity)$rename(yrString)
       # ee_print(bareCity)
       
-      export.bare <- ee_image_to_drive(image=bareCity, description=paste0(cityID, "_Vegetation_PercentNoVeg"), fileNamePrefix=paste0(cityID, "_Vegetation_PercentNoVeg"), folder=GoogleFolderSave, timePrefix=F, region=cityNow$geometry(), maxPixels=5e6, crs=projCRS, crsTransform=projTransform)
+      export.bare <- ee_image_to_drive(image=bareCity, description=paste0(cityID, "_Vegetation_PercentNoVeg"), fileNamePrefix=paste0(cityID, "_Vegetation_PercentNoVeg"), folder=GoogleFolderSave, timePrefix=F, region=cityNow$geometry(), maxPixels=5e6, crs="EPSG:4326", scale=1e3, crsTransform=c(1,0,0,0,1,0))
       export.bare$start()
     } # End Write No Veg
     #-------
@@ -237,10 +188,10 @@ ncitiesNorthE2 <- citiesNorthE2$size()$getInfo() # 880 cities
 # lstNHFinal$first()$get("system:id")$getInfo()
 
 # Cities South is still running
-# if(ncitiesSouth>0){
-#   citiesSouthList <- citiesSouth$toList(ncitiesSouth) 
-#   extractVeg(CITIES=citiesSouthList, VEGETATION=mod44bReproj, GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
-# }
+if(ncitiesSouth>0){
+  citiesSouthList <- citiesSouth$toList(ncitiesSouth)
+  extractVeg(CITIES=citiesSouthList, TREE=modTree, VEG = modVeg, BARE=modBare, GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
+}
 
 # if(ncitiesNorthW>0){
 #   citiesNorthWList <- citiesNorthW$toList(ncitiesNorthW) #  total

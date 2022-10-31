@@ -5,6 +5,7 @@ ee_check() # For some reason, it's important to run this before initializing rig
 rgee::ee_Initialize(user = 'crollinson@mortonarb.org', drive=T)
 path.google <- "/Volumes/GoogleDrive/My Drive"
 GoogleFolderSave <- "UHI_Analysis_Output"
+assetHome <- ee_get_assethome()
 
 ##################### 
 # 0. Set up some choices for data quality thresholds
@@ -31,35 +32,10 @@ setYear <- function(img){
 
 
 ##################### 
-# 1. Load and select cities
-#####################
-sdei.df <- data.frame(vect("../data_raw/sdei-global-uhi-2013-shp/shp/sdei-global-uhi-2013.shp"))
-sdei.df <- sdei.df[sdei.df$ES00POP>=100e3 & sdei.df$SQKM_FINAL>=1e2,]
-cityIDsAll <- sdei.df$ISOURBID
-
-sdei <- ee$FeatureCollection('users/crollinson/sdei-global-uhi-2013');
-# print(sdei.first())
-
-# Right now, just set all cities with >100k people in the metro area and at least 100 sq km in size
-citiesUse <- sdei$filter(ee$Filter$gte('ES00POP', 100e3))$filter(ee$Filter$gte('SQKM_FINAL', 1e2)) 
-# ee_print(citiesUse) # Thsi function gets the summary stats; this gives us 2,682 cities
-
-# Use map to go ahead and create the buffer around everything
-citiesUse <- citiesUse$map(function(f){f$buffer(10e3)})
-
-## Just testing to make sure it works
-# popLarge <- citiesUse$filter(ee$Filter$gte('ES00POP', 1e6))$filter(ee$Filter$gte('SQKM_FINAL', 1e2))
-# ee_print(popLarge) # 389 cities
-# Map$addLayer(popLarge)
-# citiesBuff <- popLarge
-
-##################### 
-
-##################### 
 # 2. Load in data layers 
 ####################
 # -----------
-# 2.a - Land Surface Temperature
+# 2.a - Land Surface Temperature -- Not saving because of the complexities involved
 # -----------
 # 2.a.1 - Northern Hemisphere: July/August
 tempJulAug <- ee$ImageCollection('MODIS/006/MOD11A2')$filter(ee$Filter$dayOfYear(181, 240))$filter(ee$Filter$date("2001-01-01", "2020-12-31"))$map(addTime);
@@ -93,38 +69,44 @@ mod44bReproj = mod44b$map(function(img){
 # Create a noVeg Mask
 vegMask <- mod44bReproj$first()$select("Percent_Tree_Cover", "Percent_NonTree_Vegetation", "Percent_NonVegetated")$reduce('sum')$gt(50)$mask()
 
+saveVegMask <- ee_image_to_asset(vegMask, description="Save_VegetationMask", assetId=file.path(assetHome, "MOD44b_1km_Reproj_VegMask"), maxPixels = 10e9)
+saveVegMask$start()
+
+
 mod44bReproj <- mod44bReproj$map(function(IMG){IMG$updateMask(vegMask)})
-
-assetHome <- ee_get_assethome()
-
 ee_print(mod44bReproj)
 
-modTree <- ee$Image(mod44bReproj$select("Percent_Tree_Cover"))
-# modTree <- ee$Image(mod44bReproj$select("Percent_Tree_Cover"))
-ee_print(modTree)
 
-saveTree <- ee_image_to_asset(mod44bReproj$select("Percent_Tree_Cover"), description="Save_Mod44bReproj_TreeCover", assetId=file.path(assetHome, "MOD44b_1km_Reproj_Percent_Tree_Cover"))
+yrMod <- ee$List(mod44bReproj$aggregate_array("year"))$distinct()
+yrString <- ee$List(paste0("YR", yrMod$getInfo()))
+
+modTree <- ee$ImageCollection$toBands(mod44bReproj$select("Percent_Tree_Cover"))$rename(yrString)
+modVeg <- ee$ImageCollection$toBands(mod44bReproj$select("Percent_NonTree_Vegetation"))$rename(yrString)
+modBare <- ee$ImageCollection$toBands(mod44bReproj$select("Percent_NonVegetated"))$rename(yrString)
+
+# ee_print(modTree)
+
+saveTree <- ee_image_to_asset(modTree, description="Save_Mod44bReproj_TreeCover", assetId=file.path(assetHome, "MOD44b_1km_Reproj_Percent_Tree_Cover"), maxPixels = 10e9)
 saveTree$start()
 
-saveVeg <- ee_image_to_asset(mod44bReproj$select("Percent_NonTree_Vegetation"), description="Save_Mod44bReproj_OtherVegCover", assetId=file.path(assetHome, "MOD44b_1km_Reproj_Percent_NonTree_Vegetation"))
+saveVeg <- ee_image_to_asset(modVeg, description="Save_Mod44bReproj_OtherVegCover", assetId=file.path(assetHome, "MOD44b_1km_Reproj_Percent_NonTree_Vegetation"), maxPixels = 10e9)
 saveVeg$start()
 
+saveBare <- ee_image_to_asset(modBare, description="Save_Mod44bReproj_NonVeg", assetId=file.path(assetHome, "MOD44b_1km_Reproj_Percent_NonVegetated"), maxPixels = 10e9)
+saveBare$start()
 # ----------
 
 # -----------
-# Update LST Data with the MODIS veg mask
+# Elevation
+## Now using MERIT, which has combined several other products and removed bias, including from trees
+# https://agupubs.onlinelibrary.wiley.com/doi/full/10.1002/2017GL072874
 # -----------
-# Map$addLayer(lstDayGoodNH$first()$select('LST_Day_1km'), vizTempK, "GOOD Jul/Aug Temperature")
-lstNHmask <- lstDayGoodNH$map(function(IMG){IMG$updateMask(vegMask)})
-lstSHmask <- lstDayGoodSH$map(function(IMG){IMG$updateMask(vegMask)})
+elev <- ee$Image('MERIT/DEM/v1_0_3')#$select('elevation')
+ee_print(elev)
 
-# ee_print(lstNHmask$first()$select("LST_Day_1km"))
-lstNHFinal <- lstNHmask$map(function(IMG){
-  dat <- IMG$select("LST_Day_1km")$gt(0)
-  return(IMG$updateMask(dat))
-})
+elevReproj <- elev$reproject(projLST)
+elevReproj <- elevReproj$updateMask(vegMask)
+ee_print(elevReproj)
 
-lstSHFinal <- lstSHmask$map(function(IMG){
-  dat <- IMG$select("LST_Day_1km")$gt(0)
-  return(IMG$updateMask(dat))
-})
+saveElev <- ee_image_to_asset(elevReproj, description="Save_MERIT_Elevation", assetId=file.path(assetHome, "MERIT-DEM-v1_1km_Reproj"), maxPixels = 10e9)
+saveElev$start()
