@@ -104,17 +104,14 @@ vegMask <- mod44bReproj$first()$select("Percent_Tree_Cover", "Percent_NonTree_Ve
 
 # -----------
 # 2.c  - Elevation (static = easy!)
-## NEED TO MOVE TO A DIFFERENT ELEVATION DATASET to get cities far N! 
-## var jaxa = ee.ImageCollection('JAXA/ALOS/AW3D30/V3_2');
-## var elev3 = jaxa.select('DSM');
-
+## Now using MERIT, which has combined several other products and removed bias, including from trees
+# https://agupubs.onlinelibrary.wiley.com/doi/full/10.1002/2017GL072874
 # -----------
 # elev <- ee$Image('USGS/SRTMGL1_003')$select('elevation')
-elev <- ee$ImageCollection('JAXA/ALOS/AW3D30/V3_2')$select("DSM")
-proj.elev <- elev$first()$select(0)$projection()
-elev <- elev$mosaic()$setDefaultProjection(proj.elev) # Mosaic everythign into 1 image that we can then reproject etc.
-# ee_print(elev)
-# Map$addLayer(elev$first(), list(min=-10, max=5e3))
+# elev <- ee$ImageCollection('JAXA/ALOS/AW3D30/V3_2')$select("DSM")
+elev <- ee$Image('MERIT/DEM/v1_0_3')#$select('elevation')
+ee_print(elev)
+# Map$addLayer(elev, list(min=-10, max=5e3))
 
 
 # # I don't know why this is causing issues, but it is
@@ -124,8 +121,11 @@ elev <- elev$mosaic()$setDefaultProjection(proj.elev) # Mosaic everythign into 1
 # Need to use this version of reproject :shrug:
 elevReproj <- elev$reproject(projLST)
 elevReproj <- elevReproj$updateMask(vegMask)
-# ee_print(elevReproj)
+ee_print(elevReproj)
 # Map$addLayer(elevReproj$select("DSM"), list(min=-10, max=5e3))
+
+# ee_image_to_asset(elevReproj, description="Reprojected Elevation", assetID="ALOS_DSM_LST-aligned", , maxPixels=1e9, crs=projCRS, crsTransform=projTransform)
+# elevReproj 
 ##################### 
 
 
@@ -148,37 +148,37 @@ extractElevEE <- function(CITIES, GoogleFolderSave, overwrite=F, ...){
     elevCity <- elevReproj$clip(cityNow)
     # Map$addLayer(elevCity, list(min=-10, max=500))
     
-    elevOutlier <- function(img){
-      # Calculate the means & sds for the region
-      elevStats <- img$select("DSM")$reduceRegion(reducer=ee$Reducer$mean()$combine(
-        reducer2=ee$Reducer$stdDev(), sharedInputs=T),
-        geometry=cityNow$geometry(), scale=1e3)
-      
-      # Cacluate the key numbers for our sanity
-      elevMean <- ee$Number(elevStats$get("DSM_mean"))
-      elevSD <- ee$Number(elevStats$get("DSM_stdDev"))
-      thresh <- elevSD$multiply(thresh.sigma)
-      
-      # Do the filtering
-      dat.low <- img$gte(elevMean$subtract(thresh))
-      dat.hi <- img$lte(elevMean$add(thresh))
-      img <- img$updateMask(dat.low)
-      img <- img$updateMask(dat.hi)
-      
-      # Map$addLayer(img$select('DSM'))
-      return(img)
-    }
+    # elevOutlier <- function(img){
+    #   # Calculate the means & sds for the region
+    #   elevStats <- img$select("dem")$reduceRegion(reducer=ee$Reducer$mean()$combine(
+    #     reducer2=ee$Reducer$stdDev(), sharedInputs=T),
+    #     geometry=cityNow$geometry(), scale=1e3)
+    #   
+    #   # Cacluate the key numbers for our sanity
+    #   elevMean <- ee$Number(elevStats$get("dem_mean"))
+    #   elevSD <- ee$Number(elevStats$get("dem_stdDev"))
+    #   thresh <- elevSD$multiply(thresh.sigma)
+    #   
+    #   # Do the filtering
+    #   dat.low <- img$gte(elevMean$subtract(thresh))
+    #   dat.hi <- img$lte(elevMean$add(thresh))
+    #   img <- img$updateMask(dat.low)
+    #   img <- img$updateMask(dat.hi)
+    #   
+    #   # Map$addLayer(img$select('dem'))
+    #   return(img)
+    # }
+    # 
+    # elevCity <- elevOutlier(elevCity)
     
-    elevCity <- elevOutlier(elevCity)
-    
-    npts.elev <- elevCity$reduceRegion(reducer=ee$Reducer$count(), geometry=cityNow$geometry(), scale=1e3)
-    npts.elev <- npts.elev$getInfo()$DSM
-    
-    ### *** ###  If we don't have many points in the elevation file, skip the city
-    if(npts.elev<thresh.pts){ 
-      print(warning(paste("Not enough Elevation Points; skipping : ", cityID)))
-      next
-    }
+    # npts.elev <- elevCity$reduceRegion(reducer=ee$Reducer$count(), geometry=cityNow$geometry(), scale=1e3)
+    # npts.elev <- npts.elev$getInfo()$DSM
+    # 
+    # ### *** ###  If we don't have many points in the elevation file, skip the city
+    # if(npts.elev<thresh.pts){ 
+    #   print(warning(paste("Not enough Elevation Points; skipping : ", cityID)))
+    #   next
+    # }
     
     # Save elevation only if it's worth our while -- Note: Still doing the extraction & computation first since we use it as our base
     if(overwrite | !any(grepl(cityID, elev.done))){
@@ -196,11 +196,22 @@ extractElevEE <- function(CITIES, GoogleFolderSave, overwrite=F, ...){
 ##################### 
 print(citiesUse$first()$propertyNames()$getInfo())
 
+# If this still doesn't work, can update using the city stat summary file; ex
+lst.done <- dir(file.path(path.google, GoogleFolderSave), "Tmean.tif")
 elev.done <- dir(file.path(path.google, GoogleFolderSave), "elevation.tif")
 
-citiesDone <- unlist(lapply(strsplit(elev.done, "_"), function(x){x[1]}))
+lstDone <- unlist(lapply(strsplit(lst.done, "_"), function(x){x[1]}))
 
-citiesUse <- citiesUse$filter(ee$Filter$inList('ISOURBID', ee$List(citiesDone)))
+elevDone <- unlist(lapply(strsplit(elev.done, "_"), function(x){x[1]}))
+
+# Create a vector with teh handful of cities that have been actually updated, but the extraction is just so dang slow today!
+# If this gets too long, just sort files by newest, move the "good" elev to a new place and delete the old ones
+# citiesUpdated <- c("AFG90032, AFG90009", "AFG37217", "AFG40389", "AGO60738")
+# citiesDone <- citiesDone[!citiesDone %in% citiesUpdated,] 
+citiesNeed <- lstDone[!lstDone %in% elevDone]
+length(citiesNeed)
+
+citiesUse <- citiesUse$filter(ee$Filter$inList('ISOURBID', ee$List(citiesNeed)))
 ncitiesAll <- citiesUse$size()$getInfo()
 
 
