@@ -16,20 +16,6 @@ GoogleFolderSave <- "UHI_Analysis_Output"
 overwrite=F
 ##################### 
 
-
-##################### 
-# 0. Set up helper functions
-##################### 
-# addTime <- function(image){
-#   return(image$addBands(image$metadata('system:time_start')$divide(1000 * 60 * 60 * 24 * 365)))
-# }
-# 
-# setYear <- function(img){
-#   return(img$set("year", img$date()$get("year")))
-# }
-##################### 
-
-
 ##################### 
 # 1. Load and select cities
 #####################
@@ -47,12 +33,6 @@ citiesUse <- sdei$filter(ee$Filter$gte('ES00POP', 100e3))$filter(ee$Filter$gte('
 # Use map to go ahead and create the buffer around everything
 citiesUse <- citiesUse$map(function(f){f$buffer(10e3)})
 # ee_print(citiesUse)
-
-
-# projSDEI = citiesUse$geometry()$getInfo()
-# projCRS = citiesUse$geometry()$crs()
-# projTransform <- unlist(citiesUse$geometry()$crs())
-
 ##################### 
 
 ##################### 
@@ -128,7 +108,9 @@ extractVeg <- function(CitySP, CityNames, TREE, VEG, BARE, GoogleFolderSave, ove
 print(citiesUse$first()$propertyNames()$getInfo())
 
 cityIdS <-sdei.df$ISOURBID[sdei.df$LATITUDE<0]
-cityIdN <-sdei.df$ISOURBID[sdei.df$LATITUDE>=0]
+cityIdNW <-sdei.df$ISOURBID[sdei.df$LATITUDE>=0 & sdei.df$LONGITUDE<=0]
+cityIdNE1 <-sdei.df$ISOURBID[sdei.df$LATITUDE>=0 & sdei.df$LONGITUDE>0 & sdei.df$LONGITUDE<=75]
+cityIdNE2 <-sdei.df$ISOURBID[sdei.df$LATITUDE>=0 & sdei.df$LONGITUDE>75]
 # length(cityIdS); length(cityIdNW)
 
 # If we're not trying to overwrite our files, remove files that were already done
@@ -141,31 +123,34 @@ if(!overwrite){
   cityRemove <- unlist(lapply(strsplit(tmean.done, "_"), function(x){x[1]}))
   
   cityIdS <- cityIdS[!cityIdS %in% cityRemove]
-  cityIdsN <- cityIdS[!cityIdN %in% cityRemove]
+  cityIdsNW <- cityIdNW[!cityIdNW %in% cityRemove]
+  cityIdsNE1 <- cityIdNE2[!cityIdNE1 %in% cityRemove]
+  cityIdsNE2 <- cityIdNE1[!cityIdNE2 %in% cityRemove]
   
 } # End remove cities loop
 
 citiesSouth <- citiesUse$filter(ee$Filter$inList('ISOURBID', ee$List(cityIdS)))
-citiesNorth <- citiesUse$filter(ee$Filter$inList('ISOURBID', ee$List(cityIdN)))
+citiesNorthW <- citiesUse$filter(ee$Filter$inList('ISOURBID', ee$List(cityIdNW)))
 # citiesSouth$size()$getInfo()
 # length(cityIdS)
 
-# # All except 1 ran successfully
+# 
 if(length(cityIdS)>0){
   extractVeg(CitySP=citiesSouth, CityNames = cityIdS, TREE=modTree, VEG = modVeg, BARE=modBare, GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
 }
 
-if(length(cityIdN)>0){
-  extractVeg(CitySP=citiesNorth, CityNames = cityIdN, TREE=modTree, VEG = modVeg, BARE=modBare, GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
+# This may need some chunking as it will be 6k cities
+if(length(cityIdNW)>0){
+  extractVeg(CitySP=citiesUse, CityNames = cityIdNW, TREE=modTree, VEG = modVeg, BARE=modBare, GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
 }
 
+if(length(cityIdNE1)>0){
+  extractVeg(CitySP=citiesUse, CityNames = cityIdNE1, TREE=modTree, VEG = modVeg, BARE=modBare, GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
+}
 
-# if(ncitiesNorth>0){
-#   citiesNorthList <- citiesNorthW$toList(ncitiesNorth) #  total
-#   extractVeg(CITIES=citiesNorthWList, VEGETATION=mod44bReproj, GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
-# }
+if(length(cityIdNE2)>0){
+  extractVeg(CitySP=citiesUse, CityNames = cityIdNE2, TREE=modTree, VEG = modVeg, BARE=modBare, GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
+}
 
-
-### FOR LOOP ENDS HERE
 ##################### 
 

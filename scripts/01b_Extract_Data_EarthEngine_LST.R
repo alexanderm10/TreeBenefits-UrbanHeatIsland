@@ -396,7 +396,7 @@ if(!overwrite){
   cityRemove <- unlist(lapply(strsplit(tmean.done, "_"), function(x){x[1]}))
 
   cityIdS <- cityIdS[!cityIdS %in% cityRemove]
-  cityIdsN <- cityIdS[!cityIdN %in% cityRemove]
+  cityIdsN <- cityIdN[!cityIdN %in% cityRemove]
   
 } # End remove cities loop
 
