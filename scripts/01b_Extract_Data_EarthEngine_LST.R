@@ -331,7 +331,7 @@ extractTempEE <- function(CitySP, CityNames, TEMPERATURE, GoogleFolderSave, over
     # ee_print(tempYrMean)
     # Map$addLayer(tempYrMean$select('YR2020'), vizTempK, 'Mean Surface Temperature (K)');
     
-    export.TempMean <- ee_image_to_drive(image=tempYrMean, description=paste0(cityID, "_LST_Day_Tmean"), fileNamePrefix=paste0(cityID, "_LST_Day_Tmean"), folder=GoogleFolderSave, timePrefix=F, region=cityNow$geometry(), maxPixels=5e6, crs=projCRS, crsTransform=projTransform)
+    export.TempMean <- ee_image_to_drive(image=tempYrMean, description=paste0(cityID, "_LST_Day_Tmean"), fileNamePrefix=paste0(cityID, "_LST_Day_Tmean"), folder=GoogleFolderSave, timePrefix=F, region=cityNow$geometry(), maxPixels=5e7, crs=projCRS, crsTransform=projTransform)
     export.TempMean$start()
     # ee_monitoring(export.TempMean)
     
@@ -398,7 +398,7 @@ citiesNorth <- citiesUse$filter(ee$Filter$inList('ISOURBID', ee$List(cityIdN)))
 
 # # All except 1 ran successfully
 if(length(cityIdS)>0){
-  extractTempEE(CitySP=citiesSouth, CityNames = cityIdS, TEMPERATURE=lstDayGoodSH$select("LST_Day_1km"), GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
+  extractTempEE(CitySP=citiesSouth, CityNames = cityIdS, TEMPERATURE=lstDayGoodSH$select("LST_Day_1km"), GoogleFolderSave = GoogleFolderSave)
 }
 
 
@@ -408,16 +408,6 @@ if(length(cityIdS)>0){
 #   extractTempEE(CITIES=citiesNorthWList, TEMPERATURE=lstNHFinal, GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
 # }
 
-# Stalled; no error, but 30 min since last file 10% way in 98 cities in queue 8 a.m. 29 Oct 2022
-if(ncitiesNorthE1>0){
-  citiesNorthE1List <- citiesNorthE1$toList(ncitiesNorthE1) 
-  extractTempEE(CITIES=citiesNorthE1List, TEMPERATURE=lstNHFinal, GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
-}
-
-if(ncitiesNorthE2>0){
-  citiesNorthE2List <- citiesNorthE2$toList(ncitiesNorthE2) 
-  extractTempEE(CITIES=citiesNorthE2List, TEMPERATURE=lstNHFinal, GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
-}
 ### FOR LOOP ENDS HERE
 ##################### 
 

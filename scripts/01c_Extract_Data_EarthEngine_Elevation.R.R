@@ -36,7 +36,7 @@ setYear <- function(img){
 #####################
 sdei.df <- data.frame(vect("../data_raw/sdei-global-uhi-2013-shp/shp/sdei-global-uhi-2013.shp"))
 sdei.df <- sdei.df[sdei.df$ES00POP>=100e3 & sdei.df$SQKM_FINAL>=1e2,]
-cityIDsAll <- sdei.df$ISOURBID
+cityIdAll <- sdei.df$ISOURBID
 
 sdei <- ee$FeatureCollection('users/crollinson/sdei-global-uhi-2013');
 # print(sdei.first())
@@ -74,29 +74,33 @@ elevVis = list(
 
 # elev <- ee$Image('USGS/SRTMGL1_003')$select('elevation')
 # elev <- ee$ImageCollection('JAXA/ALOS/AW3D30/V3_2')$select("DSM")
-elevLoad <- ee$Image('users/crollinson/MERIT-DEM-v1_1km_Reproj')#$select('elevation')
-ee_print(elevLoad)
-Map$addLayer(elevLoad, elevVis, "Elevation - Masked, reproj")
+elev <- ee$Image('users/crollinson/MERIT-DEM-v1_1km_Reproj')#$select('elevation')
+ee_print(elev)
+# Map$addLayer(elevLoad, elevVis, "Elevation - Masked, reproj")
+
+projElev = elev$projection()
+projCRS = projElev$crs()
+projTransform <- unlist(projElev$getInfo()$transform)
+
 ##################### 
 
 
-extractElevEE <- function(CITIES, GoogleFolderSave, overwrite=F, ...){
-  cityseq <- seq_len(CITIES$length()$getInfo())
-  pb <- txtProgressBar(min=0, max=max(cityseq), style=3)
-  for(i in (cityseq - 1)){
+extractElevEE <- function(CitySP, CityNames, ELEV, GoogleFolderSave, overwrite=F, ...){
+  pb <- txtProgressBar(min=0, max=length(CityNames), style=3)
+  for(i in 1:length(CityNames)){
     setTxtProgressBar(pb, i)
+    cityID <- CityNames[i]
     # cityNow <- citiesUse$filter('NAME=="Chicago"')$first()
-    cityNow <- ee$Feature(CITIES$get(i))
-    # cityNow$first()$propertyNames()$getInfo()
-    cityID <- cityNow$get("ISOURBID")$getInfo()
+    cityNow <- CitySP$filter(ee$Filter$eq('ISOURBID', cityID))
     # Map$centerObject(cityNow) # NOTE: THIS IS REALLY IMPORTANT APPARENTLY!
+    # Map$addLayer(cityNow)
     
     #-------
     # extracting elevation -- 
     #  NOTE: Doing outlier removal because there are some known issues with a couple points: https://developers.google.com/earth-engine/datasets/catalog/JAXA_ALOS_AW3D30_V3_2
     #-------
     # elevCity <- elevReproj$updateMask(cityMask)
-    elevCity <- elevReproj$clip(cityNow)
+    elevCity <- ELEV$clip(cityNow)
     # Map$addLayer(elevCity, list(min=-10, max=500))
     
     # elevOutlier <- function(img){
@@ -132,11 +136,9 @@ extractElevEE <- function(CITIES, GoogleFolderSave, overwrite=F, ...){
     # }
     
     # Save elevation only if it's worth our while -- Note: Still doing the extraction & computation first since we use it as our base
-    if(overwrite | !any(grepl(cityID, elev.done))){
-      export.elev <- ee_image_to_drive(image=elevCity, description=paste0(cityID, "_elevation"), fileNamePrefix=paste0(cityID, "_elevation"), folder=GoogleFolderSave, timePrefix=F, region=cityNow$geometry(), maxPixels=5e6, crs=projCRS, crsTransform=projTransform)
-      export.elev$start()
+    export.elev <- ee_image_to_drive(image=elevCity, description=paste0(cityID, "_elevation"), fileNamePrefix=paste0(cityID, "_elevation"), folder=GoogleFolderSave, timePrefix=F, region=cityNow$geometry(), maxPixels=5e6, crs=projCRS, crsTransform=projTransform)
+    export.elev$start()
       # ee_monitoring(export.elev)
-    }
     #-------
   } # End i loop
 } # End function
@@ -147,25 +149,41 @@ extractElevEE <- function(CITIES, GoogleFolderSave, overwrite=F, ...){
 ##################### 
 print(citiesUse$first()$propertyNames()$getInfo())
 
-# If this still doesn't work, can update using the city stat summary file; ex
-lst.done <- dir(file.path(path.google, GoogleFolderSave), "Tmean.tif")
-elev.done <- dir(file.path(path.google, GoogleFolderSave), "elevation.tif")
 
-lstDone <- unlist(lapply(strsplit(lst.done, "_"), function(x){x[1]}))
+cityIdS <-sdei.df$ISOURBID[sdei.df$LATITUDE<0]
+cityIdN <-sdei.df$ISOURBID[sdei.df$LATITUDE>=0]
+# length(cityIdS); length(cityIdNW)
 
-elevDone <- unlist(lapply(strsplit(elev.done, "_"), function(x){x[1]}))
+# If we're not trying to overwrite our files, remove files that were already done
+cityRemove <- vector()
+if(!overwrite){
+  ### Filter out sites that have been done!
+  elev.done <- dir(file.path(path.google, GoogleFolderSave), "elevation.tif")
+  
+  # Check to make sure a city has all three layers; if it doesn't do it again
+  cityRemove <- unlist(lapply(strsplit(elev.done, "_"), function(x){x[1]}))
+  
+  cityIdS <- cityIdS[!cityIdS %in% cityRemove]
+  cityIdsN <- cityIdS[!cityIdN %in% cityRemove]
+  
+} # End remove cities loop
+
+citiesSouth <- citiesUse$filter(ee$Filter$inList('ISOURBID', ee$List(cityIdS)))
+citiesNorth <- citiesUse$filter(ee$Filter$inList('ISOURBID', ee$List(cityIdN)))
+citiesSouth$size()$getInfo()
+length(cityIdS)
+
+# # All except 1 ran successfully
+if(length(cityIdS)>0){
+  extractElevEE(CitySP=citiesSouth, CityNames = cityIdS, ELEV = elev, GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
+}
+if(length(cityIdN)>0){
+  extractElevEE(CitySP=citiesNorth, CityNames = cityIdN, ELEV = elev, GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
+}
 
 # Create a vector with teh handful of cities that have been actually updated, but the extraction is just so dang slow today!
 # If this gets too long, just sort files by newest, move the "good" elev to a new place and delete the old ones
 # citiesUpdated <- c("AFG90032, AFG90009", "AFG37217", "AFG40389", "AGO60738")
 # citiesDone <- citiesDone[!citiesDone %in% citiesUpdated,] 
-citiesNeed <- lstDone[!lstDone %in% elevDone]
-length(citiesNeed)
-
-citiesUse <- citiesUse$filter(ee$Filter$inList('ISOURBID', ee$List(citiesNeed)))
-ncitiesAll <- citiesUse$size()$getInfo()
-
-
-citiesElevList <- citiesUse$toList(ncitiesAll) 
 extractElevEE(CITIES=citiesElevList,  GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
 
