@@ -147,15 +147,15 @@ if(!overwrite){
 
 citiesSouth <- citiesUse$filter(ee$Filter$inList('ISOURBID', ee$List(cityIdS)))
 citiesNorth <- citiesUse$filter(ee$Filter$inList('ISOURBID', ee$List(cityIdN)))
-citiesSouth$size()$getInfo()
-length(cityIdS)
+# citiesSouth$size()$getInfo()
+# length(cityIdS)
 
 # # All except 1 ran successfully
 if(length(cityIdS)>0){
   extractVeg(CitySP=citiesSouth, CityNames = cityIdS, TREE=modTree, VEG = modVeg, BARE=modBare, GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
 }
 
-if(length(cityIdS)>0){
+if(length(cityIdN)>0){
   extractVeg(CitySP=citiesNorth, CityNames = cityIdN, TREE=modTree, VEG = modVeg, BARE=modBare, GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
 }
 
