@@ -224,16 +224,18 @@ extractTempEE <- function(CitySP, CityNames, TEMPERATURE, GoogleFolderSave, over
     }
     
     tempCityAll <- tempCityAll$map(setNPts)
-    # ee_print(tempCityAll2)
+    # ee_print(tempCityAll)
     
     # Making sure we have at least 50% of the points present
     # tempCityAll$select("2016_02_18")
     # tempCityAll$first()$get("n_Pts")$getInfo()
     # tempCityAll$first()$get("year")$getInfo()
     ptsString <- tempCityAll$aggregate_array("n_Pts")$sort()
-    ptsThresh <- ee$Number(ptsString$get(-1))$multiply(ee$Number(thresh.prop))
+    ptsMax <- ptsString$get(-1)
+    ptsThresh <- ee$Number(ptsMax)$multiply(ee$Number(thresh.prop))
     
-    tempCityAll <- tempCityAll$filter(ee$Filter$gte("n_Pts", ptsThresh)) # have at least 5    # ---------------
+    tempCityAll <- tempCityAll$filter(ee$Filter$gte("n_Pts", ptsThresh)) # have at least 5    
+    # ---------------
 
     ## ----------------
     # Now remove outliers
@@ -279,7 +281,7 @@ extractTempEE <- function(CitySP, CityNames, TEMPERATURE, GoogleFolderSave, over
     }
     
     tempCityAll <- tempCityAll$map(setNPts)
-    # ee_print(tempCityAll2)
+    # ee_print(tempCityAll)
 
     tempCityAll <- tempCityAll$filter(ee$Filter$gte("n_Pts", ptsThresh)) # have at least 50% of the data points (see top of script)
     ## ----------------
@@ -303,9 +305,12 @@ extractTempEE <- function(CitySP, CityNames, TEMPERATURE, GoogleFolderSave, over
     # Now lets do our annual means
     ## ----------------
     # Only iterate through years with some data! 
+    # tempCityAll$aggregate_array("year")$getInfo()
     yrList <- ee$List(tempCityAll$aggregate_array("year"))$distinct()
-    yrString2 <- ee$List(paste0("YR", yrList$getInfo()))
-    
+    yrString <- yrList$map(ee_utils_pyfunc(function(j){
+      return(ee$String("YR")$cat(ee$String(ee$Number(j)$format())))
+    }))
+
     tempYrMean <- yrList$map(ee_utils_pyfunc(function(j){
       YR <- ee$Number(j);
       START <- ee$Date$fromYMD(YR,1,1);
@@ -326,7 +331,7 @@ extractTempEE <- function(CitySP, CityNames, TEMPERATURE, GoogleFolderSave, over
       return (tempAgg); # update to standardized once read
     }))
     tempYrMean <- ee$ImageCollection$fromImages(tempYrMean) # go ahead and overwrite it since we're just changing form
-    tempYrMean <- ee$ImageCollection$toBands(tempYrMean)$rename(yrString2)
+    tempYrMean <- ee$ImageCollection$toBands(tempYrMean)$rename(yrString)
     # tempYrMean <- tempYrMean$setDefaultProjection(projLST)
     # ee_print(tempYrMean)
     # Map$addLayer(tempYrMean$select('YR2020'), vizTempK, 'Mean Surface Temperature (K)');
@@ -380,7 +385,9 @@ cityIdN <-sdei.df$ISOURBID[sdei.df$LATITUDE>=0]
 # length(cityIdS); length(cityIdNW)
 
 # If we're not trying to overwrite our files, remove files that were already done
-cityRemove <- vector()
+# cityRemove <- vector()
+cityRemove <- c("IND58965", "BRA58970", "IDN58965")
+
 if(!overwrite){
   ### Filter out sites that have been done!
   tmean.done <- dir(file.path(path.google, GoogleFolderSave), "Tmean.tif")
@@ -396,11 +403,22 @@ if(!overwrite){
 citiesSouth <- citiesUse$filter(ee$Filter$inList('ISOURBID', ee$List(cityIdS)))
 citiesNorth <- citiesUse$filter(ee$Filter$inList('ISOURBID', ee$List(cityIdN)))
 
+citiesSouth$size()$getInfo()
+length(cityIdS)
+
+citiesNorth$size()$getInfo()
+length(cityIdN)
+
+
 # # All except 1 ran successfully
 if(length(cityIdS)>0){
   extractTempEE(CitySP=citiesSouth, CityNames = cityIdS, TEMPERATURE=lstDayGoodSH$select("LST_Day_1km"), GoogleFolderSave = GoogleFolderSave)
 }
 
+# # All except 1 ran successfully
+if(length(cityIdN)>0){
+  extractTempEE(CitySP=citiesNorth, CityNames = cityIdN, TEMPERATURE=lstDayGoodSH$select("LST_Day_1km"), GoogleFolderSave = GoogleFolderSave)
+}
 
 # # All except 3 were run successfully
 # if(ncitiesNorthW>0){
