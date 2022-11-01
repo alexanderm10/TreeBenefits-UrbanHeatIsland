@@ -10,9 +10,9 @@ GoogleFolderSave <- "UHI_Analysis_Output"
 ##################### 
 # 0. Set up some choices for data quality thresholds
 ##################### 
-yr.analy <- 2001:2020
+# yr.analy <- 2001:2020
 thresh.sigma <- 6 # Use 6-sigma outliers for the data filtering\
-thresh.pts <- 50
+# thresh.pts <- 50
 thresh.prop <- 0.5 # The proportion of data needed for a time point to be "good"; currenlty 0.5
 overwrite=T
 ##################### 
@@ -58,74 +58,25 @@ citiesUse <- citiesUse$map(function(f){f$buffer(10e3)})
 
 
 ##################### 
-# 2. Load in data layers 
+# 2. Load in data layers  -- formatting in script 1!
 ####################
-# -----------
-# 2.a - Land Surface Temperature
-# -----------
-# 2.a.1 - Northern Hemisphere: July/August
-tempJulAug <- ee$ImageCollection('MODIS/006/MOD11A2')$filter(ee$Filter$dayOfYear(181, 240))$filter(ee$Filter$date("2001-01-01", "2020-12-31"))$map(addTime);
-tempJulAug <- tempJulAug$map(setYear)
-# ee_print(tempJulAug)
-# tempJulAug$first()$propertyNames()$getInfo()
-# ee_print(tempJulAug$first())
-# Map$addLayer(tempJulAug$first()$select('LST_Day_1km'), vizTempK, "Jul/Aug Temperature")
-
-projLST = tempJulAug$select("LST_Day_1km")$first()$projection()
-projCRS = projLST$crs()
-projTransform <- unlist(projLST$getInfo()$transform)
-
-# ee_print(projLST)
-# -----------
-
-# -----------
-# 2.b MODIS Tree Data
-# -----------
-mod44b <- ee$ImageCollection('MODIS/006/MOD44B')$filter(ee$Filter$date("2001-01-01", "2020-12-31"))
-mod44b <- mod44b$map(setYear)
-# ee_print(mod44b)
-# Map$addLayer(mod44b$select('Percent_Tree_Cover')$first(), vizTree, 'Percent Tree Cover')
-
-
-# This seems to work, but seems to be very slow
-mod44bReproj = mod44b$map(function(img){
-  return(img$reduceResolution(reducer=ee$Reducer$mean())$reproject(projLST))
-})$map(addTime); # add year here!
-
-# Create a noVeg Mask
-vegMask <- mod44bReproj$first()$select("Percent_Tree_Cover", "Percent_NonTree_Vegetation", "Percent_NonVegetated")$reduce('sum')$gt(50)$mask()
-# ee_print(vegMask)
-# Map$addLayer(vegMask)
-
-# ee_print(mod44bReproj)
-# ee_print(mod44bReproj$first())
-# Map$addLayer(mod44bReproj$select('Percent_Tree_Cover')$first(), vizTree, 'Percent Tree Cover')
-# -----------
-
 # -----------
 # 2.c  - Elevation (static = easy!)
 ## Now using MERIT, which has combined several other products and removed bias, including from trees
 # https://agupubs.onlinelibrary.wiley.com/doi/full/10.1002/2017GL072874
 # -----------
+elevVis = list(
+  min= 0,
+  max= 5000,
+  palette=c ('0000ff', '00ffff', 'ffff00', 'ff0000', 'ffffff')
+);
+
+
 # elev <- ee$Image('USGS/SRTMGL1_003')$select('elevation')
 # elev <- ee$ImageCollection('JAXA/ALOS/AW3D30/V3_2')$select("DSM")
-elev <- ee$Image('MERIT/DEM/v1_0_3')#$select('elevation')
-ee_print(elev)
-# Map$addLayer(elev, list(min=-10, max=5e3))
-
-
-# # I don't know why this is causing issues, but it is
-# elevReproj <- elev$reduceResolution(reducer=ee$Reducer$mean())$reproject(projLST)
-# ee_print(elevReprojA)
-
-# Need to use this version of reproject :shrug:
-elevReproj <- elev$reproject(projLST)
-elevReproj <- elevReproj$updateMask(vegMask)
-ee_print(elevReproj)
-# Map$addLayer(elevReproj$select("DSM"), list(min=-10, max=5e3))
-
-# ee_image_to_asset(elevReproj, description="Reprojected Elevation", assetID="ALOS_DSM_LST-aligned", , maxPixels=1e9, crs=projCRS, crsTransform=projTransform)
-# elevReproj 
+elevLoad <- ee$Image('users/crollinson/MERIT-DEM-v1_1km_Reproj')#$select('elevation')
+ee_print(elevLoad)
+Map$addLayer(elevLoad, elevVis, "Elevation - Masked, reproj")
 ##################### 
 
 

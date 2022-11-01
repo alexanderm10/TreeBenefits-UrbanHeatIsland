@@ -12,7 +12,6 @@ GoogleFolderSave <- "UHI_Analysis_Output"
 ##################### 
 # 0. Set up some choices for data quality thresholds
 ##################### 
-yr.analy <- 2001:2020
 thresh.sigma <- 6 # Use 6-sigma outliers for the data filtering\
 thresh.pts <- 50
 thresh.prop <- 0.5 # The proportion of data needed for a time point to be "good"; currenlty 0.5
@@ -77,7 +76,7 @@ lstMask <- function(img){
 #####################
 sdei.df <- data.frame(vect("../data_raw/sdei-global-uhi-2013-shp/shp/sdei-global-uhi-2013.shp"))
 sdei.df <- sdei.df[sdei.df$ES00POP>=100e3 & sdei.df$SQKM_FINAL>=1e2,]
-cityIDsAll <- sdei.df$ISOURBID
+cityIdAll <- sdei.df$ISOURBID
 
 sdei <- ee$FeatureCollection('users/crollinson/sdei-global-uhi-2013');
 # print(sdei.first())
@@ -100,6 +99,24 @@ citiesUse <- citiesUse$map(function(f){f$buffer(10e3)})
 ##################### 
 # 2. Load in data layers 
 ####################
+tempColors <- c(
+  '040274', '040281', '0502a3', '0502b8', '0502ce', '0502e6',
+  '0602ff', '235cb1', '307ef3', '269db1', '30c8e2', '32d3ef',
+  '3be285', '3ff38f', '86e26f', '3ae237', 'b5e22e', 'd6e21f',
+  'fff705', 'ffd611', 'ffb613', 'ff8b13', 'ff6e08', 'ff500d',
+  'ff0000', 'de0101', 'c21301', 'a71001', '911003'
+)
+vizTemp <- list(
+  min=10.0,
+  max=47.0,
+  palette=tempColors
+);
+
+vizTempK <- list( 
+  min=10.0+273.15,
+  max=47.0+273.15,
+  palette=tempColors
+);
 # -----------
 # 2.a - Land Surface Temperature
 # -----------
@@ -136,30 +153,8 @@ projTransform <- unlist(projLST$getInfo()$transform)
 # -----------
 # 2.b MODIS Tree Data -- Still need this to get the veg mask!
 # -----------
-mod44b <- ee$ImageCollection('MODIS/006/MOD44B')$filter(ee$Filter$date("2001-01-01", "2020-12-31"))
-mod44b <- mod44b$map(setYear)
-# ee_print(mod44b)
-# Map$addLayer(mod44b$select('Percent_Tree_Cover')$first(), vizTree, 'Percent Tree Cover')
-
-
-# This seems to work, but seems to be very slow
-mod44bReproj = mod44b$map(function(img){
-  return(img$reduceResolution(reducer=ee$Reducer$mean())$reproject(projLST))
-})$map(addTime); # add year here!
-
-# mod44bReproj = mod44b$map(function(img){
-#   return(img$reproject(projLST))
-# })$map(addTime); # add year here!
-
-
-# Create a noVeg Mask
-vegMask <- mod44bReproj$first()$select("Percent_Tree_Cover", "Percent_NonTree_Vegetation", "Percent_NonVegetated")$reduce('sum')$gt(50)$mask()
-# ee_print(vegMask)
+vegMask <- ee$Image("users/crollinson/MOD44b_1km_Reproj_VegMask")
 # Map$addLayer(vegMask)
-
-# ee_print(mod44bReproj)
-# ee_print(mod44bReproj$first())
-# Map$addLayer(mod44bReproj$select('Percent_Tree_Cover')$first(), vizTree, 'Percent Tree Cover')
 # -----------
 
 # -----------
@@ -169,57 +164,39 @@ vegMask <- mod44bReproj$first()$select("Percent_Tree_Cover", "Percent_NonTree_Ve
 lstNHmask <- lstDayGoodNH$map(function(IMG){IMG$updateMask(vegMask)})
 lstSHmask <- lstDayGoodSH$map(function(IMG){IMG$updateMask(vegMask)})
 
-# ee_print(lstNHmask$first()$select("LST_Day_1km"))
-lstNHFinal <- lstNHmask$map(function(IMG){
-  dat <- IMG$select("LST_Day_1km")$gt(0)
-  return(IMG$updateMask(dat))
-})
+# Map$addLayer(lstSHmask$first()$select('LST_Day_1km'), vizTempK, "GOOD MASKED Jul/Aug Temperature")
 
-lstSHFinal <- lstSHmask$map(function(IMG){
-  dat <- IMG$select("LST_Day_1km")$gt(0)
-  return(IMG$updateMask(dat))
-})
+# # ee_print(lstNHmask$first()$select("LST_Day_1km"))
+# lstNHFinal <- lstNHmask$map(function(IMG){
+#   dat <- IMG$select("LST_Day_1km")$gt(0)
+#   return(IMG$updateMask(dat))
+# })
+# 
+# lstSHFinal <- lstSHmask$map(function(IMG){
+#   dat <- IMG$select("LST_Day_1km")$gt(0)
+#   return(IMG$updateMask(dat))
+# })
 
 # lstNHmasl2 <- lstNHmask
 # Map$addLayer(lstNHFinal$first()$select('LST_Day_1km'), vizTempK, "GOOD MASKED Jul/Aug Temperature")
 # Map$addLayer(lstSHFinal$first()$select('LST_Day_1km'), vizTempK, "GOOD MASKED Jan/Feb Temperature")
 # -----------
 
-
-# -----------
-# 2.c  - Elevation (static = easy!)
-## Now using MERIT, which has combined several other products and removed bias, including from trees
-# https://agupubs.onlinelibrary.wiley.com/doi/full/10.1002/2017GL072874
-# -----------
-elev <- ee$Image('MERIT/DEM/v1_0_3')#$select('elevation')
-# Map$addLayer(elev, list(min=-10, max=5e3))
-
-
-# # I don't know why this is causing issues, but it is
-# elevReproj <- elev$reduceResolution(reducer=ee$Reducer$mean())$reproject(projLST)
-# ee_print(elevReprojA)
-
-# Need to use this version of reproject :shrug:
-elevReproj <- elev$reproject(projLST)
-elevReproj <- elevReproj$updateMask(vegMask)
-# ee_print(elevReproj)
-# Map$addLayer(elevReproj$select("elevation"), list(min=-10, max=5e3))
-# -----------
 ##################### 
 
 ## Making the workflow a function that we can then feed N/S data to
 # Cities needs to be an EarthEngine Feature List
-extractTempEE <- function(CITIES, TEMPERATURE, GoogleFolderSave, overwrite=F, ...){
-  cityseq <- seq_len(CITIES$length()$getInfo())
-  pb <- txtProgressBar(min=0, max=max(cityseq), style=3)
-  for(i in (cityseq - 1)){
+extractTempEE <- function(CitySP, CityNames, TEMPERATURE, GoogleFolderSave, overwrite=F, ...){
+  # cityseq <- seq_len(CITIES$length()$getInfo())
+  pb <- txtProgressBar(min=0, max=length(CityNames), style=3)
+  for(i in 1:length(CityNames)){
     setTxtProgressBar(pb, i)
-    # cityNow <- citiesBuff$filter('NAME=="Chicago"')$first()
-    cityNow <- ee$Feature(CITIES$get(i))
-    # cityNow$first()$propertyNames()$getInfo()
-    cityID <- cityNow$get("ISOURBID")$getInfo()
-    # Map$centerObject(cityNow) # NOTE: THIS IS REALLY IMPORTANT APPARENTLY!
-    
+    cityID <- CityNames[i]
+    # cityNow <- citiesUse$filter('NAME=="Chicago"')$first()
+    cityNow <- CitySP$filter(ee$Filter$eq('ISOURBID', cityID))
+    # cityNow <- CitySP$filter('ISOURBID'=="NZL96")
+    # Map$centerObject(cityNow) 
+    # Map$addLayer(cityNow)
 
     #-------
     # Now doing Land Surface Temperature
@@ -237,33 +214,27 @@ extractTempEE <- function(CITIES, TEMPERATURE, GoogleFolderSave, overwrite=F, ..
     # tempCityAll$first()$get("year")$getInfo()
     # Map$addLayer(tempCityAll$first()$select('LST_Day_1km'), vizTempK, "Raw Surface Temperature")
     
-    ## ----------------
-    ## Need to remove layers that don't meet our requirements right off the bat
-    ##   -- because we can't compute means etc when there are no good values
-    ##   -- resource from Ren https://gis.stackexchange.com/questions/276791/removing-images-based-on-band-threshold-using-google-earth-engine
-    ## ----------------
+ 
+    # ---------------
+    # Need to run this first so that layers without data are removed up front
+    # ---------------
     setNPts <- function(img){
       npts.now <- img$select("LST_Day_1km")$reduceRegion(reducer=ee$Reducer$count(), geometry=cityNow$geometry(), scale=1e3)
-      # p.now <- list(p_Pts=ee$Number(npts.now$get("LST_Day_1km"))$divide(npts.elev))
-      # p.now <- ee$Dictionary(p.now)
-      
-      # test <- img$set("n_Pts", npts.now$get("LST_Day_1km"))$set("p_Pts", p.now$get("p_Pts"))
-      # test$get("p_Pts")$getInfo()
-      return(img$set("n_Pts", npts.now$get("LST_Day_1km")))#$set("p_Pts", p.now$get("p_Pts")))
+      return(img$set("n_Pts", npts.now$get("LST_Day_1km")))#$set("p_Pts", p.now$get
     }
     
-    
     tempCityAll <- tempCityAll$map(setNPts)
-    # ee_print(tempCityAll$first())
-    # print(tempCityAll$first()$get("n_Pts")$getInfo())
-    # print(tempCityAll$first()$get("p_Pts")$getInfo())
+    # ee_print(tempCityAll2)
     
-    tempCityAll <- tempCityAll$filter(ee$Filter$gte("n_Pts", thresh.pts)) # have at least 50 points (see top of script)
-    # tempCityAll <- tempCityAll$filter(ee$Filter$gte("p_Pts", thresh.prop)) # Have at least 50% of the data
-    # ee_print(tempCityAll)
-    # Map$addLayer(tempCityAll$first()$select('LST_Day_1km'), vizTempK, "Raw Surface Temperature")
-    ## ----------------
+    # Making sure we have at least 50% of the points present
+    # tempCityAll$select("2016_02_18")
+    # tempCityAll$first()$get("n_Pts")$getInfo()
+    # tempCityAll$first()$get("year")$getInfo()
+    ptsString <- tempCityAll$aggregate_array("n_Pts")$sort()
+    ptsThresh <- ee$Number(ptsString$get(-1))$multiply(ee$Number(thresh.prop))
     
+    tempCityAll <- tempCityAll$filter(ee$Filter$gte("n_Pts", ptsThresh)) # have at least 5    # ---------------
+
     ## ----------------
     # Now remove outliers
     # #  NOTE : THIS DOESN"T WORK YET!
@@ -294,13 +265,23 @@ extractTempEE <- function(CITIES, TEMPERATURE, GoogleFolderSave, overwrite=F, ..
     # ee_print(tempCityAll)
     # Map$addLayer(tempCityAll$first()$select('LST_Day_1km'), vizTempK, "Raw Surface Temperature")
     
-    tempCityAll <- tempCityAll$map(setNPts)
-    # print(tempCityAll$first()$get("n_Pts")$getInfo())
-    # print(tempCityAll$first()$get("p_Pts")$getInfo())
+    # ---------------
+    # Remove poor data layers
+    # ---------------
+    setNPts <- function(img){
+      npts.now <- img$select("LST_Day_1km")$reduceRegion(reducer=ee$Reducer$count(), geometry=cityNow$geometry(), scale=1e3)
+      # p.now <- list(p_Pts=ee$Number(npts.now$get("LST_Day_1km"))$divide(npts.elev))
+      # p.now <- ee$Dictionary(p.now)
+      
+      # test <- img$set("n_Pts", npts.now$get("LST_Day_1km"))$set("p_Pts", p.now$get("p_Pts"))
+      # test$get("p_Pts")$getInfo()
+      return(img$set("n_Pts", npts.now$get("LST_Day_1km")))#$set("p_Pts", p.now$get("p_Pts")))
+    }
     
-    tempCityAll <- tempCityAll$filter(ee$Filter$gte("n_Pts", thresh.pts)) # have at least 50 points (see top of script)
-    # tempCityAll <- tempCityAll$filter(ee$Filter$gte("p_Pts", thresh.prop)) # Have at least 50% of the data
-    # ee_print(tempCityAll)
+    tempCityAll <- tempCityAll$map(setNPts)
+    # ee_print(tempCityAll2)
+
+    tempCityAll <- tempCityAll$filter(ee$Filter$gte("n_Pts", ptsThresh)) # have at least 50% of the data points (see top of script)
     ## ----------------
     
     ## ----------------
@@ -323,7 +304,7 @@ extractTempEE <- function(CITIES, TEMPERATURE, GoogleFolderSave, overwrite=F, ..
     ## ----------------
     # Only iterate through years with some data! 
     yrList <- ee$List(tempCityAll$aggregate_array("year"))$distinct()
-    yrString2 <- ee$List(paste(yrList$getInfo()))
+    yrString2 <- ee$List(paste0("YR", yrList$getInfo()))
     
     tempYrMean <- yrList$map(ee_utils_pyfunc(function(j){
       YR <- ee$Number(j);
@@ -343,13 +324,12 @@ extractTempEE <- function(CITIES, TEMPERATURE, GoogleFolderSave, overwrite=F, ..
       # Map$addLayer(tempAgg$select('LST_Day_Dev_mean'), vizTempAnom, 'Mean Surface Temperature - Anomaly');
       
       return (tempAgg); # update to standardized once read
-      
     }))
     tempYrMean <- ee$ImageCollection$fromImages(tempYrMean) # go ahead and overwrite it since we're just changing form
     tempYrMean <- ee$ImageCollection$toBands(tempYrMean)$rename(yrString2)
-    tempYrMean <- tempYrMean$setDefaultProjection(projLST)
+    # tempYrMean <- tempYrMean$setDefaultProjection(projLST)
     # ee_print(tempYrMean)
-    # Map$addLayer(tempYrMean$select('2020'), vizTempK, 'Mean Surface Temperature (K)');
+    # Map$addLayer(tempYrMean$select('YR2020'), vizTempK, 'Mean Surface Temperature (K)');
     
     export.TempMean <- ee_image_to_drive(image=tempYrMean, description=paste0(cityID, "_LST_Day_Tmean"), fileNamePrefix=paste0(cityID, "_LST_Day_Tmean"), folder=GoogleFolderSave, timePrefix=F, region=cityNow$geometry(), maxPixels=5e6, crs=projCRS, crsTransform=projTransform)
     export.TempMean$start()
@@ -395,62 +375,31 @@ extractTempEE <- function(CITIES, TEMPERATURE, GoogleFolderSave, overwrite=F, ..
 # 3.1 select the city
 print(citiesUse$first()$propertyNames()$getInfo())
 
+cityIdS <-sdei.df$ISOURBID[sdei.df$LATITUDE<0]
+cityIdN <-sdei.df$ISOURBID[sdei.df$LATITUDE>=0]
+# length(cityIdS); length(cityIdNW)
 
 # If we're not trying to overwrite our files, remove files that were already done
+cityRemove <- vector()
 if(!overwrite){
   ### Filter out sites that have been done!
-  elev.done <- dir(file.path(path.google, GoogleFolderSave), "elevation.tif")
   tmean.done <- dir(file.path(path.google, GoogleFolderSave), "Tmean.tif")
-  tdev.done <- dir(file.path(path.google, GoogleFolderSave), "Tdev.tif")
-  
+
   # Check to make sure a city has all three layers; if it doesn't do it again
-  citiesDone <- unlist(lapply(strsplit(elev.done, "_"), function(x){x[1]}))
-  if(length(citiesDone)>0){
-  	cityRemove <- vector()
-    for(i in 1:length(citiesDone)){
-      cityCheck <- citiesDone[i] # Check by name because it's going to change number
-      cityDONE <- any(grepl(cityCheck, tmean.done)) & any(grepl(cityCheck, tdev.done))
-      if(!cityDONE) next 
-      cityRemove <- c(cityRemove, cityCheck)
-    }
-    
-    # citiesDone <- citiesDone[citiesDone %in% cityRemove]
-    # for(i in 1:length(citiesDone)){
-    #   citiesUse <- citiesUse$filter(ee$Filter$neq('ISOURBID', citiesDone[i]))
-    # }
-  	cities.keep <- cityIDsAll[!cityIDsAll %in% cityRemove]
-  	
-  	citiesUse <- citiesUse$filter(ee$Filter$inList('ISOURBID', ee$List(cities.keep)))
-  }# length(citiesDone)
-  ncitiesAll <- citiesUse$size()$getInfo()
+  cityRemove <- unlist(lapply(strsplit(tmean.done, "_"), function(x){x[1]}))
+
+  cityIdS <- cityIdS[!cityIdS %in% cityRemove]
+  cityIdsN <- cityIdS[!cityIdN %in% cityRemove]
   
 } # End remove cities loop
 
-citiesSouth <- citiesUse$filter(ee$Filter$lt('LATITUDE', 0))
-citiesNorthW <- citiesUse$filter(ee$Filter$gte('LATITUDE', 0))$filter(ee$Filter$lte('LONGITUDE', 0))
-citiesNorthE1 <- citiesUse$filter(ee$Filter$gte('LATITUDE', 0))$filter(ee$Filter$gt('LONGITUDE', 0))$filter(ee$Filter$lte('LONGITUDE', 75))
-citiesNorthE2 <- citiesUse$filter(ee$Filter$gte('LATITUDE', 0))$filter(ee$Filter$gt('LONGITUDE', 75))
-
-# Figuring out how many cities we have (2682 in all)
-ncitiesSouth <- citiesSouth$size()$getInfo() # 336 cities total 1 left
-ncitiesNorthW <- citiesNorthW$size()$getInfo() # 484 cities; 3 left
-ncitiesNorthE1 <- citiesNorthE1$size()$getInfo() # 982 cities; 740 left
-ncitiesNorthE2 <- citiesNorthE2$size()$getInfo() # 880 cities
-
-# To co all of them
-# citiesList <- citiesUse$toList(3)
-# North: 2346 total
-# print(citiesSouthList$size()$getInfo())
-# Map$addLayer(citiesSouth)
-
-# lstSHFinal$first()$get("system:id")$getInfo()
-# lstNHFinal$first()$get("system:id")$getInfo()
+citiesSouth <- citiesUse$filter(ee$Filter$inList('ISOURBID', ee$List(cityIdS)))
+citiesNorth <- citiesUse$filter(ee$Filter$inList('ISOURBID', ee$List(cityIdN)))
 
 # # All except 1 ran successfully
-# if(ncitiesSouth>0){
-#   citiesSouthList <- citiesSouth$toList(ncitiesSouth) 
-#   extractTempEE(CITIES=citiesSouthList, TEMPERATURE=lstSHFinal, GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
-# }
+if(length(cityIdS)>0){
+  extractTempEE(CitySP=citiesSouth, CityNames = cityIdS, TEMPERATURE=lstDayGoodSH$select("LST_Day_1km"), GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
+}
 
 
 # # All except 3 were run successfully
