@@ -111,7 +111,7 @@ cityIdS <-sdei.df$ISOURBID[sdei.df$LATITUDE<0]
 cityIdNW <-sdei.df$ISOURBID[sdei.df$LATITUDE>=0 & sdei.df$LONGITUDE<=0]
 cityIdNE1 <-sdei.df$ISOURBID[sdei.df$LATITUDE>=0 & sdei.df$LONGITUDE>0 & sdei.df$LONGITUDE<=75]
 cityIdNE2 <-sdei.df$ISOURBID[sdei.df$LATITUDE>=0 & sdei.df$LONGITUDE>75]
-# length(cityIdS); length(cityIdNW)
+length(cityIdS); length(cityIdNW); length(cityIdNE1); length(cityIdNE2)
 
 # If we're not trying to overwrite our files, remove files that were already done
 cityRemove <- vector()
@@ -120,7 +120,7 @@ if(!overwrite){
   tree.done <- dir(file.path(path.google, GoogleFolderSave), "PercentTree.tif")
   
   # Check to make sure a city has all three layers; if it doesn't do it again
-  cityRemove <- unlist(lapply(strsplit(tmean.done, "_"), function(x){x[1]}))
+  cityRemove <- unlist(lapply(strsplit(tree.done, "_"), function(x){x[1]}))
   
   cityIdS <- cityIdS[!cityIdS %in% cityRemove]
   cityIdsNW <- cityIdNW[!cityIdNW %in% cityRemove]
@@ -128,16 +128,18 @@ if(!overwrite){
   cityIdsNE2 <- cityIdNE1[!cityIdNE2 %in% cityRemove]
   
 } # End remove cities loop
+length(cityIdS); length(cityIdNW); length(cityIdNE1); length(cityIdNE2)
+
 
 citiesSouth <- citiesUse$filter(ee$Filter$inList('ISOURBID', ee$List(cityIdS)))
-citiesNorthW <- citiesUse$filter(ee$Filter$inList('ISOURBID', ee$List(cityIdNW)))
+# citiesNorthW <- citiesUse$filter(ee$Filter$inList('ISOURBID', ee$List(cityIdNW)))
 # citiesSouth$size()$getInfo()
 # length(cityIdS)
 
 # 
-if(length(cityIdS)>0){
-  extractVeg(CitySP=citiesSouth, CityNames = cityIdS, TREE=modTree, VEG = modVeg, BARE=modBare, GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
-}
+# if(length(cityIdS)>0){
+#   extractVeg(CitySP=citiesSouth, CityNames = cityIdS, TREE=modTree, VEG = modVeg, BARE=modBare, GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
+# }
 
 # This may need some chunking as it will be 6k cities
 if(length(cityIdNW)>0){
