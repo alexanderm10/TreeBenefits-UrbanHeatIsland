@@ -1,4 +1,5 @@
 library(raster); library(sp); library(terra); library(sf) 
+library(dplyr) # Boo hiss... it's just more complicated for me!  I don't like that it overwrites/masks so many functions!
 library(ggplot2)
 library(mgcv)
 
@@ -7,7 +8,8 @@ library(mgcv)
 # path.cities <- "../data_processed/data_cities_all"
 path.cities <- "/Volumes/GoogleDrive/Shared drives/Urban Ecological Drought/Trees-UHI Manuscript/Analysis/data_processed/data_cities_all"
 if(!dir.exists(path.cities)) dir.create(path.cities, recursive=T, showWarnings = F)
-file.cityAll.stats <- file.path(path.cities, "../city_stats_all.csv")
+file.cityStatsRegion <- file.path(path.cities, "../city_stats_all.csv")
+file.cityStatsCat <- file.path(path.cities, "../city_stats_core-buffer.csv")
 
 # Path to where Earth Engine is saving the spatial extractions
 path.EEout <- "/Volumes/GoogleDrive/My Drive/UHI_Analysis_Output"
@@ -23,14 +25,15 @@ grad.bare <- c("#5e3c99", "#b2abd2", "#f7f7f7", "#fbd863", "#e66101") # Ends wit
 
 # Lets add the ecoregion for each city; accessed 27 Oct 2022 9:30 a.m.
 # SDEI shapefile: https://sedac.ciesin.columbia.edu/data/set/sdei-global-uhi-2013/data-download# # NOTE: REQUIRES LOGIN
-# ecoregion file: https://www.worldwildlife.org/publications/global-200
-sdei.urb <- vect("../data_raw/sdei-global-uhi-2013-shp/shp/sdei-global-uhi-2013.shp")
+# ecoregion file: https://www.worldwildlife.org/publications/terrestrial-ecoregions-of-the-world
+sdei.urb <- read_sf("../data_raw/sdei-global-uhi-2013-shp/shp/sdei-global-uhi-2013.shp")
 sdei.urb <- sdei.urb[sdei.urb$ES00POP>100e3 & sdei.urb$SQKM_FINAL>100,]
 summary(sdei.urb)
+# plot(sdei.urb[1,])
 
-
-ecoregions <- vect("../data_raw/global200ecoregions/g200_terr.shp")
-ecoregions$biome.name <- car::recode(ecoregions$G200_BIOME, "'1'='tropical moist broadleaf forest'; 
+# ecoregions <- read_sf("../data_raw/wwf_biomes_official/wwf_terr_ecos.shp")
+ecoregions <- read_sf("../data_raw/wwf_biomes_official/wwf_terr_ecos.shp")
+ecoregions$biome.name <- car::recode(ecoregions$BIOME, "'1'='tropical moist broadleaf forest'; 
                                                              '2'='tropical dry broadleaf forest'; 
                                                              '3'='tropical coniferous forest';
                                                              '4'='temperate broadleaf/mixed forest'; 
@@ -46,39 +49,80 @@ ecoregions$biome.name <- car::recode(ecoregions$G200_BIOME, "'1'='tropical moist
                                                             '14'='mangroves'")
 summary(ecoregions)
 
+# Aggregating ecoregions by biome to make life easier!
+# Had hoped to avoid tidyverse, but that might not be possible at the moment
+# All methods I've tried give me an error abotu a duplicate vertex... grrr.
+# biomeSP <- aggregate(ecoregions, by=list(c("BIOME", "biome.name")), FUN=mean, do_union=T, simplify=T)
+# biomeSP <- ecoregions %>% 
+#   group_by("BIOME", "biome.name") %>% 
+#   summarise(geometry=sf::st_union(geometry)) %>% ungroup()
+# summary(biomeSP)
+
+# Transform the cities and ecoregion files to what we've worked with fo the MODIS data
+projMODIS <- "+proj=sinu +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs"
+sdei.urb <- st_transform(sdei.urb, crs(projMODIS))
+summary(sdei.urb)
+ecoregions <- st_transform(ecoregions, crs(projMODIS))
+summary(ecoregions)
 
 # If we don't have our summary file yet, create it and create all the column names we're going to want
-if(!file.exists(file.cityAll.stats)){
-  # cityAll.stats <- read.csv("../sdei-global-uhi-2013.csv")
+if(!file.exists(file.cityStatsRegion)){
+  # cityStatsRegion <- read.csv("../sdei-global-uhi-2013.csv")
   cols.keep <-  c("ISOURBID", "ISO3", "URBID", "NAME", "LATITUDE", "LONGITUDE", "ES00POP")
-  cityAll.stats <- data.frame(sdei.urb[, cols.keep])[,1:length(cols.keep)]
-  # head(cityAll.stats)
+  cityStatsRegion <- data.frame(sdei.urb[, cols.keep])[,1:length(cols.keep)]
+  cityStatsCat <- merge(data.frame(sdei.urb[, cols.keep])[,1:length(cols.keep)], data.frame(City.Buff = c("City", "Buffer")))
+  # head(cityStatsRegion)
   
-  # Some summary stats about the inputs: 
+  # ------------------
+  # Some summary stats about the inputs at the region scale 
+  # ------------------
   # - number of pixels, mean LST, cover, elev --> for ranges, give range across entire dataset to indicate range of values used in full model
-  cityAll.stats[,c("biome", "n.pixels", "LST.mean", "LST.sd", "LST.min", "LST.max", "tree.mean", "tree.sd", "tree.min", "tree.max", "veg.mean", "veg.sd", "veg.min", "veg.max", "elev.mean", "elev.sd", "elev.min", "elev.max")] <- NA
+  cityStatsRegion[,c("biome", "n.pixels", "LST.mean", "LST.sd", "LST.min", "LST.max", "tree.mean", "tree.sd", "tree.min", "tree.max", "veg.mean", "veg.sd", "veg.min", "veg.max", "elev.mean", "elev.sd", "elev.min", "elev.max")] <- NA
   
   # Save the key info from the full model
-  cityAll.stats[,c("model.R2adj", "model.tree.slope", "model.veg.slope", "model.elev.slope", "model.tree.p", "model.veg.p", "model.elev.p")] <- NA
+  cityStatsRegion[,c("model.R2adj", "model.tree.slope", "model.veg.slope", "model.elev.slope", "model.tree.p", "model.veg.p", "model.elev.p")] <- NA
   
   # For each variable calculate the overall trends --> this will need to be separate from the pixel-by-pixel analysis, although we'll do and save that as well
-  cityAll.stats[,c("trend.LST.slope", "trend.LST.slope.sd", "trend.LST.p")] <- NA
-  cityAll.stats[,c("trend.tree.slope", "trend.tree.slope.sd", "trend.tree.p")] <- NA
-  cityAll.stats[,c("trend.veg.slope", "trend.veg.slope.sd", "trend.veg.p")] <- NA
+  cityStatsRegion[,c("trend.LST.slope", "trend.LST.slope.sd", "trend.LST.p")] <- NA
+  cityStatsRegion[,c("trend.tree.slope", "trend.tree.slope.sd", "trend.tree.p")] <- NA
+  cityStatsRegion[,c("trend.veg.slope", "trend.veg.slope.sd", "trend.veg.p")] <- NA
   
   # Also look at the correlation between warming and change in tree & veg cover
-  cityAll.stats[,c("corr.LST.tree.slope", "corr.LST.tree.p", "corr.LST.tree.Rsq")] <- NA
-  cityAll.stats[,c("corr.LST.veg.slope", "corr.LST.veg.p", "corr.LST.veg.Rsq")] <- NA
-  cityAll.stats[,c("corr.tree.veg.slope", "corr.tree.veg.p", "corr.tree.veg.Rsq")] <- NA
+  cityStatsRegion[,c("corr.LST.tree.slope", "corr.LST.tree.p", "corr.LST.tree.Rsq")] <- NA
+  cityStatsRegion[,c("corr.LST.veg.slope", "corr.LST.veg.p", "corr.LST.veg.Rsq")] <- NA
+  cityStatsRegion[,c("corr.tree.veg.slope", "corr.tree.veg.p", "corr.tree.veg.Rsq")] <- NA
   
-  summary(cityAll.stats)
-  dim(cityAll.stats)
+  summary(cityStatsRegion)
+  dim(cityStatsRegion)
   
-  write.csv(cityAll.stats, file.cityAll.stats, row.names=F)  
+  write.csv(cityStatsRegion, file.cityStatsRegion, row.names=F)  
+  # ------------------
+ 
+  
+  # ------------------
+  # Setting up a sheet that compares urban core and buffer
+  # ------------------
+  cityStatsCat[,c("biome", "n.pixels", "LST.mean", "LST.sd", "LST.min", "LST.max", "tree.mean", "tree.sd", "tree.min", "tree.max", "veg.mean", "veg.sd", "veg.min", "veg.max", "elev.mean", "elev.sd", "elev.min", "elev.max")] <- NA
+  
+  cityStatsCat[,c("trend.LST.slope", "trend.LST.slope.sd", "trend.LST.p")] <- NA
+  cityStatsCat[,c("trend.tree.slope", "trend.tree.slope.sd", "trend.tree.p")] <- NA
+  cityStatsCat[,c("trend.veg.slope", "trend.veg.slope.sd", "trend.veg.p")] <- NA
+  
+  summary(cityStatsCat)
+  dim(cityStatsCat)
+  
+  write.csv(cityStatsCat, file.cityStatsCat, row.names=F)  
+  
+  # ------------------
+  
 }
 
-cityAll.stats <- read.csv(file.cityAll.stats)
-summary(cityAll.stats); dim(cityAll.stats)
+cityStatsRegion <- read.csv(file.cityStatsRegion)
+summary(cityStatsRegion); dim(cityStatsRegion)
+
+cityStatsCat <- read.csv(file.cityStatsCat)
+summary(cityStatsCat); dim(cityStatsCat)
+
 
 # Get a list of the files that are done
 files.elev <- dir(path.EEout, "elevation")
@@ -98,35 +142,43 @@ citiesDone <- cities.lst[cities.lst %in% cities.elev & cities.lst %in% cities.tr
 length(citiesDone)
 
 # Now compare the done list to what needs to be analyzed
-citiesAnalyze <- citiesDone[citiesDone %in% cityAll.stats$ISOURBID[is.na(cityAll.stats$model.R2adj)]]
+citiesAnalyze <- citiesDone[citiesDone %in% cityStatsRegion$ISOURBID[is.na(cityStatsRegion$model.R2adj)]]
 length(citiesAnalyze)
 
 for(CITY in citiesAnalyze){
   # # Good Test Cities: Sydney (AUS66430)
   # CITY="AUS66430"
-  row.city <- which(cityAll.stats$ISOURBID==CITY)
+  row.city <- which(cityStatsRegion$ISOURBID==CITY)
   print(CITY)
   dir.create(file.path(path.cities, CITY), recursive = T, showWarnings = F)
   
-  # sp.city <- buffer(sdei.urb[sdei.urb$ISOURBID==CITY, ], width=10e3)
-  # biome <- terra::intersect(ecoregions, sp.city)
+  citySP <- sdei.urb[sdei.urb$ISOURBID==CITY, ]
+  cityBuff <- st_buffer(citySP, dist=10e3)
+  # plot(cityBuff[1], add=T); 
+  # plot(citySP[1], add=F)
+  biome <- st_intersection(ecoregions[,c("BIOME", "biome.name")], cityBuff[,"ISOURBID"])
+  summary(biome)
+  # plot(ecoregions)
+  
   # # data.frame(biome)
-  # if(nrow(biome)>0){ # Some aren't quite aligning-- we'll figure those out later
-  #   if(nrow(biome)==1){
-  #     cityAll.stats$biome[row.city] <- biome$biome.name
-  #   } else { 
-  #     biome$area <- expanse(biome)
-  #     biome.sum <- aggregate(area ~ biome.name, data=biome, FUN=sum)
-  #     
-  #     if(nrow(biome.sum)>1){
-  #       cityAll.stats$biome[row.city] <- biome.sum$biome.name[biome.sum$area==max(biome.sum$area)]
-  #     } else {
-  #       cityAll.stats$biome[row.city] <- biome.sum$biome.name
-  #     }
-  #     
-  #     rm(biome.sum)
-  #   } # End if/else
-  # } # End skipping biomes that don't exist
+  if(nrow(biome)>0){ # Some aren't quite aligning-- we'll figure those out later
+    if(nrow(biome)==1){
+      cityStatsRegion$biome[row.city] <- biome$biome.name
+    } else {
+      biome$area <- st_area(biome)
+      biome.sum <- aggregate(area ~ biome.name, data=biome, FUN=sum)
+
+      if(nrow(biome.sum)>1){
+        cityStatsRegion$biome[row.city] <- biome.sum$biome.name[biome.sum$area==max(biome.sum$area)]
+      } else {
+        cityStatsRegion$biome[row.city] <- biome.sum$biome.name
+      }
+
+      rm(biome.sum)
+    } # End if/else
+  } # End skipping biomes that don't exist
+  
+  
   elevCity <- raster(file.path(path.EEout, paste0(CITY, "_elevation.tif")))
   lstCity <- brick(file.path(path.EEout, paste0(CITY, "_LST_Day_Tmean.tif")))-273.15
   treeCity <- brick(file.path(path.EEout, paste0(CITY, "_Vegetation_PercentTree.tif")))
@@ -137,6 +189,8 @@ for(CITY in citiesAnalyze){
   # veg.mean <- mean(vegCity)
   # par(mfrow=c(2,2))
   # plot(elevCity); plot(lst.mean); plot(tree.mean); plot(veg.mean)
+  
+  #### ADD CITY CORE VS BUFFER HERE!!
   
   coordsCity <- data.frame(coordinates(lstCity))
   coordsCity$location <- paste0("x", coordsCity$x, "y", coordsCity$y)
@@ -158,24 +212,24 @@ for(CITY in citiesAnalyze){
   dim(valsCity); summary(valsCity)
   
   # Saving some summary stats of our inputs
-  # cityAll.stats[row.city,]
-  cityAll.stats$n.pixels[row.city] <- length(unique(valsCity$location))
-  cityAll.stats$LST.mean[row.city] <- mean(valsCity$LST_Day, na.rm=T)
-  cityAll.stats$LST.sd[row.city] <- sd(valsCity$LST_Day, na.rm=T)
-  cityAll.stats$LST.min[row.city] <- min(valsCity$LST_Day, na.rm=T)
-  cityAll.stats$LST.max[row.city] <- max(valsCity$LST_Day, na.rm=T)
-  cityAll.stats$tree.mean[row.city] <- mean(valsCity$cover.tree, na.rm=T)
-  cityAll.stats$tree.sd[row.city] <- sd(valsCity$cover.tree, na.rm=T)
-  cityAll.stats$tree.min[row.city] <- min(valsCity$cover.tree, na.rm=T)
-  cityAll.stats$tree.max[row.city] <- max(valsCity$cover.tree, na.rm=T)
-  cityAll.stats$veg.mean[row.city] <- mean(valsCity$cover.veg, na.rm=T)
-  cityAll.stats$veg.sd[row.city] <- sd(valsCity$cover.veg, na.rm=T)
-  cityAll.stats$veg.min[row.city] <- min(valsCity$cover.veg, na.rm=T)
-  cityAll.stats$veg.max[row.city] <- max(valsCity$cover.veg, na.rm=T)
-  cityAll.stats$elev.mean[row.city] <- mean(valsCity$elevation, na.rm=T)
-  cityAll.stats$elev.sd[row.city] <- sd(valsCity$elevation, na.rm=T)
-  cityAll.stats$elev.min[row.city] <- min(valsCity$elevation, na.rm=T)
-  cityAll.stats$elev.max[row.city] <- max(valsCity$elevation, na.rm=T)
+  # cityStatsRegion[row.city,]
+  cityStatsRegion$n.pixels[row.city] <- length(unique(valsCity$location))
+  cityStatsRegion$LST.mean[row.city] <- mean(valsCity$LST_Day, na.rm=T)
+  cityStatsRegion$LST.sd[row.city] <- sd(valsCity$LST_Day, na.rm=T)
+  cityStatsRegion$LST.min[row.city] <- min(valsCity$LST_Day, na.rm=T)
+  cityStatsRegion$LST.max[row.city] <- max(valsCity$LST_Day, na.rm=T)
+  cityStatsRegion$tree.mean[row.city] <- mean(valsCity$cover.tree, na.rm=T)
+  cityStatsRegion$tree.sd[row.city] <- sd(valsCity$cover.tree, na.rm=T)
+  cityStatsRegion$tree.min[row.city] <- min(valsCity$cover.tree, na.rm=T)
+  cityStatsRegion$tree.max[row.city] <- max(valsCity$cover.tree, na.rm=T)
+  cityStatsRegion$veg.mean[row.city] <- mean(valsCity$cover.veg, na.rm=T)
+  cityStatsRegion$veg.sd[row.city] <- sd(valsCity$cover.veg, na.rm=T)
+  cityStatsRegion$veg.min[row.city] <- min(valsCity$cover.veg, na.rm=T)
+  cityStatsRegion$veg.max[row.city] <- max(valsCity$cover.veg, na.rm=T)
+  cityStatsRegion$elev.mean[row.city] <- mean(valsCity$elevation, na.rm=T)
+  cityStatsRegion$elev.sd[row.city] <- sd(valsCity$elevation, na.rm=T)
+  cityStatsRegion$elev.min[row.city] <- min(valsCity$elevation, na.rm=T)
+  cityStatsRegion$elev.max[row.city] <- max(valsCity$elevation, na.rm=T)
   
   
   # Running the actual model! Woot Woot
@@ -197,10 +251,10 @@ for(CITY in citiesAnalyze){
   
   
   # Save the key stats from the big model
-  cityAll.stats$model.R2adj[row.city] <- sum.modCity$r.sq
-  cityAll.stats[row.city,c("model.tree.slope", "model.veg.slope", "model.elev.slope")] <- sum.modCity$p.coeff[c("cover.tree", "cover.veg", "elevation")]
-  cityAll.stats[row.city,c("model.tree.p", "model.veg.p", "model.elev.p")] <- sum.modCity$p.pv[c("cover.tree", "cover.veg", "elevation")]
-  # cityAll.stats[row.city,]
+  cityStatsRegion$model.R2adj[row.city] <- sum.modCity$r.sq
+  cityStatsRegion[row.city,c("model.tree.slope", "model.veg.slope", "model.elev.slope")] <- sum.modCity$p.coeff[c("cover.tree", "cover.veg", "elevation")]
+  cityStatsRegion[row.city,c("model.tree.p", "model.veg.p", "model.elev.p")] <- sum.modCity$p.pv[c("cover.tree", "cover.veg", "elevation")]
+  # cityStatsRegion[row.city,]
   
   # Calculating pixel-based summary stats to do some trend correlations
   # For computational tractability, need to run each pixel independently.  Doing Hobart as a loop just takes a few seconds
@@ -303,22 +357,22 @@ for(CITY in citiesAnalyze){
   dev.off()  
   
   if(length(which(!is.na(summaryCity$LST.trend)))>50){
-    # cityAll.stats[row.city,]
+    # cityStatsRegion[row.city,]
     # Calculate the stats for the trends in LST and veg cover
-    cityAll.stats$trend.LST.slope[row.city] <- mean(summaryCity$LST.trend, na.rm=T)
-    cityAll.stats$trend.LST.slope.sd[row.city] <- sd(summaryCity$LST.trend, na.rm=T)
+    cityStatsRegion$trend.LST.slope[row.city] <- mean(summaryCity$LST.trend, na.rm=T)
+    cityStatsRegion$trend.LST.slope.sd[row.city] <- sd(summaryCity$LST.trend, na.rm=T)
     LST.out <- t.test(summaryCity$LST.trend)
-    cityAll.stats$trend.LST.p[row.city] <- LST.out$p.value
+    cityStatsRegion$trend.LST.p[row.city] <- LST.out$p.value
     
-    cityAll.stats$trend.tree.slope[row.city] <- mean(summaryCity$tree.trend, na.rm=T)
-    cityAll.stats$trend.tree.slope.sd[row.city] <- sd(summaryCity$tree.trend, na.rm=T)
+    cityStatsRegion$trend.tree.slope[row.city] <- mean(summaryCity$tree.trend, na.rm=T)
+    cityStatsRegion$trend.tree.slope.sd[row.city] <- sd(summaryCity$tree.trend, na.rm=T)
     tree.out <- t.test(summaryCity$tree.trend)
-    cityAll.stats$trend.tree.p[row.city] <- tree.out$p.value
+    cityStatsRegion$trend.tree.p[row.city] <- tree.out$p.value
     
-    cityAll.stats$trend.veg.slope[row.city] <- mean(summaryCity$veg.trend, na.rm=T)
-    cityAll.stats$trend.veg.slope.sd[row.city] <- sd(summaryCity$veg.trend, na.rm=T)
+    cityStatsRegion$trend.veg.slope[row.city] <- mean(summaryCity$veg.trend, na.rm=T)
+    cityStatsRegion$trend.veg.slope.sd[row.city] <- sd(summaryCity$veg.trend, na.rm=T)
     veg.out <- t.test(summaryCity$veg.trend)
-    cityAll.stats$trend.veg.p[row.city] <- veg.out$p.value
+    cityStatsRegion$trend.veg.p[row.city] <- veg.out$p.value
     
     # Creating and saving some maps of those trends
     plot.lst.trend <- ggplot(data=summaryCity[!is.na(summaryCity$LST.trend),]) +
@@ -365,25 +419,25 @@ for(CITY in citiesAnalyze){
     dev.off()  
     
     
-    # cityAll.stats[row.city,]
+    # cityStatsRegion[row.city,]
     # Now calculating the correlations among variables
     tree.lst <- lm(LST.trend ~ tree.trend, data=summaryCity)
     sum.corrTreeLST <- summary(tree.lst)
-    cityAll.stats$corr.LST.tree.slope[row.city] <- sum.corrTreeLST$coefficients["tree.trend",1]
-    cityAll.stats$corr.LST.tree.p[row.city] <- sum.corrTreeLST$coefficients["tree.trend",4]
-    cityAll.stats$corr.LST.tree.Rsq[row.city]  <- sum.corrTreeLST$r.squared
+    cityStatsRegion$corr.LST.tree.slope[row.city] <- sum.corrTreeLST$coefficients["tree.trend",1]
+    cityStatsRegion$corr.LST.tree.p[row.city] <- sum.corrTreeLST$coefficients["tree.trend",4]
+    cityStatsRegion$corr.LST.tree.Rsq[row.city]  <- sum.corrTreeLST$r.squared
     
     veg.lst <- lm(LST.trend ~ veg.trend, data=summaryCity)
     sum.corrVegLST <- summary(veg.lst)
-    cityAll.stats$corr.LST.veg.slope[row.city] <- sum.corrVegLST$coefficients["veg.trend",1]
-    cityAll.stats$corr.LST.veg.p[row.city] <- sum.corrVegLST$coefficients["veg.trend",4]
-    cityAll.stats$corr.LST.veg.Rsq[row.city]  <- sum.corrVegLST$r.squared
+    cityStatsRegion$corr.LST.veg.slope[row.city] <- sum.corrVegLST$coefficients["veg.trend",1]
+    cityStatsRegion$corr.LST.veg.p[row.city] <- sum.corrVegLST$coefficients["veg.trend",4]
+    cityStatsRegion$corr.LST.veg.Rsq[row.city]  <- sum.corrVegLST$r.squared
   
     veg.tree <- lm(tree.trend ~ veg.trend, data=summaryCity)
     sum.corrVegTree <- summary(veg.tree)
-    cityAll.stats$corr.tree.veg.slope[row.city] <- sum.corrVegTree$coefficients["veg.trend",1]
-    cityAll.stats$corr.tree.veg.p[row.city] <- sum.corrVegTree$coefficients["veg.trend",4]
-    cityAll.stats$corr.tree.veg.Rsq[row.city]  <- sum.corrVegTree$r.squared
+    cityStatsRegion$corr.tree.veg.slope[row.city] <- sum.corrVegTree$coefficients["veg.trend",1]
+    cityStatsRegion$corr.tree.veg.p[row.city] <- sum.corrVegTree$coefficients["veg.trend",4]
+    cityStatsRegion$corr.tree.veg.Rsq[row.city]  <- sum.corrVegTree$r.squared
     
     plot.corr.LST.Tree <- ggplot(data=summaryCity, aes(x=tree.trend, y=LST.trend)) +
       geom_point() +
@@ -424,7 +478,7 @@ for(CITY in citiesAnalyze){
     )
     dev.off()  
   }
-  write.csv(cityAll.stats, file.cityAll.stats, row.names=F)  # Write our city stats file each time in case it bonks
+  write.csv(cityStatsRegion, file.cityStatsRegion, row.names=F)  # Write our city stats file each time in case it bonks
 
   # Remove a bunch of stuff for our own sanity
   # rm(elevCity, treeCity, vegCity, lstCity, modCity, valsCity, summaryCity, coordsCity, biome, sp.city, plot.corr.LST.Tree, plot.corr.LST.Veg, plot.corr.Tree.Veg, plot.lst.trend, plot.tree.trend, plot.veg.trend, plot.elev, plot.lst, plot.tree, plot.veg, veg.lst, veg.tree, tree.lst, veg.out, tree.out, sum.corrTreeLST, sum.corrVegLST, sum.corrVegTree, sum.modCity)
