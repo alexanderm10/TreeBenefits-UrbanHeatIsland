@@ -14,7 +14,7 @@ GoogleFolderSave <- "UHI_Analysis_Output"
 thresh.sigma <- 6 # Use 6-sigma outliers for the data filtering\
 # thresh.pts <- 50
 thresh.prop <- 0.5 # The proportion of data needed for a time point to be "good"; currenlty 0.5
-overwrite=T
+overwrite=F
 ##################### 
 
 
@@ -122,6 +122,8 @@ if(!overwrite){
   cityIdsN <- cityIdN[!cityIdN %in% cityRemove]
   
 } # End remove cities loop
+length(cityIdS); length(cityIdN)
+
 
 citiesSouth <- citiesUse$filter(ee$Filter$inList('ISOURBID', ee$List(cityIdS)))
 citiesNorth <- citiesUse$filter(ee$Filter$inList('ISOURBID', ee$List(cityIdN)))
