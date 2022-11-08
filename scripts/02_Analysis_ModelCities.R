@@ -1,5 +1,5 @@
 library(raster); library(sp); library(terra); library(sf) 
-library(dplyr) # Boo hiss... it's just more complicated for me!  I don't like that it overwrites/masks so many functions!
+# library(dplyr) # Boo hiss... it's just more complicated for me!  I don't like that it overwrites/masks so many functions!
 library(ggplot2)
 library(mgcv)
 
@@ -147,7 +147,7 @@ length(citiesAnalyze)
 
 for(CITY in citiesAnalyze){
   # # Good Test Cities: Sydney (AUS66430)
-  # CITY="AUS66430"
+  # CITY="AUS66430"; CITY="USA26687"
   row.city <- which(cityStatsRegion$ISOURBID==CITY)
   print(CITY)
   dir.create(file.path(path.cities, CITY), recursive = T, showWarnings = F)
@@ -191,6 +191,14 @@ for(CITY in citiesAnalyze){
   # plot(elevCity); plot(lst.mean); plot(tree.mean); plot(veg.mean)
   
   #### ADD CITY CORE VS BUFFER HERE!!
+  #### Whatever Google Does for its resolving doesn't look right in R, so lets skip
+  # par(mfrow=c(2,2))
+  # plot(elevCity); plot(citySP, add=T, col=NA)#; plot(cityBuff, fill=NA, add=T)
+  # plot(lstCity[[1]]); plot(citySP, add=T, col=NA)
+  # plot(treeCity[[1]]); plot(citySP, add=T, col=NA)#; plot(cityBuff, fill=NA, add=T)
+  # plot(vegCity[[1]]); plot(citySP, add=T, col=NA)
+  # elevMask <- raster::mask(elevCity, citySP)
+  # plot(elevMask)
   
   coordsCity <- data.frame(coordinates(lstCity))
   coordsCity$location <- paste0("x", coordsCity$x, "y", coordsCity$y)
@@ -206,9 +214,9 @@ for(CITY in citiesAnalyze){
   valsCity$cover.tree <- stack(data.frame(getValues(treeCity[[layers.use]])))[,1]
   valsCity$cover.veg <- stack(data.frame(getValues(vegCity[[layers.use]])))[,1]
   valsCity$elevation <- getValues(elevCity)
-  valsCity$year <- as.numeric(substr(valsCity$year, 2, 5))
+  valsCity$year <- as.numeric(substr(valsCity$year, 3, 6))
   valsCity[,c("x", "y", "location")] <- coordsCity
-  valsCity <- valsCity[!is.na(valsCity$LST_Day),]
+  valsCity <- valsCity[complete.cases(valsCity),]
   dim(valsCity); summary(valsCity)
   
   # Saving some summary stats of our inputs
