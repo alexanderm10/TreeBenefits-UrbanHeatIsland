@@ -15,7 +15,7 @@ GoogleFolderSave <- "UHI_Analysis_Output"
 thresh.sigma <- 6 # Use 6-sigma outliers for the data filtering\
 thresh.pts <- 50
 thresh.prop <- 0.5 # The proportion of data needed for a time point to be "good"; currenlty 0.5
-overwrite=F
+overwrite=T
 ##################### 
 
 
@@ -386,7 +386,7 @@ cityIdN <-sdei.df$ISOURBID[sdei.df$LATITUDE>=0]
 
 # If we're not trying to overwrite our files, remove files that were already done
 # cityRemove <- vector()
-cityRemove <- c("IND58965", "BRA58970", "IDN58965")
+# cityRemove <- c("IND58965", "BRA58970", "IDN58965")
 
 if(!overwrite){
   ### Filter out sites that have been done!
@@ -400,24 +400,24 @@ if(!overwrite){
   
 } # End remove cities loop
 
-citiesSouth <- citiesUse$filter(ee$Filter$inList('ISOURBID', ee$List(cityIdS)))
-citiesNorth <- citiesUse$filter(ee$Filter$inList('ISOURBID', ee$List(cityIdN)))
+# citiesSouth <- citiesUse$filter(ee$Filter$inList('ISOURBID', ee$List(cityIdS)))
+# citiesNorth <- citiesUse$filter(ee$Filter$inList('ISOURBID', ee$List(cityIdN)))
 
-citiesSouth$size()$getInfo()
+# citiesSouth$size()$getInfo()
 length(cityIdS)
 
-citiesNorth$size()$getInfo()
+# citiesNorth$size()$getInfo()
 length(cityIdN)
 
 
 # # All except 1 ran successfully
 if(length(cityIdS)>0){
-  extractTempEE(CitySP=citiesSouth, CityNames = cityIdS, TEMPERATURE=lstDayGoodSH$select("LST_Day_1km"), GoogleFolderSave = GoogleFolderSave)
+  extractTempEE(CitySP=citiesUse, CityNames = cityIdS, TEMPERATURE=lstSHmask$select("LST_Day_1km"), GoogleFolderSave = GoogleFolderSave)
 }
 
 # # All except 1 ran successfully
 if(length(cityIdN)>0){
-  extractTempEE(CitySP=citiesNorth, CityNames = cityIdN, TEMPERATURE=lstDayGoodSH$select("LST_Day_1km"), GoogleFolderSave = GoogleFolderSave)
+  extractTempEE(CitySP=citiesUse, CityNames = cityIdN, TEMPERATURE=lstNHmask$select("LST_Day_1km"), GoogleFolderSave = GoogleFolderSave)
 }
 
 # # All except 3 were run successfully
