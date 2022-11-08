@@ -38,13 +38,13 @@ citiesBuff <- citiesUse$map(function(f){f$buffer(10e3)})
 ##################### 
 # 2. Load in data layers  -- formatting in script 1!
 ####################
-elev <- ee$Image('users/crollinson/MERIT-DEM-v1_1km_Reproj')#$select('elevation')
-ee_print(elev)
-# Map$addLayer(elevLoad, elevVis, "Elevation - Masked, reproj")
+vegMask <- ee$Image("users/crollinson/MOD44b_1km_Reproj_VegMask")
+# Map$addLayer(vegMask)
 
-projElev = elev$projection()
-projCRS = projElev$crs()
-projTransform <- unlist(projElev$getInfo()$transform)
+projMask = vegMask$projection()
+projCRS = projMask$crs()
+projTransform <- unlist(projMask$getInfo()$transform)
+
 ####################
 
 
@@ -69,15 +69,14 @@ extractCityMask <- function(cityBuff, cityRaw, CityNames, BASE, GoogleFolderSave
     # extracting elevation -- 
     #  NOTE: Doing outlier removal because there are some known issues with a couple points: https://developers.google.com/earth-engine/datasets/catalog/JAXA_ALOS_AW3D30_V3_2
     #-------
-    baseCity <- BASE$constant(1)$updatemask()$clip(cityNowBuff)
+    # baseCity <- BASE$clip(cityNowBuff)
     # Map$addLayer(baseCity)
-    cityNowMask <- ee$Image$constant(1)$clip(cityNow)$mask()
-    maskCity <- baseCity$updateMask(cityNowMask)
-    # Map$addLayer(maskCity)
-    
+    baseCity <- BASE$clip(cityNow)
+    # Map$addLayer(baseCity)
+
     # Save elevation only if it's worth our while -- Note: Still doing the extraction & computation first since we use it as our base
-    export.base <- ee_image_to_drive(image=baseCity, description=paste0(cityID, "_cityMask"), fileNamePrefix=paste0(cityID, "_CityMask"), folder=GoogleFolderSave, timePrefix=F, region=cityNow$geometry(), maxPixels=5e6, crs=projCRS, crsTransform=projTransform)
-    export.base$start()
+    export.mask <- ee_image_to_drive(image=baseCity, description=paste0(cityID, "_CityMask"), fileNamePrefix=paste0(cityID, "_CityMask"), folder=GoogleFolderSave, timePrefix=F, region=cityNowBuff$geometry(), maxPixels=5e6, crs=projCRS, crsTransform=projTransform)
+    export.mask$start()
     # ee_monitoring(export.elev)
     #-------
   } # End i loop
@@ -107,7 +106,7 @@ if(!overwrite){
 length(cityIdAll)
 
 if(length(cityIdAll)>0){
-  extractCityMask(cityBuff=citiesBuff, cityRaw=citiesUse, CityNames=cityIdAll, BASE=elev, GoogleFolderSave, overwrite=F)
+  extractCityMask(cityBuff=citiesBuff, cityRaw=citiesUse, CityNames=cityIdAll, BASE=vegMask, GoogleFolderSave, overwrite=F)
 }
 
 
