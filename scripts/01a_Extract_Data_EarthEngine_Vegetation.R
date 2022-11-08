@@ -50,7 +50,7 @@ modVeg <- ee$Image('users/crollinson/MOD44b_1km_Reproj_Percent_NonTree_Vegetatio
 modBare <- ee$Image('users/crollinson/MOD44b_1km_Reproj_Percent_NonVegetated')
 
 ee_print(modTree)
-Map$addLayer(modTree$select("YR2020"), vizTree, "Tree Cover: 1km, Reproj")
+# Map$addLayer(modTree$select("YR2020"), vizTree, "Tree Cover: 1km, Reproj")
 
 projTree = modTree$projection()
 projCRS = projTree$crs()
@@ -113,7 +113,6 @@ cityIdNE1 <-sdei.df$ISOURBID[sdei.df$LATITUDE>=0 & sdei.df$LONGITUDE>0 & sdei.df
 cityIdNE2 <-sdei.df$ISOURBID[sdei.df$LATITUDE>=0 & sdei.df$LONGITUDE>75]
 length(cityIdS); length(cityIdNW); length(cityIdNE1); length(cityIdNE2)
 
-
 # If we're not trying to overwrite our files, remove files that were already done
 cityRemove <- vector()
 if(!overwrite){
@@ -137,15 +136,15 @@ citiesSouth <- citiesUse$filter(ee$Filter$inList('ISOURBID', ee$List(cityIdS)))
 # citiesSouth$size()$getInfo()
 # length(cityIdS)
 
-# 
-# if(length(cityIdS)>0){
-#   extractVeg(CitySP=citiesSouth, CityNames = cityIdS, TREE=modTree, VEG = modVeg, BARE=modBare, GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
-# }
 
-# 
-# if(length(cityIdNW)>0){
-#   extractVeg(CitySP=citiesUse, CityNames = cityIdNW, TREE=modTree, VEG = modVeg, BARE=modBare, GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
-# }
+if(length(cityIdS)>0){
+  extractVeg(CitySP=citiesSouth, CityNames = cityIdS, TREE=modTree, VEG = modVeg, BARE=modBare, GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
+}
+
+
+if(length(cityIdNW)>0){
+  extractVeg(CitySP=citiesUse, CityNames = cityIdNW, TREE=modTree, VEG = modVeg, BARE=modBare, GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
+}
 
 if(length(cityIdNE1)>0){
   extractVeg(CitySP=citiesUse, CityNames = cityIdNE1, TREE=modTree, VEG = modVeg, BARE=modBare, GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
