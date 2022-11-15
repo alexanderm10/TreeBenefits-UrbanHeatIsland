@@ -3,6 +3,8 @@ library(raster); library(sp); library(terra); library(sf)
 library(ggplot2)
 library(mgcv)
 
+overwrite=T
+
 
 # file paths for where to put the processed data
 # path.cities <- "../data_processed/data_cities_all"
@@ -66,7 +68,7 @@ ecoregions <- st_transform(ecoregions, crs(projMODIS))
 summary(ecoregions)
 
 # If we don't have our summary file yet, create it and create all the column names we're going to want
-if(!file.exists(file.cityStatsRegion)){
+if(!file.exists(file.cityStatsRegion) | overwrite){
   # cityStatsRegion <- read.csv("../sdei-global-uhi-2013.csv")
   cols.keep <-  c("ISOURBID", "ISO3", "URBID", "NAME", "LATITUDE", "LONGITUDE", "ES00POP")
   cityStatsRegion <- data.frame(sdei.urb[, cols.keep])[,1:length(cols.keep)]
@@ -129,7 +131,8 @@ files.elev <- dir(path.EEout, "elevation")
 files.lst <- dir(path.EEout, "LST_Day_Tmean")
 files.tree <- dir(path.EEout, "PercentTree")
 files.veg <- dir(path.EEout, "PercentOtherVeg")
-length(files.elev); length(files.lst); length(files.tree); length(files.veg)
+files.mask <- dir(path.EEout, "CityMask")
+length(files.elev); length(files.lst); length(files.tree); length(files.veg); length(files.mask)
 
 # Figure out which cities have all the layers needed ot be analyzed
 cities.elev <- unlist(lapply(files.elev, FUN=function(x){strsplit(x, "_")[[1]][1]}))
@@ -149,6 +152,7 @@ for(CITY in citiesAnalyze){
   # # Good Test Cities: Sydney (AUS66430)
   # CITY="AUS66430"; CITY="USA26687"
   row.city <- which(cityStatsRegion$ISOURBID==CITY)
+  row.cityCat <- which(cityStatsCat$ISOURBID==CITY)
   print(CITY)
   dir.create(file.path(path.cities, CITY), recursive = T, showWarnings = F)
   
@@ -164,14 +168,17 @@ for(CITY in citiesAnalyze){
   if(nrow(biome)>0){ # Some aren't quite aligning-- we'll figure those out later
     if(nrow(biome)==1){
       cityStatsRegion$biome[row.city] <- biome$biome.name
+      cityStatsCat$biome[row.cityCat] <- biome$biome.name
     } else {
       biome$area <- st_area(biome)
       biome.sum <- aggregate(area ~ biome.name, data=biome, FUN=sum)
 
       if(nrow(biome.sum)>1){
         cityStatsRegion$biome[row.city] <- biome.sum$biome.name[biome.sum$area==max(biome.sum$area)]
+        cityStatsCat$biome[row.cityCat] <- biome.sum$biome.name[biome.sum$area==max(biome.sum$area)]
       } else {
         cityStatsRegion$biome[row.city] <- biome.sum$biome.name
+        cityStatsCat$biome[row.cityCat] <- biome.sum$biome.name
       }
 
       rm(biome.sum)
@@ -179,10 +186,24 @@ for(CITY in citiesAnalyze){
   } # End skipping biomes that don't exist
   
   
-  elevCity <- raster(file.path(path.EEout, paste0(CITY, "_elevation.tif")))
-  lstCity <- brick(file.path(path.EEout, paste0(CITY, "_LST_Day_Tmean.tif")))-273.15
-  treeCity <- brick(file.path(path.EEout, paste0(CITY, "_Vegetation_PercentTree.tif")))
-  vegCity <- brick(file.path(path.EEout, paste0(CITY, "_Vegetation_PercentOtherVeg.tif")))
+  # length(files.elev); length(files.lst); length(files.tree); length(files.veg); length(files.mask)
+  # Circuitous coding, but it will be more resilient to multiple versions
+  fMASK <- files.mask[grep(CITY, files.mask)]
+  fELEV <- files.elev[grep(CITY, files.elev)]
+  fLST <- files.lst[grep(CITY, files.lst)]
+  fTREE <- files.tree[grep(CITY, files.tree)]
+  fVEG <- files.veg[grep(CITY, files.veg)]
+  
+  # The length statements will grab the newest file if there's more than one
+  maskCity <- raster(file.path(path.EEout, fMASK[length(fMASK)]))
+  elevCity <- raster(file.path(path.EEout, fELEV[length(fELEV)]))
+  lstCity <- brick(file.path(path.EEout, fLST[length(fLST)]))-273.15
+  treeCity <- brick(file.path(path.EEout, fTREE[length(fTREE)]))
+  vegCity <- brick(file.path(path.EEout, fVEG[length(fVEG)]))
+  
+  # par(mfrow=c(1,2))
+  # plot(elevCity); plot(maskCity)
+  # par(mfrow=c(1,1))
   
   # lst.mean <- mean(lstCity)
   # tree.mean <- mean(treeCity)
@@ -190,36 +211,117 @@ for(CITY in citiesAnalyze){
   # par(mfrow=c(2,2))
   # plot(elevCity); plot(lst.mean); plot(tree.mean); plot(veg.mean)
   
-  #### ADD CITY CORE VS BUFFER HERE!!
-  #### Whatever Google Does for its resolving doesn't look right in R, so lets skip
-  # par(mfrow=c(2,2))
-  # plot(elevCity); plot(citySP, add=T, col=NA)#; plot(cityBuff, fill=NA, add=T)
-  # plot(lstCity[[1]]); plot(citySP, add=T, col=NA)
-  # plot(treeCity[[1]]); plot(citySP, add=T, col=NA)#; plot(cityBuff, fill=NA, add=T)
-  # plot(vegCity[[1]]); plot(citySP, add=T, col=NA)
-  # elevMask <- raster::mask(elevCity, citySP)
-  # plot(elevMask)
-  
-  coordsCity <- data.frame(coordinates(lstCity))
+  # Elevation should be our most reliable data layer, so lets use that as our base
+  coordsCity <- data.frame(coordinates(elevCity)) 
   coordsCity$location <- paste0("x", coordsCity$x, "y", coordsCity$y)
+  coordsCity$elevation <- getValues(elevCity)
+  coordsCity$cityBounds <- getValues(maskCity)
+  coordsCity$cityBounds <- !is.na(coordsCity$cityBounds) # NA = buffer = FALSE citybounds
   
-  # names(lstCity)
-  # names(treeCity)
   # In case we're missing some years of LST (likely in the tropics); only pull certain layers
   layers.use <- names(treeCity)[names(treeCity) %in% names(lstCity)]
   
-  # Put everything into a single data frame 
-  valsCity <- stack(data.frame(getValues(lstCity[[layers.use]])))
-  names(valsCity) <- c("LST_Day", "year")
-  valsCity$cover.tree <- stack(data.frame(getValues(treeCity[[layers.use]])))[,1]
-  valsCity$cover.veg <- stack(data.frame(getValues(vegCity[[layers.use]])))[,1]
-  valsCity$elevation <- getValues(elevCity)
-  valsCity$year <- as.numeric(substr(valsCity$year, 3, 6))
-  valsCity[,c("x", "y", "location")] <- coordsCity
-  valsCity <- valsCity[complete.cases(valsCity),]
-  dim(valsCity); summary(valsCity)
+  coordsVeg <- data.frame(coordinates(treeCity))
+  coordsVeg$location <- paste0("x", coordsVeg$x, "y", coordsVeg$y)
   
-  # Saving some summary stats of our inputs
+  valsCityVeg <- stack(data.frame(getValues(treeCity[[layers.use]])))
+  names(valsCityVeg) <- c("cover.tree", "year")
+  valsCityVeg$cover.veg <- stack(data.frame(getValues(vegCity[[layers.use]])))[,1]
+  valsCityVeg$x <- coordsVeg$x
+  valsCityVeg$y <- coordsVeg$y
+  valsCityVeg$location <- coordsVeg$location
+  
+  # nrow(coordsCity); nrow(coordsVeg)
+  if(all(coordsVeg$location %in% coordsCity$location)){
+    valsCity <- merge(coordsCity, valsCityVeg, all.x=T, all.y=T)
+  } else {
+    stop("Veg and Elev Layer doesn't match. :-( gotta figure it out")
+  }
+  
+  
+  # Land Surface Temperature is mismatched with 
+  coordsLST <- data.frame(coordinates(lstCity))
+  coordsLST$location <- paste0("x", coordsLST$x, "y", coordsLST$y)
+  
+  valsLST <- stack(data.frame(getValues(lstCity[[layers.use]])))
+  names(valsLST) <- c("LST_Day", "year")
+  valsLST$x <- coordsLST$x
+  valsLST$y <- coordsLST$y
+  valsLST$location <- coordsLST$location
+  
+  nrow(coordsCity); nrow(coordsLST)
+  if(any(coordsLST$location %in% coordsCity$location)){
+    valsCity <- merge(valsCity, valsLST, all.x=T, all.y=T)
+  } else {
+    print(warning("LST coords do not match elev.  Doing nearest neighbor"))
+    
+    valsCity$LST_Day <- NA
+    valsCity$LST_Offset <- NA
+    
+    for(i in 1:nrow(coordsLST)){
+      locLST <- coordsLST$location[i]
+      xLST <- coordsLST$x[i]
+      yLST <- coordsLST$y[i]
+      lstNow <- which(valsLST$location==locLST)
+      
+      # Check to see if this is a blank spot; if so, move on
+      if(all(is.na(valsLST$LST_Day[lstNow]))) next 
+      
+      # Find the nearest pixel from the cityCoords
+      distLocX <- coordsCity$x - xLST
+      distLocY <- coordsCity$y - yLST
+      distLocCity <- sqrt(distLocX^2 + distLocY^2)
+      # summary(distLocCity)
+      
+      minDist <- min(distLocCity)
+      
+      # If the closest cell is more than half a pixel away, skip it
+      if(minDist > 927/2) next 
+      locCity <- coordsCity$location[which(distLocCity==minDist)]
+      
+      valsCity$LST_Day[valsCity$location==locCity] <- valsLST$LST_Day[lstNow]
+      valsCity$LST_Offset[valsCity$location==locCity] <- minDist
+    }
+    
+  }
+
+  valsCity <- valsCity[!is.na(valsCity$elevation) & !is.na(valsCity$cover.tree),]
+  summary(valsCity)
+ 
+  # This will hopefully get fixed next time around
+  # if(nrow(coordsLST)!=nrow(coordsCity)){ 
+  #   print(warning("Mismatched cells.  Skip this city for now."))
+  #   next
+  # }
+  # names(lstCity)
+  # names(treeCity)
+  
+  # # Put everything into a single data frame 
+  # valsCity <- stack(data.frame(getValues(lstCity[[layers.use]])))
+  # names(valsCity) <- c("LST_Day", "year")
+  # 
+  # valsCity$cover.tree <- stack(data.frame(getValues(treeCity[[layers.use]])))[,1]
+  # valsCity$cover.veg <- stack(data.frame(getValues(vegCity[[layers.use]])))[,1]
+  # valsCity$elevation <- getValues(elevCity)
+  # valsCity$cityBounds <- getValues(maskCity)
+  # valsCity$cityBounds <- !is.na(valsCity$cityBounds) # NA = buffer = FALSE citybounds
+  # valsCity$year <- as.numeric(substr(valsCity$year, 3, 6))
+  # valsCity[,c("x", "y", "location")] <- coordsCity
+  # valsCity <- valsCity[complete.cases(valsCity),]
+  # dim(valsCity); summary(valsCity)
+  
+  # Recode the cityBounds variable to be T/F
+  # ggplot(data=valsCity[valsCity$year==2020,], aes(x=x, y=y)) +
+  #   coord_equal() +
+  #   geom_tile(aes(fill=cityBounds))
+  
+  # ggplot(data=valsCity, aes(x=x, y=y)) +
+  #   coord_equal() +
+  #   facet_wrap(~year) +
+  #   geom_tile(aes(fill=LST_Day))
+  
+  
+  # Saving some summary stats of our inputs -- I know there's a more elegant way to do this, but hey, this works
   # cityStatsRegion[row.city,]
   cityStatsRegion$n.pixels[row.city] <- length(unique(valsCity$location))
   cityStatsRegion$LST.mean[row.city] <- mean(valsCity$LST_Day, na.rm=T)
@@ -238,13 +340,36 @@ for(CITY in citiesAnalyze){
   cityStatsRegion$elev.sd[row.city] <- sd(valsCity$elevation, na.rm=T)
   cityStatsRegion$elev.min[row.city] <- min(valsCity$elevation, na.rm=T)
   cityStatsRegion$elev.max[row.city] <- max(valsCity$elevation, na.rm=T)
+  # cityStatsRegion[row.city,]
+  
+  # also doing all fo the stats for core vs buffer
+  # Note that in the cityStatsCat, city is listed before buffer, this means we have to reverse the order we write things in
+  cityStatsCat$n.pixels[row.cityCat] <- rev(aggregate(location ~ cityBounds, data=valsCity, FUN=function(x){ length(unique(x))})[,2])
+  cityStatsCat$LST.mean[row.cityCat] <- rev(aggregate(LST_Day ~ cityBounds, data=valsCity, FUN=mean)[,2])
+  cityStatsCat$LST.sd[row.cityCat] <- rev(aggregate(LST_Day ~ cityBounds, data=valsCity, FUN=sd)[,2])
+  cityStatsCat$LST.min[row.cityCat] <- rev(aggregate(LST_Day ~ cityBounds, data=valsCity, FUN=min)[,2])
+  cityStatsCat$LST.max[row.cityCat] <- rev(aggregate(LST_Day ~ cityBounds, data=valsCity, FUN=max)[,2])
+  cityStatsCat$tree.mean[row.cityCat] <- rev(aggregate(cover.tree ~ cityBounds, data=valsCity, FUN=mean)[,2])
+  cityStatsCat$tree.sd[row.cityCat] <- rev(aggregate(cover.tree ~ cityBounds, data=valsCity, FUN=sd)[,2])
+  cityStatsCat$tree.min[row.cityCat] <- rev(aggregate(cover.tree ~ cityBounds, data=valsCity, FUN=min)[,2])
+  cityStatsCat$tree.max[row.cityCat] <- rev(aggregate(cover.tree ~ cityBounds, data=valsCity, FUN=max)[,2])
+  cityStatsCat$veg.mean[row.cityCat] <- rev(aggregate(cover.veg ~ cityBounds, data=valsCity, FUN=mean)[,2])
+  cityStatsCat$veg.sd[row.cityCat] <- rev(aggregate(cover.veg ~ cityBounds, data=valsCity, FUN=sd)[,2])
+  cityStatsCat$veg.min[row.cityCat] <- rev(aggregate(cover.veg ~ cityBounds, data=valsCity, FUN=min)[,2])
+  cityStatsCat$veg.max[row.cityCat] <- rev(aggregate(cover.veg ~ cityBounds, data=valsCity, FUN=max)[,2])
+  cityStatsCat$elev.mean[row.cityCat] <- rev(aggregate(elevation ~ cityBounds, data=valsCity, FUN=mean)[,2])
+  cityStatsCat$elev.sd[row.cityCat] <- rev(aggregate(elevation ~ cityBounds, data=valsCity, FUN=sd)[,2])
+  cityStatsCat$elev.min[row.cityCat] <- rev(aggregate(elevation ~ cityBounds, data=valsCity, FUN=min)[,2])
+  cityStatsCat$elev.max[row.cityCat] <- rev(aggregate(elevation ~ cityBounds, data=valsCity, FUN=max)[,2])
+  
+  # cityStatsCat[row.cityCat,] # City first, then buffer
   
   
   # Running the actual model! Woot Woot
   modCity <- gam(LST_Day ~ cover.tree + cover.veg + elevation + s(x,y) + as.factor(year)-1, data=valsCity)
   sum.modCity <- summary(modCity)
-  valsCity$gam.pred <- predict(modCity)
-  valsCity$gam.resid <- resid(modCity)
+  valsCity$gam.pred[!is.na(valsCity$LST_Day)] <- predict(modCity)
+  valsCity$gam.resid[!is.na(valsCity$LST_Day)] <- resid(modCity)
   save(modCity, file=file.path(path.cities, CITY, paste0(CITY, "_Model_gam.RData")))
   # par(mfrow=c(1,1)); plot(modCity)
   
@@ -266,7 +391,7 @@ for(CITY in citiesAnalyze){
   
   # Calculating pixel-based summary stats to do some trend correlations
   # For computational tractability, need to run each pixel independently.  Doing Hobart as a loop just takes a few seconds
-  summaryCity <- aggregate(cbind(LST_Day, cover.tree, cover.veg, elevation) ~ x+y+location, data=valsCity, FUN=mean)
+  summaryCity <- aggregate(cbind(LST_Day, cover.tree, cover.veg, elevation) ~ x+y+location + cityBounds, data=valsCity, FUN=mean)
   names(summaryCity)[names(summaryCity) %in% c("LST_Day", "cover.tree", "cover.veg")] <- c("LST.mean", "tree.mean", "veg.mean")
   summary(summaryCity)
   
@@ -311,6 +436,7 @@ for(CITY in citiesAnalyze){
   plot.lst <- ggplot(data=summaryCity[!is.na(summaryCity$LST.mean),]) +
     coord_equal() +
     geom_tile(aes(x=x, y=y, fill=LST.mean)) +
+    geom_tile(data=summaryCity[!summaryCity$cityBounds,], aes(x=x, y=y), alpha=0.2, fill="black", color=NA) +
     # geom_sf(data=sp.city3, fill=NA) +
     scale_fill_gradientn(name="Summer\nTemp\n(deg. C)", colors=grad.temp) +
     theme(panel.background=element_rect(fill=NA, color="black"),
@@ -324,6 +450,7 @@ for(CITY in citiesAnalyze){
     coord_equal() +
     # geom_tile(aes(x=x2, y=y2, fill=temp.summer)) +
     geom_tile(aes(x=x, y=y, fill=elevation)) +
+    geom_tile(data=summaryCity[!summaryCity$cityBounds,], aes(x=x, y=y), alpha=0.2, fill="black", color=NA) +
     # geom_path(data=city.sp, aes(x=long, y=lat, group=group)) +
     scale_fill_gradientn(name="Elevation\n(m)", colors=grad.elev) +
     theme(panel.background=element_rect(fill=NA, color="black"),
@@ -336,7 +463,8 @@ for(CITY in citiesAnalyze){
   plot.tree <- ggplot(data=summaryCity[!is.na(summaryCity$tree.mean),]) +
     coord_equal() +
     geom_tile(aes(x=x, y=y, fill=tree.mean)) +
-    # geom_path(data=city.sp, aes(x=long, y=lat, group=group)) +
+    geom_tile(data=summaryCity[!summaryCity$cityBounds,], aes(x=x, y=y), alpha=0.2, fill="black", color=NA) +
+     # geom_path(data=city.sp, aes(x=long, y=lat, group=group)) +
     scale_fill_gradientn(name="Tree\nCover\n(%)", colors=grad.tree, limits=c(0,100)) +
     theme(panel.background=element_rect(fill=NA, color="black"),
           panel.grid=element_blank(),
@@ -348,6 +476,7 @@ for(CITY in citiesAnalyze){
   plot.veg <- ggplot(data=summaryCity[!is.na(summaryCity$veg.mean),]) +
     coord_equal() +
     geom_tile(aes(x=x, y=y, fill=veg.mean)) +
+    geom_tile(data=summaryCity[!summaryCity$cityBounds,], aes(x=x, y=y), alpha=0.2, fill="black", color=NA) +
     # geom_path(data=city.sp, aes(x=long, y=lat, group=group)) +
     scale_fill_gradientn(name="Other Veg\nCover (%)", colors=grad.other, limits=c(0,100)) +
     theme(panel.background=element_rect(fill=NA, color="black"),
@@ -382,10 +511,22 @@ for(CITY in citiesAnalyze){
     veg.out <- t.test(summaryCity$veg.trend)
     cityStatsRegion$trend.veg.p[row.city] <- veg.out$p.value
     
+    
+    cityStatsCat$trend.LST.slope[row.cityCat] <- rev(aggregate(LST.trend ~ cityBounds, data=summaryCity, FUN=mean)[,2])
+    cityStatsCat$trend.LST.slope.sd[row.cityCat] <- rev(aggregate(LST.trend ~ cityBounds, data=summaryCity, FUN=sd)[,2])
+    cityStatsCat$trend.tree.slope[row.cityCat] <- rev(aggregate(tree.trend ~ cityBounds, data=summaryCity, FUN=mean)[,2])
+    cityStatsCat$trend.tree.slope.sd[row.cityCat] <- rev(aggregate(tree.trend ~ cityBounds, data=summaryCity, FUN=sd)[,2])
+    cityStatsCat$trend.veg.slope[row.cityCat] <- rev(aggregate(veg.trend ~ cityBounds, data=summaryCity, FUN=mean)[,2])
+    cityStatsCat$trend.veg.slope.sd[row.cityCat] <- rev(aggregate(veg.trend ~ cityBounds, data=summaryCity, FUN=sd)[,2])
+    # cityStatsCat[row.cityCat,]
+    
+    
+    
     # Creating and saving some maps of those trends
     plot.lst.trend <- ggplot(data=summaryCity[!is.na(summaryCity$LST.trend),]) +
       coord_equal() +
       geom_tile(aes(x=x, y=y, fill=LST.trend)) +
+      geom_tile(data=summaryCity[!summaryCity$cityBounds,], aes(x=x, y=y), alpha=0.2, fill="black") +
       # geom_sf(data=sp.city3, fill=NA) +
       scale_fill_gradientn(name="Summer\nTemp\n(deg. C/yr)", colors=grad.temp) +
       theme(panel.background=element_rect(fill=NA, color="black"),
@@ -398,6 +539,7 @@ for(CITY in citiesAnalyze){
     plot.tree.trend <- ggplot(data=summaryCity[!is.na(summaryCity$tree.trend),]) +
       coord_equal() +
       geom_tile(aes(x=x, y=y, fill=tree.trend)) +
+      geom_tile(data=summaryCity[!summaryCity$cityBounds,], aes(x=x, y=y), alpha=0.2, fill="black") +
       # geom_path(data=city.sp, aes(x=long, y=lat, group=group)) +
       scale_fill_gradientn(name="Tree\nCover\n(%/yr)", colors=grad.tree) +
       theme(panel.background=element_rect(fill=NA, color="black"),
@@ -410,6 +552,7 @@ for(CITY in citiesAnalyze){
     plot.veg.trend <- ggplot(data=summaryCity[!is.na(summaryCity$veg.trend),]) +
       coord_equal() +
       geom_tile(aes(x=x, y=y, fill=veg.trend)) +
+      geom_tile(data=summaryCity[!summaryCity$cityBounds,], aes(x=x, y=y), alpha=0.2, fill="black") +
       # geom_path(data=city.sp, aes(x=long, y=lat, group=group)) +
       scale_fill_gradientn(name="Other Veg\nCover (%/yr)", colors=grad.other) +
       theme(panel.background=element_rect(fill=NA, color="black"),
