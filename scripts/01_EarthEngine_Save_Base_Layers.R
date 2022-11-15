@@ -230,13 +230,12 @@ sizeSH <- lstSHmask$size()$getInfo()
 lstSHList <- lstSHmask$toList(sizeSH)
 
 # Doing a loop for the Northern Hemisphere first
-# for(i in 1:sizeNH-1){
-for(i in 3:sizeNH-1){ # Currently have 2 in the queue as a test
+for(i in 1:sizeNH-1){
   img <- ee$Image(lstNHList$get(i))
   imgID <- img$id()$getInfo()
   # ee_print(img)
   # Map$addLayer(img, vizTempK, "Jul/Aug Temperature")
-  saveLSTNH <- ee_image_to_asset(img, description=paste0("LST_", imgID), assetId=file.path(assetHome, "LST_JulAug_Clean"), maxPixels = 10e9, scale=926.6, region = maskBBox, crs="SR-ORG:6974", crsTransform=c(926.625433056, 0, -20015109.354, 0, -926.625433055, 10007554.677), overwrite=F)
+  saveLSTNH <- ee_image_to_asset(img, description=paste0("Save_LST_JulAug_", imgID), assetId=file.path(assetHome, "LST_JulAug_Clean", imgID), maxPixels = 10e9, scale=926.6, region = maskBBox, crs="SR-ORG:6974", crsTransform=c(926.625433056, 0, -20015109.354, 0, -926.625433055, 10007554.677), overwrite=F)
   saveLSTNH$start()
 }
 
@@ -245,7 +244,7 @@ for(i in 1:sizeSH-1){
   imgID <- img$id()$getInfo()
   # ee_print(img)
   # Map$addLayer(img, vizTempK, "JanFeb Temperature")
-  saveLSTSH <- ee_image_to_asset(img, description=paste0("Save_LST_JanFeb_", imgID), assetId=file.path(assetHome, "LST_JanFeb_Clean"), maxPixels = 10e9, scale=926.6, region = maskBBox, crs="SR-ORG:6974", crsTransform=c(926.625433056, 0, -20015109.354, 0, -926.625433055, 10007554.677), overwrite=F)
+  saveLSTSH <- ee_image_to_asset(img, description=paste0("Save_LST_JanFeb_", imgID), assetId=file.path(assetHome, "LST_JanFeb_Clean", imgID), maxPixels = 10e9, scale=926.6, region = maskBBox, crs="SR-ORG:6974", crsTransform=c(926.625433056, 0, -20015109.354, 0, -926.625433055, 10007554.677), overwrite=F)
   saveLSTSH$start()
 }
 
