@@ -15,7 +15,7 @@ GoogleFolderSave <- "UHI_Analysis_Output"
 thresh.sigma <- 6 # Use 6-sigma outliers for the data filtering\
 thresh.pts <- 50
 thresh.prop <- 0.5 # The proportion of data needed for a time point to be "good"; currenlty 0.5
-overwrite=T
+overwrite=F
 ##################### 
 
 
@@ -382,7 +382,7 @@ print(citiesUse$first()$propertyNames()$getInfo())
 
 cityIdS <-sdei.df$ISOURBID[sdei.df$LATITUDE<0]
 cityIdN <-sdei.df$ISOURBID[sdei.df$LATITUDE>=0]
-# length(cityIdS); length(cityIdNW)
+length(cityIdS); length(cityIdN)
 
 # If we're not trying to overwrite our files, remove files that were already done
 # cityRemove <- vector()
@@ -390,13 +390,13 @@ cityIdN <-sdei.df$ISOURBID[sdei.df$LATITUDE>=0]
 
 if(!overwrite){
   ### Filter out sites that have been done!
-  tmean.done <- dir(file.path(path.google, GoogleFolderSave), "Tmean.tif")
+  tmean.done <- dir(file.path(path.google, GoogleFolderSave), "LST_Day_Tmean")
 
   # Check to make sure a city has all three layers; if it doesn't do it again
   cityRemove <- unlist(lapply(strsplit(tmean.done, "_"), function(x){x[1]}))
 
   cityIdS <- cityIdS[!cityIdS %in% cityRemove]
-  cityIdsN <- cityIdN[!cityIdN %in% cityRemove]
+  cityIdN <- cityIdN[!cityIdN %in% cityRemove]
   
 } # End remove cities loop
 

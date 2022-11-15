@@ -61,7 +61,7 @@ extractCityMask <- function(cityBuff, cityRaw, CityNames, BASE, GoogleFolderSave
     cityID <- CityNames[i]
     # cityNow <- citiesUse$filter('NAME=="Chicago"')$first()
     cityNow <- cityRaw$filter(ee$Filter$eq('ISOURBID', cityID))
-    cityNowBuff <- cityBuff$filter(ee$Filter$eq('ISOURBID', cityID))
+    cityNowBuff <- cityBuff$filter(ee$Filter$eq('ISOURBID', cityID)) # Note: this is only getting used for the geometry arguement.  We'll see how it works
     # Map$centerObject(cityNow) # NOTE: THIS IS REALLY IMPORTANT APPARENTLY!
     # Map$addLayer(cityNow)
     
