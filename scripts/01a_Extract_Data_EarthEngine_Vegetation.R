@@ -4,7 +4,7 @@ library(rgee); library(raster); library(terra)
 ee_check() # For some reason, it's important to run this before initializing right now
 rgee::ee_Initialize(user = 'crollinson@mortonarb.org', drive=T)
 path.google <- "/Volumes/GoogleDrive/My Drive"
-GoogleFolderSave <- "UHI_Analysis_Output"
+GoogleFolderSave <- "UHI_Analysis_Output_Final"
 
 ##################### 
 # 0. Set up some choices for data quality thresholds
@@ -131,14 +131,8 @@ if(!overwrite){
 length(cityIdS); length(cityIdNW); length(cityIdNE1); length(cityIdNE2)
 
 
-citiesSouth <- citiesUse$filter(ee$Filter$inList('ISOURBID', ee$List(cityIdS)))
-# citiesNorthW <- citiesUse$filter(ee$Filter$inList('ISOURBID', ee$List(cityIdNW)))
-# citiesSouth$size()$getInfo()
-# length(cityIdS)
-
-
 if(length(cityIdS)>0){
-  extractVeg(CitySP=citiesSouth, CityNames = cityIdS, TREE=modTree, VEG = modVeg, BARE=modBare, GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
+  extractVeg(CitySP=citiesUse, CityNames = cityIdS, TREE=modTree, VEG = modVeg, BARE=modBare, GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
 }
 
 
