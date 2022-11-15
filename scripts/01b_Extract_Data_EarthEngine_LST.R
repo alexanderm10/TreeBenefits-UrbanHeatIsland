@@ -134,70 +134,19 @@ vizTempK <- list(
 # 2.a - Land Surface Temperature
 # -----------
 # 2.a.1 - Northern Hemisphere: July/August
-tempJulAug <- ee$ImageCollection('MODIS/006/MOD11A2')$filter(ee$Filter$dayOfYear(181, 240))$filter(ee$Filter$date("2001-01-01", "2020-12-31"))$map(addTime);
-tempJulAug <- tempJulAug$map(lstConvert)
-tempJulAug <- tempJulAug$map(setYear)
-
-# ee_print(tempJulAug)
+JulAugList <- ee_manage_assetlist(path_asset = "users/crollinson/LST_JulAug_Clean/")
+tempJulAug <- ee$ImageCollection(JulAugList$ID)
+ee_print(tempJulAug)
 # tempJulAug$first()$propertyNames()$getInfo()
 # tempJulAug$first()$get("system:id")$getInfo()
 # ee_print(tempJulAug$first())
-# Map$addLayer(tempJulAug$first()$select('LST_Day_1km'), vizTempK, "Jul/Aug Temperature")
+# Map$addLayer(tempJulAug$first(), vizTempK, "Jul/Aug Temperature")
 
 # 2.a.2 - Southern Hemisphere: Jan/Feb
-tempJanFeb <- ee$ImageCollection('MODIS/006/MOD11A2')$filter(ee$Filter$dayOfYear(1, 60))$filter(ee$Filter$date("2001-01-01", "2020-12-31"))$map(addTime);
-tempJanFeb <- tempJanFeb$map(lstConvert)
-tempJanFeb <- tempJanFeb$map(setYear)
-# ee_print(tempJanFeb$bandNames()$getInfo())
-# tempJanFeb$first()$get("system:id")$getInfo()
-
-
-# # Reset the projection so it's all the same as the first for sanity
-# This might be slow, but I think it's going to be better to do now rather than later for consistency with how I've treated other products
-tempJulAug = tempJulAug$map(function(img){
-  return(img$reproject(projMask))
-})
-
-tempJanFeb = tempJanFeb$map(function(img){
-  return(img$reproject(projMask))
-})
-
-# Filtering good LST Data --> note: we'll still do some outlier remover from each city
-lstDayGoodNH <- tempJulAug$map(lstMask)
-lstDayGoodSH <- tempJanFeb$map(lstMask)
-
-# ee_print(lstDayGoodNH$first())
-# Map$addLayer(lstDayGoodNH$first()$select('LST_Day_1km'), vizTempK, "GOOD Jul/Aug Temperature")
-# Map$addLayer(lstDayGoodSH$first()$select('LST_Day_1km'), vizTempK, "GOOD Jan/Feb Temperature")
-# projLST = lstDayGoodNH$select("LST_Day_1km")$first()$projection()
-# projCRS = projLST$crs()
-# projTransform <- unlist(projLST$getInfo()$transform)
-# ee_print(projLST)
+JanFebList <- ee_manage_assetlist(path_asset = "users/crollinson/LST_JanFeb_Clean/")
+tempJanFeb <- ee$ImageCollection(JanFebList$ID);
 # -----------
 
-# -----------
-# Update LST Data with the MODIS veg mask
-# -----------
-# Map$addLayer(lstDayGoodNH$first()$select('LST_Day_1km'), vizTempK, "GOOD Jul/Aug Temperature")
-lstNHmask <- lstDayGoodNH$map(function(IMG){IMG$updateMask(vegMask)})
-lstSHmask <- lstDayGoodSH$map(function(IMG){IMG$updateMask(vegMask)})
-
-# Map$addLayer(lstSHmask$first()$select('LST_Day_1km'), vizTempK, "GOOD MASKED Jul/Aug Temperature")
-
-# # ee_print(lstNHmask$first()$select("LST_Day_1km"))
-# lstNHFinal <- lstNHmask$map(function(IMG){
-#   dat <- IMG$select("LST_Day_1km")$gt(0)
-#   return(IMG$updateMask(dat))
-# })
-# 
-# lstSHFinal <- lstSHmask$map(function(IMG){
-#   dat <- IMG$select("LST_Day_1km")$gt(0)
-#   return(IMG$updateMask(dat))
-# })
-
-# lstNHmasl2 <- lstNHmask
-# Map$addLayer(lstNHFinal$first()$select('LST_Day_1km'), vizTempK, "GOOD MASKED Jul/Aug Temperature")
-# Map$addLayer(lstSHFinal$first()$select('LST_Day_1km'), vizTempK, "GOOD MASKED Jan/Feb Temperature")
 # -----------
 
 ##################### 
@@ -431,12 +380,12 @@ length(cityIdN)
 
 # # All except 1 ran successfully
 if(length(cityIdS)>0){
-  extractTempEE(CitySP=citiesUse, CityNames = cityIdS, TEMPERATURE=lstSHmask$select("LST_Day_1km"), GoogleFolderSave = GoogleFolderSave)
+  extractTempEE(CitySP=citiesUse, CityNames = cityIdS, TEMPERATURE=tempJanFeb$select("LST_Day_1km"), GoogleFolderSave = GoogleFolderSave)
 }
 
 # # All except 1 ran successfully
 if(length(cityIdN)>0){
-  extractTempEE(CitySP=citiesUse, CityNames = cityIdN, TEMPERATURE=lstNHmask$select("LST_Day_1km"), GoogleFolderSave = GoogleFolderSave)
+  extractTempEE(CitySP=citiesUse, CityNames = cityIdN, TEMPERATURE=tempJulAug$select("LST_Day_1km"), GoogleFolderSave = GoogleFolderSave)
 }
 
 # # All except 3 were run successfully
