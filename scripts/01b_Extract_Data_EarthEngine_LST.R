@@ -144,9 +144,9 @@ lstDayGoodSH <- tempJanFeb$map(lstMask)
 # ee_print(lstDayGoodNH$first())
 # Map$addLayer(lstDayGoodNH$first()$select('LST_Day_1km'), vizTempK, "GOOD Jul/Aug Temperature")
 # Map$addLayer(lstDayGoodSH$first()$select('LST_Day_1km'), vizTempK, "GOOD Jan/Feb Temperature")
-projLST = lstDayGoodNH$select("LST_Day_1km")$first()$projection()
-projCRS = projLST$crs()
-projTransform <- unlist(projLST$getInfo()$transform)
+# projLST = lstDayGoodNH$select("LST_Day_1km")$first()$projection()
+# projCRS = projLST$crs()
+# projTransform <- unlist(projLST$getInfo()$transform)
 # ee_print(projLST)
 # -----------
 
@@ -155,6 +155,11 @@ projTransform <- unlist(projLST$getInfo()$transform)
 # -----------
 vegMask <- ee$Image("users/crollinson/MOD44b_1km_Reproj_VegMask")
 # Map$addLayer(vegMask)
+
+# Using the same projection info as we saved all of the other layers in
+projMask = vegMask$projection()
+projCRS = projMask$crs()
+projTransform <- unlist(projMask$getInfo()$transform)
 # -----------
 
 # -----------
@@ -337,6 +342,7 @@ extractTempEE <- function(CitySP, CityNames, TEMPERATURE, GoogleFolderSave, over
     # Map$addLayer(tempYrMean$select('YR2020'), vizTempK, 'Mean Surface Temperature (K)');
     
     export.TempMean <- ee_image_to_drive(image=tempYrMean, description=paste0(cityID, "_LST_Day_Tmean"), fileNamePrefix=paste0(cityID, "_LST_Day_Tmean"), folder=GoogleFolderSave, timePrefix=F, region=cityNow$geometry(), maxPixels=5e7, crs=projCRS, crsTransform=projTransform)
+    
     export.TempMean$start()
     # ee_monitoring(export.TempMean)
     
