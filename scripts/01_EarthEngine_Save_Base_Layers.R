@@ -61,9 +61,73 @@ setYear <- function(img){
 # -----------
 # 2.a - Land Surface Temperature -- Not saving because of the complexities involved
 # -----------
+lstConvert <- function(img){
+  lstDay <- img$select('LST_Day_1km')$multiply(0.02)
+  lstNight <- img$select('LST_Night_1km')$multiply(0.02)
+  lstK <- ee$Image(c(lstDay, lstNight));
+  img <- img$addBands(srcImg=lstK, overwrite=TRUE);
+  return(img)
+}
+
+# // Cleaning Up and getting just Good LST data
+# // Code adapted from https://gis.stackexchange.com/a/349401/5160
+# // Let's extract all pixels from the input image where
+# // Bits 0-1 <= 1 (LST produced of both good and other quality)
+# // Bits 2-3 = 0 (Good data quality)
+# // Bits 4-5 Ignore, any value is ok
+# // Bits 6-7 = 0 (Average LST error ≤ 1K)
+# // var lstMask = function(qcDay, lstDay){
+# //   var qaMask = bitwiseExtract(qcDay, 0, 1).lte(1)
+# //   var dataQualityMask = bitwiseExtract(qcDay, 2, 3).eq(0)
+# //   var lstErrorMask = bitwiseExtract(qcDay, 6, 7).eq(0)
+# //   var mask = qaMask.and(dataQualityMask).and(lstErrorMask)
+# //   var lstDayMasked = lstDay.updateMask(mask)  
+# // }
+bitwiseExtract <- function(input, fromBit, toBit) {
+  maskSize <- ee$Number(1)$add(toBit)$subtract(fromBit)
+  mask <- ee$Number(1)$leftShift(maskSize)$subtract(1)
+  return(input$rightShift(fromBit)$bitwiseAnd(mask))
+}
+
+lstMask <- function(img){
+  qcDay <- img$select('QC_Day')
+  qaMask <- bitwiseExtract(qcDay, 0, 1)$lte(1);
+  dataQualityMask <- bitwiseExtract(qcDay, 2, 3)$eq(0)
+  lstErrorMask <- bitwiseExtract(qcDay, 6, 7)$lte(2) # setting up error <=2 ˚K
+  datVal <- img$select('LST_Day_1km')$gt(0)
+  maskT <- qaMask$And(dataQualityMask)$And(lstErrorMask)$And(datVal)
+  lstDayMasked <- img$updateMask(maskT)
+  return(lstDayMasked)
+}
+
+tempColors <- c(
+  '040274', '040281', '0502a3', '0502b8', '0502ce', '0502e6',
+  '0602ff', '235cb1', '307ef3', '269db1', '30c8e2', '32d3ef',
+  '3be285', '3ff38f', '86e26f', '3ae237', 'b5e22e', 'd6e21f',
+  'fff705', 'ffd611', 'ffb613', 'ff8b13', 'ff6e08', 'ff500d',
+  'ff0000', 'de0101', 'c21301', 'a71001', '911003'
+)
+vizTemp <- list(
+  min=10.0,
+  max=47.0,
+  palette=tempColors
+);
+
+vizTempK <- list( 
+  min=10.0+273.15,
+  max=47.0+273.15,
+  palette=tempColors
+);
+
 # 2.a.1 - Northern Hemisphere: July/August
 tempJulAug <- ee$ImageCollection('MODIS/006/MOD11A2')$filter(ee$Filter$dayOfYear(181, 240))$filter(ee$Filter$date("2001-01-01", "2020-12-31"))$map(addTime);
+tempJulAug <- tempJulAug$map(lstConvert)
 tempJulAug <- tempJulAug$map(setYear)
+
+tempJanFeb <- ee$ImageCollection('MODIS/006/MOD11A2')$filter(ee$Filter$dayOfYear(1, 60))$filter(ee$Filter$date("2001-01-01", "2020-12-31"))$map(addTime);
+tempJanFeb <- tempJanFeb$map(lstConvert)
+tempJanFeb <- tempJanFeb$map(setYear)
+
 # ee_print(tempJulAug)
 # tempJulAug$first()$propertyNames()$getInfo()
 # ee_print(tempJulAug$first())
@@ -74,6 +138,22 @@ projCRS = projLST$crs()
 projTransform <- unlist(projLST$getInfo()$transform)
 
 # ee_print(projLST)
+
+
+# # Reset the projection so it's all the same as the first for sanity
+# This might be slow, but I think it's going to be better to do now rather than later for consistency with how I've treated other products
+tempJulAug = tempJulAug$map(function(img){
+  return(img$reproject(projLST))
+})
+
+tempJanFeb = tempJanFeb$map(function(img){
+  return(img$reproject(projLST))
+})
+
+# Filtering good LST Data --> note: we'll still do some outlier remover from each city
+lstDayGoodNH <- tempJulAug$map(lstMask)
+lstDayGoodSH <- tempJanFeb$map(lstMask)
+# Map$addLayer(lstDayGoodNH$first()$select('LST_Day_1km'), vizTempK, "Jul/Aug Temperature")
 # -----------
 
 # -----------
@@ -126,42 +206,67 @@ Map$addLayer(modTree$select("YR2020"), vizTree, "TreeCover")
 saveTree <- ee_image_to_asset(modTree, description="Save_Mod44bReproj_TreeCover", assetId=file.path(assetHome, "MOD44b_1km_Reproj_Percent_Tree_Cover"), maxPixels = 10e9, scale=926.6, region = maskBBox, crs="SR-ORG:6974", crsTransform=c(926.625433056, 0, -20015109.354, 0, -926.625433055, 10007554.677), overwrite=T)
 saveTree$start()
 
-
-# 
-# 
-# saveTreeS <- ee_image_to_asset(image=treeS, description="Save_Mod44bReproj_TreeCover_South", assetId=file.path(assetHome, "MOD44b_1km_Reproj_Percent_Tree_Cover_South"), maxPixels=10e9, crs="EPSG:4326", scale=1e3, crsTransform=c(1,0,0,0,1,0))
-# saveTreeS$start()
-# 
-# saveTreeNW <- ee_image_to_asset(image=treeNW, description="Save_Mod44bReproj_TreeCover_NorthW", assetId=file.path(assetHome, "MOD44b_1km_Reproj_Percent_Tree_Cover_NorthW"), maxPixels=10e9, crs="EPSG:4326", scale=1e3, crsTransform=c(1,0,0,0,1,0))
-# saveTreeNW$start()
-# 
-# saveTreeNE1 <- ee_image_to_asset(image=treeNE1, description="Save_Mod44bReproj_TreeCover_NorthE1", assetId=file.path(assetHome, "MOD44b_1km_Reproj_Percent_Tree_Cover_NorthE1"), maxPixels=10e9, crs="EPSG:4326", scale=1e3, crsTransform=c(1,0,0,0,1,0))
-# saveTreeNE1$start()
-# 
-# saveTreeNE2 <- ee_image_to_asset(image=treeNE2, description="Save_Mod44bReproj_TreeCover_NorthE2", assetId=file.path(assetHome, "MOD44b_1km_Reproj_Percent_Tree_Cover_NorthE2"), maxPixels=10e9, crs="EPSG:4326", scale=1e3, crsTransform=c(1,0,0,0,1,0))
-# saveTreeNE2$start()
-# 
-# 
-# vegS <- modVeg$clipToCollection(citiesSouth)
-# vegNW <- modTree$clipToCollection(citiesNorthW)
-# vegNE1 <- modTree$clipToCollection(citiesNorthE1)
-# vegNE2 <- modTree$clipToCollection(citiesNorthE2)
-# 
-# saveVegS <- ee_image_to_asset(vegS, description="Save_Mod44bReproj_OtherVeg_South", assetId=file.path(assetHome, "MOD44b_1km_Reproj_Percent_NonTree_Vegetation_South"), maxPixels=10e9, crs="EPSG:4326", scale=1e3, crsTransform=c(1,0,0,0,1,0))
-# saveVegS$start()
-# 
-# bareS <- modBare$clipToCollection(citiesSouth)
-# 
-# saveBareS <- ee_image_to_asset(bareS, description="Save_Mod44bReproj_NonVeg_South", assetId=file.path(assetHome, "MOD44b_1km_Reproj_Percent_NonVegetated_South"), maxPixels=10e9, crs="EPSG:4326", scale=1e3, crsTransform=c(1,0,0,0,1,0))
-# saveBareS$start()
-
-
 saveVeg <- ee_image_to_asset(modVeg, description="Save_Mod44bReproj_OtherVegCover", assetId=file.path(assetHome, "MOD44b_1km_Reproj_Percent_NonTree_Vegetation"), maxPixels = 10e9, scale=926.6, region = maskBBox, crs="SR-ORG:6974", crsTransform=c(926.625433056, 0, -20015109.354, 0, -926.625433055, 10007554.677), overwrite=T)
 saveVeg$start()
 
 saveBare <- ee_image_to_asset(modBare, description="Save_Mod44bReproj_NonVeg", assetId=file.path(assetHome, "MOD44b_1km_Reproj_Percent_NonVegetated"), maxPixels = 10e9, scale=926.6, region = maskBBox, crs="SR-ORG:6974", crsTransform=c(926.625433056, 0, -20015109.354, 0, -926.625433055, 10007554.677), overwrite=T)
 saveBare$start()
 # ----------
+
+# -----------
+# Revisit Temperatures to save
+# -----------
+lstNHmask <- lstDayGoodNH$select("LST_Day_1km")$map(function(IMG){IMG$updateMask(vegMask)})
+lstSHmask <- lstDayGoodSH$select("LST_Day_1km")$map(function(IMG){IMG$updateMask(vegMask)})
+ee_print(lstNHmask)
+# Map$addLayer(lstNHmask$first()$select('LST_Day_1km'), vizTempK, "Jul/Aug Temperature")
+
+# Trying to export each collection as a Collection 
+# Source: https://gis.stackexchange.com/questions/407146/export-imagecollection-to-asset
+sizeNH <- lstNHmask$size()$getInfo()
+lstNHList <- lstNHmask$toList(sizeNH)
+
+sizeSH <- lstSHmask$size()$getInfo()
+lstSHList <- lstSHmask$toList(sizeSH)
+
+# Doing a loop for the Northern Hemisphere first
+# for(i in 1:sizeNH-1){
+for(i in 3:sizeNH-1){ # Currently have 2 in the queue as a test
+  img <- ee$Image(lstNHList$get(i))
+  imgID <- img$id()$getInfo()
+  # ee_print(img)
+  # Map$addLayer(img, vizTempK, "Jul/Aug Temperature")
+  saveLSTNH <- ee_image_to_asset(img, description=paste0("LST_", imgID), assetId=file.path(assetHome, "LST_JulAug_Clean"), maxPixels = 10e9, scale=926.6, region = maskBBox, crs="SR-ORG:6974", crsTransform=c(926.625433056, 0, -20015109.354, 0, -926.625433055, 10007554.677), overwrite=F)
+  saveLSTNH$start()
+}
+
+for(i in 1:sizeSH-1){
+  img <- ee$Image(lstSHList$get(i))
+  imgID <- img$id()$getInfo()
+  # ee_print(img)
+  # Map$addLayer(img, vizTempK, "JanFeb Temperature")
+  saveLSTSH <- ee_image_to_asset(img, description=paste0("Save_LST_JanFeb_", imgID), assetId=file.path(assetHome, "LST_JanFeb_Clean"), maxPixels = 10e9, scale=926.6, region = maskBBox, crs="SR-ORG:6974", crsTransform=c(926.625433056, 0, -20015109.354, 0, -926.625433055, 10007554.677), overwrite=F)
+  saveLSTSH$start()
+}
+
+# for (var i = 0; i < size; i++) {
+#   var img = ee.Image(listOfImage.get(i));
+#   var id = img.id().getInfo() || 'image_'+i.toString();
+#   var region = p.buffer(1000)
+#   var assetId = 'TEST'
+#   
+#   Export.image.toAsset({
+#     image: img,
+#     description: id,
+#     assetId: assetId,
+#     region: region,
+#     scale: 10,
+#     maxPixels: 1e13
+#   })
+# }
+
+# -----------
+
 
 # -----------
 # Elevation
@@ -186,20 +291,4 @@ Map$addLayer(elevReproj, elevVis, "Elevation - Masked, reproj")
 saveElev <- ee_image_to_asset(elevReproj, description="Save_MERIT_Elevation", assetId=file.path(assetHome, "MERIT-DEM-v1_1km_Reproj"), maxPixels = 10e9, scale=926.6, region = maskBBox, crs="SR-ORG:6974", crsTransform=c(926.625433056, 0, -20015109.354, 0, -926.625433055, 10007554.677), overwrite=T)
 saveElev$start()
 
-# elevS <- elevReproj$clipToCollection(citiesSouth)
-# elevNW <- elevReproj$clipToCollection(citiesNorthW)
-# elevNE1 <- elevReproj$clipToCollection(citiesNorthE1)
-# elevNE2 <- elevReproj$clipToCollection(citiesNorthE2)
-# # ee_print(treeS)
-# 
-# saveElevS <- ee_image_to_asset(image=elevS, description="Save_MERIT_Elevation_South", assetId=file.path(assetHome, "MERIT-DEM-v1_1km_Reproj_South"), maxPixels=10e9, crs="EPSG:4326", scale=1e3, crsTransform=c(1,0,0,0,1,0))
-# saveElevS$start()
-# 
-# saveElevNW <- ee_image_to_asset(image=elevNW, description="Save_MERIT_Elevation_NorthW", assetId=file.path(assetHome, "MERIT-DEM-v1_1km_Reproj_NorthW"), maxPixels=10e9, crs="EPSG:4326", scale=1e3, crsTransform=c(1,0,0,0,1,0))
-# saveElevNW$start()
-# 
-# saveElevNE1 <- ee_image_to_asset(image=elevNE1, description="Save_MERIT_Elevation_NorthE1", assetId=file.path(assetHome, "MERIT-DEM-v1_1km_Reproj_NorthE1"), maxPixels=10e9, crs="EPSG:4326", scale=1e3, crsTransform=c(1,0,0,0,1,0))
-# saveElevNE1$start()
-# 
-# saveElevNE2 <- ee_image_to_asset(image=elevNE2, description="Save_MERIT_Elevation_NorthE2", assetId=file.path(assetHome, "MERIT-DEM-v1_1km_Reproj_NorthE2"), maxPixels=10e9, crs="EPSG:4326", scale=1e3, crsTransform=c(1,0,0,0,1,0))
-# saveElevNE2$start()
+
