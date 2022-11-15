@@ -1,10 +1,8 @@
 library(raster); library(sp); library(terra); library(sf) 
-# library(dplyr) # Boo hiss... it's just more complicated for me!  I don't like that it overwrites/masks so many functions!
 library(ggplot2)
 library(mgcv)
 
 overwrite=T
-
 
 # file paths for where to put the processed data
 # path.cities <- "../data_processed/data_cities_all"
@@ -141,7 +139,7 @@ cities.tree <- unlist(lapply(files.tree, FUN=function(x){strsplit(x, "_")[[1]][1
 cities.veg <- unlist(lapply(files.veg, FUN=function(x){strsplit(x, "_")[[1]][1]}))
 
 
-citiesDone <- cities.lst[cities.lst %in% cities.elev & cities.lst %in% cities.tree & cities.lst %in% cities.veg]
+citiesDone <- unique(cities.lst[cities.lst %in% cities.elev & cities.lst %in% cities.tree & cities.lst %in% cities.veg])
 length(citiesDone)
 
 # Now compare the done list to what needs to be analyzed
@@ -154,8 +152,6 @@ for(CITY in citiesAnalyze){
   row.city <- which(cityStatsRegion$ISOURBID==CITY)
   row.cityCat <- which(cityStatsCat$ISOURBID==CITY)
   print(CITY)
-  dir.create(file.path(path.cities, CITY), recursive = T, showWarnings = F)
-  
   citySP <- sdei.urb[sdei.urb$ISOURBID==CITY, ]
   cityBuff <- st_buffer(citySP, dist=10e3)
   # plot(cityBuff[1], add=T); 
@@ -238,7 +234,6 @@ for(CITY in citiesAnalyze){
     stop("Veg and Elev Layer doesn't match. :-( gotta figure it out")
   }
   
-  
   # Land Surface Temperature is mismatched with 
   coordsLST <- data.frame(coordinates(lstCity))
   coordsLST$location <- paste0("x", coordsLST$x, "y", coordsLST$y)
@@ -250,7 +245,7 @@ for(CITY in citiesAnalyze){
   valsLST$location <- coordsLST$location
   summary(valsLST)
   
-  locLSTAll <- unique(valsLST$location[!is.na(valsLST$LST_Day)])
+  # locLSTAll <- unique(valsLST$location[!is.na(valsLST$LST_Day)])
   
   # nrow(coordsCity); nrow(coordsLST)
   if(any(coordsLST$location %in% coordsCity$location)){
@@ -277,16 +272,16 @@ for(CITY in citiesAnalyze){
       # summary(distLocCity)
       
       minDist <- min(distLocCity)
+      locCity <- coordsCity$location[which(distLocCity==minDist)]
+      valsCity$LST_Offset[valsCity$location==locCity] <- minDist
       
       # If the closest cell is more than half a pixel away, skip it
-      # if(minDist > 927/2) next 
-      if(minDist > 1000/2) next  # Adjusting to our nominal scale
+      if(minDist > 927/2) next
+      # if(minDist > 1000/2) next  # Adjusting to our nominal scale
       
       # # Useful if we need to diagnose code bugs
-      # locCity <- coordsCity$location[which(distLocCity==minDist)]
       
       valsCity$LST_Day[valsCity$location==locCity] <- valsLST$LST_Day[lstNow]
-      valsCity$LST_Offset[valsCity$location==locCity] <- minDist
     }
     
   }
@@ -295,6 +290,13 @@ for(CITY in citiesAnalyze){
   valsCity <- valsCity[!is.na(valsCity$elevation) & !is.na(valsCity$cover.tree),]
   summary(valsCity)
  
+  if(length(unique(valsCity$location[!is.na(valsCity$LST_Day)]))<50){
+    print(warning("LST Spatial mismatch too big; skip city"))
+    print("") # Just give a clean return before moving on
+    
+    next
+  }
+  
   # This will hopefully get fixed next time around
   # if(nrow(coordsLST)!=nrow(coordsCity)){ 
   #   print(warning("Mismatched cells.  Skip this city for now."))
@@ -327,6 +329,8 @@ for(CITY in citiesAnalyze){
   #   facet_wrap(~year) +
   #   geom_tile(aes(fill=LST_Day))
   
+  # Don't bother creating a folder for a city until we'll have at least something to save!
+  dir.create(file.path(path.cities, CITY), recursive = T, showWarnings = F)
   
   # Saving some summary stats of our inputs -- I know there's a more elegant way to do this, but hey, this works
   # cityStatsRegion[row.city,]
@@ -642,7 +646,7 @@ for(CITY in citiesAnalyze){
   }
   write.csv(cityStatsRegion, file.cityStatsRegion, row.names=F)  # Write our city stats file each time in case it bonks
 
-  print("") # Just give a clean return befor emoving on
+  print("") # Just give a clean return before moving on
   
   # Remove a bunch of stuff for our own sanity
   # rm(elevCity, treeCity, vegCity, lstCity, modCity, valsCity, summaryCity, coordsCity, biome, sp.city, plot.corr.LST.Tree, plot.corr.LST.Veg, plot.corr.Tree.Veg, plot.lst.trend, plot.tree.trend, plot.veg.trend, plot.elev, plot.lst, plot.tree, plot.veg, veg.lst, veg.tree, tree.lst, veg.out, tree.out, sum.corrTreeLST, sum.corrVegLST, sum.corrVegTree, sum.modCity)
