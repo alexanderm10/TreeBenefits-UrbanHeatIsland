@@ -285,6 +285,7 @@ for(CITY in citiesAnalyze){
     
   }
 
+  valsCity$year <- as.numeric(substr(valsCity$year, 3, 6))
   valsCity <- valsCity[!is.na(valsCity$elevation) & !is.na(valsCity$cover.tree),]
   summary(valsCity)
  
