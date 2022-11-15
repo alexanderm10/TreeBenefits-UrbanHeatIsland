@@ -3,6 +3,8 @@ library(raster); library(sp); library(terra); library(sf)
 library(ggplot2)
 library(mgcv)
 
+overwrite=T
+
 
 # file paths for where to put the processed data
 # path.cities <- "../data_processed/data_cities_all"
@@ -66,7 +68,7 @@ ecoregions <- st_transform(ecoregions, crs(projMODIS))
 summary(ecoregions)
 
 # If we don't have our summary file yet, create it and create all the column names we're going to want
-if(!file.exists(file.cityStatsRegion)){
+if(!file.exists(file.cityStatsRegion) | overwrite){
   # cityStatsRegion <- read.csv("../sdei-global-uhi-2013.csv")
   cols.keep <-  c("ISOURBID", "ISO3", "URBID", "NAME", "LATITUDE", "LONGITUDE", "ES00POP")
   cityStatsRegion <- data.frame(sdei.urb[, cols.keep])[,1:length(cols.keep)]
@@ -212,24 +214,101 @@ for(CITY in citiesAnalyze){
   # Elevation should be our most reliable data layer, so lets use that as our base
   coordsCity <- data.frame(coordinates(elevCity)) 
   coordsCity$location <- paste0("x", coordsCity$x, "y", coordsCity$y)
+  coordsCity$elevation <- getValues(elevCity)
+  coordsCity$cityBounds <- getValues(maskCity)
+  coordsCity$cityBounds <- !is.na(coordsCity$cityBounds) # NA = buffer = FALSE citybounds
   
-  # names(lstCity)
-  # names(treeCity)
   # In case we're missing some years of LST (likely in the tropics); only pull certain layers
   layers.use <- names(treeCity)[names(treeCity) %in% names(lstCity)]
   
-  # Put everything into a single data frame 
-  valsCity <- stack(data.frame(getValues(lstCity[[layers.use]])))
-  names(valsCity) <- c("LST_Day", "year")
-  valsCity$cover.tree <- stack(data.frame(getValues(treeCity[[layers.use]])))[,1]
-  valsCity$cover.veg <- stack(data.frame(getValues(vegCity[[layers.use]])))[,1]
-  valsCity$elevation <- getValues(elevCity)
-  valsCity$cityBounds <- getValues(maskCity)
-  valsCity$cityBounds <- !is.na(valsCity$cityBounds) # NA = buffer = FALSE citybounds
-  valsCity$year <- as.numeric(substr(valsCity$year, 3, 6))
-  valsCity[,c("x", "y", "location")] <- coordsCity
-  valsCity <- valsCity[complete.cases(valsCity),]
-  dim(valsCity); summary(valsCity)
+  coordsVeg <- data.frame(coordinates(treeCity))
+  coordsVeg$location <- paste0("x", coordsVeg$x, "y", coordsVeg$y)
+  
+  valsCityVeg <- stack(data.frame(getValues(treeCity[[layers.use]])))
+  names(valsCityVeg) <- c("cover.tree", "year")
+  valsCityVeg$cover.veg <- stack(data.frame(getValues(vegCity[[layers.use]])))[,1]
+  valsCityVeg$x <- coordsVeg$x
+  valsCityVeg$y <- coordsVeg$y
+  valsCityVeg$location <- coordsVeg$location
+  
+  # nrow(coordsCity); nrow(coordsVeg)
+  if(all(coordsVeg$location %in% coordsCity$location)){
+    valsCity <- merge(coordsCity, valsCityVeg, all.x=T, all.y=T)
+  } else {
+    stop("Veg and Elev Layer doesn't match. :-( gotta figure it out")
+  }
+  
+  
+  # Land Surface Temperature is mismatched with 
+  coordsLST <- data.frame(coordinates(lstCity))
+  coordsLST$location <- paste0("x", coordsLST$x, "y", coordsLST$y)
+  
+  valsLST <- stack(data.frame(getValues(lstCity[[layers.use]])))
+  names(valsLST) <- c("LST_Day", "year")
+  valsLST$x <- coordsLST$x
+  valsLST$y <- coordsLST$y
+  valsLST$location <- coordsLST$location
+  
+  nrow(coordsCity); nrow(coordsLST)
+  if(any(coordsLST$location %in% coordsCity$location)){
+    valsCity <- merge(valsCity, valsLST, all.x=T, all.y=T)
+  } else {
+    print(warning("LST coords do not match elev.  Doing nearest neighbor"))
+    
+    valsCity$LST_Day <- NA
+    valsCity$LST_Offset <- NA
+    
+    for(i in 1:nrow(coordsLST)){
+      locLST <- coordsLST$location[i]
+      xLST <- coordsLST$x[i]
+      yLST <- coordsLST$y[i]
+      lstNow <- which(valsLST$location==locLST)
+      
+      # Check to see if this is a blank spot; if so, move on
+      if(all(is.na(valsLST$LST_Day[lstNow]))) next 
+      
+      # Find the nearest pixel from the cityCoords
+      distLocX <- coordsCity$x - xLST
+      distLocY <- coordsCity$y - yLST
+      distLocCity <- sqrt(distLocX^2 + distLocY^2)
+      # summary(distLocCity)
+      
+      minDist <- min(distLocCity)
+      
+      # If the closest cell is more than half a pixel away, skip it
+      if(minDist > 927/2) next 
+      locCity <- coordsCity$location[which(distLocCity==minDist)]
+      
+      valsCity$LST_Day[valsCity$location==locCity] <- valsLST$LST_Day[lstNow]
+      valsCity$LST_Offset[valsCity$location==locCity] <- minDist
+    }
+    
+  }
+
+  valsCity <- valsCity[!is.na(valsCity$elevation) & !is.na(valsCity$cover.tree),]
+  summary(valsCity)
+ 
+  # This will hopefully get fixed next time around
+  # if(nrow(coordsLST)!=nrow(coordsCity)){ 
+  #   print(warning("Mismatched cells.  Skip this city for now."))
+  #   next
+  # }
+  # names(lstCity)
+  # names(treeCity)
+  
+  # # Put everything into a single data frame 
+  # valsCity <- stack(data.frame(getValues(lstCity[[layers.use]])))
+  # names(valsCity) <- c("LST_Day", "year")
+  # 
+  # valsCity$cover.tree <- stack(data.frame(getValues(treeCity[[layers.use]])))[,1]
+  # valsCity$cover.veg <- stack(data.frame(getValues(vegCity[[layers.use]])))[,1]
+  # valsCity$elevation <- getValues(elevCity)
+  # valsCity$cityBounds <- getValues(maskCity)
+  # valsCity$cityBounds <- !is.na(valsCity$cityBounds) # NA = buffer = FALSE citybounds
+  # valsCity$year <- as.numeric(substr(valsCity$year, 3, 6))
+  # valsCity[,c("x", "y", "location")] <- coordsCity
+  # valsCity <- valsCity[complete.cases(valsCity),]
+  # dim(valsCity); summary(valsCity)
   
   # Recode the cityBounds variable to be T/F
   # ggplot(data=valsCity[valsCity$year==2020,], aes(x=x, y=y)) +
@@ -283,14 +362,14 @@ for(CITY in citiesAnalyze){
   cityStatsCat$elev.min[row.cityCat] <- rev(aggregate(elevation ~ cityBounds, data=valsCity, FUN=min)[,2])
   cityStatsCat$elev.max[row.cityCat] <- rev(aggregate(elevation ~ cityBounds, data=valsCity, FUN=max)[,2])
   
-  cityStatsCat[row.cityCat,] # City first, then buffer
+  # cityStatsCat[row.cityCat,] # City first, then buffer
   
   
   # Running the actual model! Woot Woot
   modCity <- gam(LST_Day ~ cover.tree + cover.veg + elevation + s(x,y) + as.factor(year)-1, data=valsCity)
   sum.modCity <- summary(modCity)
-  valsCity$gam.pred <- predict(modCity)
-  valsCity$gam.resid <- resid(modCity)
+  valsCity$gam.pred[!is.na(valsCity$LST_Day)] <- predict(modCity)
+  valsCity$gam.resid[!is.na(valsCity$LST_Day)] <- resid(modCity)
   save(modCity, file=file.path(path.cities, CITY, paste0(CITY, "_Model_gam.RData")))
   # par(mfrow=c(1,1)); plot(modCity)
   
