@@ -99,6 +99,19 @@ citiesUse <- citiesUse$map(function(f){f$buffer(10e3)})
 ##################### 
 # 2. Load in data layers 
 ####################
+# -----------
+# 1.a MODIS Veg Mask Data -- Still need this to get the veg mask!
+# -----------
+vegMask <- ee$Image("users/crollinson/MOD44b_1km_Reproj_VegMask")
+# Map$addLayer(vegMask)
+
+# Using the same projection info as we saved all of the other layers in
+projMask = vegMask$projection()
+projCRS = projMask$crs()
+projTransform <- unlist(projMask$getInfo()$transform)
+# -----------
+
+
 tempColors <- c(
   '040274', '040281', '0502a3', '0502b8', '0502ce', '0502e6',
   '0602ff', '235cb1', '307ef3', '269db1', '30c8e2', '32d3ef',
@@ -124,6 +137,7 @@ vizTempK <- list(
 tempJulAug <- ee$ImageCollection('MODIS/006/MOD11A2')$filter(ee$Filter$dayOfYear(181, 240))$filter(ee$Filter$date("2001-01-01", "2020-12-31"))$map(addTime);
 tempJulAug <- tempJulAug$map(lstConvert)
 tempJulAug <- tempJulAug$map(setYear)
+
 # ee_print(tempJulAug)
 # tempJulAug$first()$propertyNames()$getInfo()
 # tempJulAug$first()$get("system:id")$getInfo()
@@ -137,6 +151,17 @@ tempJanFeb <- tempJanFeb$map(setYear)
 # ee_print(tempJanFeb$bandNames()$getInfo())
 # tempJanFeb$first()$get("system:id")$getInfo()
 
+
+# # Reset the projection so it's all the same as the first for sanity
+# This might be slow, but I think it's going to be better to do now rather than later for consistency with how I've treated other products
+tempJulAug = tempJulAug$map(function(img){
+  return(img$reproject(projMask))
+})
+
+tempJanFeb = tempJanFeb$map(function(img){
+  return(img$reproject(projMask))
+})
+
 # Filtering good LST Data --> note: we'll still do some outlier remover from each city
 lstDayGoodNH <- tempJulAug$map(lstMask)
 lstDayGoodSH <- tempJanFeb$map(lstMask)
@@ -148,18 +173,6 @@ lstDayGoodSH <- tempJanFeb$map(lstMask)
 # projCRS = projLST$crs()
 # projTransform <- unlist(projLST$getInfo()$transform)
 # ee_print(projLST)
-# -----------
-
-# -----------
-# 2.b MODIS Tree Data -- Still need this to get the veg mask!
-# -----------
-vegMask <- ee$Image("users/crollinson/MOD44b_1km_Reproj_VegMask")
-# Map$addLayer(vegMask)
-
-# Using the same projection info as we saved all of the other layers in
-projMask = vegMask$projection()
-projCRS = projMask$crs()
-projTransform <- unlist(projMask$getInfo()$transform)
 # -----------
 
 # -----------
