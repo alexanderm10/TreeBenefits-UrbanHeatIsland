@@ -248,8 +248,11 @@ for(CITY in citiesAnalyze){
   valsLST$x <- coordsLST$x
   valsLST$y <- coordsLST$y
   valsLST$location <- coordsLST$location
+  summary(valsLST)
   
-  nrow(coordsCity); nrow(coordsLST)
+  locLSTAll <- unique(valsLST$location[!is.na(valsLST$LST_Day)])
+  
+  # nrow(coordsCity); nrow(coordsLST)
   if(any(coordsLST$location %in% coordsCity$location)){
     valsCity <- merge(valsCity, valsLST, all.x=T, all.y=T)
   } else {
@@ -276,8 +279,11 @@ for(CITY in citiesAnalyze){
       minDist <- min(distLocCity)
       
       # If the closest cell is more than half a pixel away, skip it
-      if(minDist > 927/2) next 
-      locCity <- coordsCity$location[which(distLocCity==minDist)]
+      # if(minDist > 927/2) next 
+      if(minDist > 1000/2) next  # Adjusting to our nominal scale
+      
+      # # Useful if we need to diagnose code bugs
+      # locCity <- coordsCity$location[which(distLocCity==minDist)]
       
       valsCity$LST_Day[valsCity$location==locCity] <- valsLST$LST_Day[lstNow]
       valsCity$LST_Offset[valsCity$location==locCity] <- minDist
@@ -408,10 +414,14 @@ for(CITY in citiesAnalyze){
   	# Skip any analysis if there's less than 10 years of data or our trend doesn't go to the last 5 years of our record
   	if(length(rowsCity)<10 | max(valsCity$year[rowsCity])<=2015) next
   	
-  	trend.LST <- lm(LST_Day ~ year, data=valsCity[rowsCity,])
-  	sum.LST <- summary(trend.LST)
-  	summaryCity[i,c("LST.trend", "LST.p")] <- sum.LST$coefficients["year",c(1,4)]
-  	summaryCity[i,"LST.R2"] <- sum.LST $r.squared
+  	# The LST Data is going to be noisier, so we'll want to skip over anything without robust data
+  	lstGood <- which(valsCity$location==summaryCity$location[i] & !is.na(valsCity$LST_Day))
+  	if(length(lstGood)>10 & max(valsCity$year[lstGood])>2015){
+    	trend.LST <- lm(LST_Day ~ year, data=valsCity[rowsCity,])
+    	sum.LST <- summary(trend.LST)
+    	summaryCity[i,c("LST.trend", "LST.p")] <- sum.LST$coefficients["year",c(1,4)]
+    	summaryCity[i,"LST.R2"] <- sum.LST $r.squared
+  	}
   	
   	trend.tree <- lm(cover.tree ~ year, data=valsCity[rowsCity,])
   	sum.tree <- summary(trend.tree)
@@ -632,6 +642,8 @@ for(CITY in citiesAnalyze){
   }
   write.csv(cityStatsRegion, file.cityStatsRegion, row.names=F)  # Write our city stats file each time in case it bonks
 
+  print("") # Just give a clean return befor emoving on
+  
   # Remove a bunch of stuff for our own sanity
   # rm(elevCity, treeCity, vegCity, lstCity, modCity, valsCity, summaryCity, coordsCity, biome, sp.city, plot.corr.LST.Tree, plot.corr.LST.Veg, plot.corr.Tree.Veg, plot.lst.trend, plot.tree.trend, plot.veg.trend, plot.elev, plot.lst, plot.tree, plot.veg, veg.lst, veg.tree, tree.lst, veg.out, tree.out, sum.corrTreeLST, sum.corrVegLST, sum.corrVegTree, sum.modCity)
   
