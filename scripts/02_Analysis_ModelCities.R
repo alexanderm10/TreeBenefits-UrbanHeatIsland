@@ -6,13 +6,13 @@ overwrite=F
 
 # file paths for where to put the processed data
 # path.cities <- "../data_processed/data_cities_all"
-path.cities <- "/Volumes/GoogleDrive/Shared drives/Urban Ecological Drought/Trees-UHI Manuscript/Analysis/data_processed/data_cities_all"
+path.cities <- "/Volumes/GoogleDrive/Shared drives/Urban Ecological Drought/Trees-UHI Manuscript/Analysis/data_processed_final/data_cities_all"
 if(!dir.exists(path.cities)) dir.create(path.cities, recursive=T, showWarnings = F)
 file.cityStatsRegion <- file.path(path.cities, "../city_stats_all.csv")
 file.cityStatsCat <- file.path(path.cities, "../city_stats_core-buffer.csv")
 
 # Path to where Earth Engine is saving the spatial extractions
-path.EEout <- "/Volumes/GoogleDrive/My Drive/UHI_Analysis_Output"
+path.EEout <- "/Volumes/GoogleDrive/My Drive/UHI_Analysis_Output_Final/"
 
 # Some color palettes for later
 grad.temp <- c("#2c7bb6", "#abd9e9", "#ffffbf", "#fdae61", "#d7191c")
@@ -49,16 +49,8 @@ ecoregions$biome.name <- car::recode(ecoregions$BIOME, "'1'='tropical moist broa
                                                             '14'='mangroves'")
 summary(ecoregions)
 
-# Aggregating ecoregions by biome to make life easier!
-# Had hoped to avoid tidyverse, but that might not be possible at the moment
-# All methods I've tried give me an error abotu a duplicate vertex... grrr.
-# biomeSP <- aggregate(ecoregions, by=list(c("BIOME", "biome.name")), FUN=mean, do_union=T, simplify=T)
-# biomeSP <- ecoregions %>% 
-#   group_by("BIOME", "biome.name") %>% 
-#   summarise(geometry=sf::st_union(geometry)) %>% ungroup()
-# summary(biomeSP)
-
-# Transform the cities and ecoregion files to what we've worked with fo the MODIS data
+# Transform the cities and ecoregion files to what we've worked with for the MODIS data
+# NOTE: This *shouldn't* be necessary anymore, but there's a weird duplicate vertex issue that causes problems; doing the spTransform seems to help
 projMODIS <- "+proj=sinu +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs"
 sdei.urb <- st_transform(sdei.urb, crs(projMODIS))
 summary(sdei.urb)
@@ -138,6 +130,8 @@ cities.lst <- unlist(lapply(files.lst, FUN=function(x){strsplit(x, "_")[[1]][1]}
 cities.tree <- unlist(lapply(files.tree, FUN=function(x){strsplit(x, "_")[[1]][1]}))
 cities.veg <- unlist(lapply(files.veg, FUN=function(x){strsplit(x, "_")[[1]][1]}))
 
+
+# citiesDone <- unique(cities.lst)
 
 citiesDone <- unique(cities.lst[cities.lst %in% cities.elev & cities.lst %in% cities.tree & cities.lst %in% cities.veg])
 length(citiesDone)
