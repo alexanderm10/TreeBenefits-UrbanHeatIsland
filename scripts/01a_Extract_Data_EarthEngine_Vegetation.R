@@ -86,7 +86,7 @@ extractVeg <- function(CitySP, CityNames, TREE, VEG, BARE, GoogleFolderSave, ove
     # Start Other Veg Cover Layer
     vegCity <- VEG$clip(cityNow)
     # ee_print(vegCity)
-    exportVeg <- ee_image_to_drive(image=vegCity, description=paste0(cityID, "_Vegetation_PercentOtherVeg"), fileNamePrefix=paste0(cityID, "_Vegetation_PercentOtherVeg"), folder="UHI_Analysis_Output", timePrefix=F, region=cityNow$geometry(), maxPixels=5e7, crs=projCRS, crsTransform=projTransform)
+    exportVeg <- ee_image_to_drive(image=vegCity, description=paste0(cityID, "_Vegetation_PercentOtherVeg"), fileNamePrefix=paste0(cityID, "_Vegetation_PercentOtherVeg"), folder=GoogleFolderSave, timePrefix=F, region=cityNow$geometry(), maxPixels=5e7, crs=projCRS, crsTransform=projTransform)
     exportVeg$start()
 
     # Start No Veg Cover layer
