@@ -2,7 +2,7 @@ library(raster); library(sp); library(terra); library(sf)
 library(ggplot2)
 library(mgcv)
 
-overwrite=T
+overwrite=F
 
 # file paths for where to put the processed data
 # path.cities <- "../data_processed/data_cities_all"
@@ -293,7 +293,7 @@ for(CITY in citiesAnalyze){
   if(length(unique(valsCity$location[!is.na(valsCity$LST_Day)]))<50){
     print(warning("LST Spatial mismatch too big; skip city"))
     print("") # Just give a clean return before moving on
-    
+    cityStatsRegion$model.R2adj[row.city] <- -9999
     next
   }
   
