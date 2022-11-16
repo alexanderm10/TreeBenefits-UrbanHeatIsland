@@ -29,45 +29,6 @@ addTime <- function(image){
 setYear <- function(img){
   return(img$set("year", img$date()$get("year")))
 }
-
-lstConvert <- function(img){
-  lstDay <- img$select('LST_Day_1km')$multiply(0.02)
-  lstNight <- img$select('LST_Night_1km')$multiply(0.02)
-  lstK <- ee$Image(c(lstDay, lstNight));
-  img <- img$addBands(srcImg=lstK, overwrite=TRUE);
-  return(img)
-}
-
-# // Cleaning Up and getting just Good LST data
-# // Code adapted from https://gis.stackexchange.com/a/349401/5160
-# // Let's extract all pixels from the input image where
-# // Bits 0-1 <= 1 (LST produced of both good and other quality)
-# // Bits 2-3 = 0 (Good data quality)
-# // Bits 4-5 Ignore, any value is ok
-# // Bits 6-7 = 0 (Average LST error ≤ 1K)
-# // var lstMask = function(qcDay, lstDay){
-# //   var qaMask = bitwiseExtract(qcDay, 0, 1).lte(1)
-# //   var dataQualityMask = bitwiseExtract(qcDay, 2, 3).eq(0)
-# //   var lstErrorMask = bitwiseExtract(qcDay, 6, 7).eq(0)
-# //   var mask = qaMask.and(dataQualityMask).and(lstErrorMask)
-# //   var lstDayMasked = lstDay.updateMask(mask)  
-# // }
-bitwiseExtract <- function(input, fromBit, toBit) {
-  maskSize <- ee$Number(1)$add(toBit)$subtract(fromBit)
-  mask <- ee$Number(1)$leftShift(maskSize)$subtract(1)
-  return(input$rightShift(fromBit)$bitwiseAnd(mask))
-}
-
-lstMask <- function(img){
-  qcDay <- img$select('QC_Day')
-  qaMask <- bitwiseExtract(qcDay, 0, 1)$lte(1);
-  dataQualityMask <- bitwiseExtract(qcDay, 2, 3)$eq(0)
-  lstErrorMask <- bitwiseExtract(qcDay, 6, 7)$lte(2) # setting up error <=2 ˚K
-  datVal <- img$select('LST_Day_1km')$gt(0)
-  maskT <- qaMask$And(dataQualityMask)$And(lstErrorMask)$And(datVal)
-  lstDayMasked <- img$updateMask(maskT)
-  return(lstDayMasked)
-}
 ##################### 
 
 
@@ -99,18 +60,6 @@ citiesUse <- citiesUse$map(function(f){f$buffer(10e3)})
 ##################### 
 # 2. Load in data layers 
 ####################
-# -----------
-# 1.a MODIS Veg Mask Data -- Still need this to get the veg mask!
-# -----------
-vegMask <- ee$Image("users/crollinson/MOD44b_1km_Reproj_VegMask")
-# Map$addLayer(vegMask)
-
-# Using the same projection info as we saved all of the other layers in
-projMask = vegMask$projection()
-projCRS = projMask$crs()
-projTransform <- unlist(projMask$getInfo()$transform)
-# -----------
-
 
 tempColors <- c(
   '040274', '040281', '0502a3', '0502b8', '0502ce', '0502e6',
@@ -136,7 +85,8 @@ vizTempK <- list(
 # 2.a.1 - Northern Hemisphere: July/August
 JulAugList <- ee_manage_assetlist(path_asset = "users/crollinson/LST_JulAug_Clean/")
 tempJulAug <- ee$ImageCollection(JulAugList$ID)
-ee_print(tempJulAug)
+tempJulAug <- tempJulAug$map(setYear) # Note: This is needed here otherwise the format is weird and code doesn't work!
+# ee_print(tempJulAug)
 # tempJulAug$first()$propertyNames()$getInfo()
 # tempJulAug$first()$get("system:id")$getInfo()
 # ee_print(tempJulAug$first())
@@ -145,6 +95,15 @@ ee_print(tempJulAug)
 # 2.a.2 - Southern Hemisphere: Jan/Feb
 JanFebList <- ee_manage_assetlist(path_asset = "users/crollinson/LST_JanFeb_Clean/")
 tempJanFeb <- ee$ImageCollection(JanFebList$ID);
+tempJanFeb <- tempJanFeb$map(setYear) # Note: This is needed here otherwise the format is weird and code doesn't work!
+
+# ee_print(tempJanFeb)
+# Map$addLayer(tempJanFeb$first(), vizTempK, "Jan/Feb Temperature")
+
+projLST = tempJulAug$first()$projection()
+projCRS = projLST$crs()
+projTransform <- unlist(projLST$getInfo()$transform)
+
 # -----------
 
 # -----------
@@ -202,6 +161,7 @@ extractTempEE <- function(CitySP, CityNames, TEMPERATURE, GoogleFolderSave, over
     ptsThresh <- ee$Number(ptsMax)$multiply(ee$Number(thresh.prop))
     
     tempCityAll <- tempCityAll$filter(ee$Filter$gte("n_Pts", ptsThresh)) # have at least 5    
+    # ee_print(tempCityAll)
     # ---------------
 
     ## ----------------
@@ -378,12 +338,12 @@ length(cityIdS)
 length(cityIdN)
 
 
-# # All except 1 ran successfully
+# 
 if(length(cityIdS)>0){
   extractTempEE(CitySP=citiesUse, CityNames = cityIdS, TEMPERATURE=tempJanFeb$select("LST_Day_1km"), GoogleFolderSave = GoogleFolderSave)
 }
 
-# # All except 1 ran successfully
+# 
 if(length(cityIdN)>0){
   extractTempEE(CitySP=citiesUse, CityNames = cityIdN, TEMPERATURE=tempJulAug$select("LST_Day_1km"), GoogleFolderSave = GoogleFolderSave)
 }
