@@ -224,7 +224,8 @@ for(CITY in citiesAnalyze){
   # nrow(coordsCity); nrow(coordsVeg)
   if(all(coordsVeg$location == coordsCity$location)){
     valsCity <- valsCityVeg[,]
-    valsCity[,c("elevation", "cityBounds")] <- coordsCity[,c("elevation", "cityBounds")]
+    valsCity$elevation <- coordsCity$elevation
+    valsCity$cityBounds <- coordsCity$cityBounds
     # valsCity <- merge(coordsCity, valsCityVeg, all.x=T, all.y=T)
   } else {
     stop("Veg and Elev Layer doesn't match. :-( gotta figure it out")
