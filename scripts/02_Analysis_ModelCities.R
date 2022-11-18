@@ -222,8 +222,10 @@ for(CITY in citiesAnalyze){
   valsCityVeg$location <- coordsVeg$location
   
   # nrow(coordsCity); nrow(coordsVeg)
-  if(all(coordsVeg$location %in% coordsCity$location)){
-    valsCity <- merge(coordsCity, valsCityVeg, all.x=T, all.y=T)
+  if(all(coordsVeg$location == coordsCity$location)){
+    valsCity <- valsCityVeg[,]
+    valsCity[,c("elevation", "cityBounds")] <- coordsCity[,c("elevation", "cityBounds")]
+    # valsCity <- merge(coordsCity, valsCityVeg, all.x=T, all.y=T)
   } else {
     stop("Veg and Elev Layer doesn't match. :-( gotta figure it out")
   }
@@ -242,9 +244,13 @@ for(CITY in citiesAnalyze){
   # locLSTAll <- unique(valsLST$location[!is.na(valsLST$LST_Day)])
   
   # nrow(coordsCity); nrow(coordsLST)
-  if(any(coordsLST$location %in% coordsCity$location)){
+  if(all(coordsLST$location == coordsCity$location)){
+    valsCity$LST_Day <- valsLST$LST_Day
+    # valsCity <- merge(valsCity, valsLST, all.x=T, all.y=T)
+  } else if( any(coordsLST$location %in% valsCity$location)) {  
     valsCity <- merge(valsCity, valsLST, all.x=T, all.y=T)
-  } else {
+  } else 
+  {
     print(warning("LST coords do not match elev.  Doing nearest neighbor"))
     
     valsCity$LST_Day <- NA
@@ -272,8 +278,6 @@ for(CITY in citiesAnalyze){
       # If the closest cell is more than half a pixel away, skip it
       if(minDist > 927/2) next
       # if(minDist > 1000/2) next  # Adjusting to our nominal scale
-      
-      # # Useful if we need to diagnose code bugs
       
       valsCity$LST_Day[valsCity$location==locCity] <- valsLST$LST_Day[lstNow]
     }
