@@ -117,6 +117,7 @@ summary(cityStatsCat); dim(cityStatsCat)
 
 
 # Get a list of the files that are done
+# # Note: Some cities (2-3) seems to have >1 file, which is weird.  Can do a spot check or just roll with the last file like I think I have coded in
 files.elev <- dir(path.EEout, "elevation")
 files.lst <- dir(path.EEout, "LST_Day_Tmean")
 files.tree <- dir(path.EEout, "PercentTree")
