@@ -1,27 +1,357 @@
-#NOTE NOTE NOTE: THIS HAS NOT BEEN UPDATED YET!!
+# Script to synthesize the results from all of the individual city models ----
+library(ggplot2); library(RColorBrewer); library(cowplot)
+# path.figs <- "../figures/v6_vegonly"
 
-path.cities <- "/Volumes/GoogleDrive/Shared drives/Urban Ecological Drought/Trees-UHI Manuscript/Analysis/data_processed/data_cities_all"
-file.cityAll.stats <- file.path(path.cities, "../city_stats_all.csv")
 
+###########################################
+# Establish file paths etc ----
+###########################################
+path.cities <- "/Volumes/GoogleDrive/Shared drives/Urban Ecological Drought/Trees-UHI Manuscript/Analysis/data_processed_final"
+file.cityAll.stats <- file.path(path.cities, "city_stats_all.csv")
+
+path.figs <- file.path(path.cities, "figures")
+dir.create(path.figs, recursive=T, showWarnings=F)
+
+
+biome.pall.all = c("Taiga"= "#2c5c74", 
+                   "Tundra"="#6d8e9d",
+                   "Temperate Broadleaf Forest" = "#7f310f",
+                   "Temperate Conifer Forest" = "#4d1e10",
+                   "Temperate Grassland/Savanna" = "#b09c41",
+                   "Montane Grassland/Savanna" = "#a0b8c7",
+                   "Mediterranean" = "#bf772e",
+                   "Desert" = "#c89948",
+                   "Flooded Grassland/Savanna" = "#e0dfa1",
+                   "Tropical Grassland/Savanna" = "#a6b39e",
+                   "Tropical Dry Broadleaf Forest" = "#7a9c64",
+                   "Tropical Conifer Forest" = "#488458",
+                   "Tropical Moist Broadleaf Forest"= "#266240",
+                   "Mangroves" = "#9c8c94")
+
+world <- map_data("world")
+# ##########################################
+
+
+# ##########################################
+# Read in Data; do some cleanup ----
+# ##########################################
 cityAll.stats <- read.csv(file.cityAll.stats)
-summary(cityAll.stats[!is.na(cityAll.stats$model.tree.slope),])
+summary(cityAll.stats[!is.na(cityAll.stats$model.R2adj),])
 
+cityAll.stats$biome <- gsub("flodded", "flooded", cityAll.stats$biome) # Whoops, had a typo!  Not going to reprocess now.
 summary(as.factor(cityAll.stats$biome))
+
+cityAll.stats$biomeName <- car::recode(cityAll.stats$biome, 
+                                       "'boreal forest/taiga'='Taiga';
+                                       'tundra'='Tundra';
+                                       'montane grassland/savanna'='Montane Grassland/Savanna';
+                                       'temperate broadleaf/mixed forest'='Temperate Broadleaf Forest';
+                                       'temperate coniferous forest'='Temperate Conifer Forest';
+                                       'temperate grassland/savanna'='Temperate Grassland/Savanna';
+                                       'mediterranean'='Mediterranean';
+                                       'desert/xeric shrublands'='Desert';
+                                       'flooded grassland/savanna'='Flooded Grassland/Savanna';
+                                       'tropical grassland/savannas'='Tropical Grassland/Savanna';
+                                       'tropical dry broadleaf forest'='Tropical Dry Broadleaf Forest';
+                                       'tropical coniferous forest'='Tropical Conifer Forest';
+                                       'tropical moist broadleaf forest'='Tropical Moist Broadleaf Forest';
+                                       'mangroves'='Mangroves'")
+
+cityAll.stats$biomeClim[grepl("tropical", cityAll.stats$biome) | grepl("flooded", cityAll.stats$biome) | grepl("mangroves", cityAll.stats$biome)] <- "Tropical/Subtropical"
+cityAll.stats$biomeClim[grepl("temperate", cityAll.stats$biome)] <- "Temperate"
+cityAll.stats$biomeClim[grepl("xeric", cityAll.stats$biome) | grepl("mediterranean", cityAll.stats$biome)] <- "Dry"
+cityAll.stats$biomeClim[grepl("taiga", cityAll.stats$biome) | grepl("tundra", cityAll.stats$biome) | grepl("montane", cityAll.stats$biome)] <- "Polar/Montane"
+summary(as.factor(cityAll.stats$biomeClim))
+
+cityAll.stats$biomeVeg[grepl("forest", cityAll.stats$biome) | grepl("mangrove", cityAll.stats$biome)] <- "Forest"
+cityAll.stats$biomeVeg[grepl("grassland", cityAll.stats$biome)] <- "Grassland/Savanna"
+cityAll.stats$biomeVeg[grepl("shrub", cityAll.stats$biome) | grepl("tundra", cityAll.stats$biome) | grepl("mediterranean", cityAll.stats$biome)] <- "Shrubland"
+summary(as.factor(cityAll.stats$biomeVeg))
 # unique(cityAll.stats$ISO3)
+
+biome.order <- aggregate(LST.mean ~ biomeName, data=cityAll.stats, FUN=mean)
+biome.order <- biome.order[order(biome.order$LST.mean),]
+
+cityAll.stats$biomeName <- factor(cityAll.stats$biomeName, levels=biome.order$biomeName)
+
+biome.hist <- ggplot(data=cityAll.stats[!is.na(cityAll.stats$biome),]) +
+  geom_bar(aes(x=biomeName, fill=biomeName)) +
+  scale_fill_manual(values=biome.pall.all[]) +
+  scale_y_continuous(expand=c(0,0)) +
+  scale_x_discrete(name="Biome") +
+  guides(fill="none") +
+  theme_bw()+
+  theme(legend.title=element_blank(),
+        axis.text.x = element_text(angle=-30, hjust=0),
+        panel.background = element_rect(fill=NA),
+        panel.grid=element_blank(),
+        axis.text=element_text(color="black"),
+        axis.title=element_text(color="black", face="bold"), 
+        plot.margin = margin(1, 2, 0.5, 1, "lines"))
+
+biome.map <- ggplot(data=cityAll.stats[!is.na(cityAll.stats$biome),]) +
+  coord_equal(expand=0, ylim=c(-65,80)) +
+  geom_polygon(data=world, aes(x=long, y=lat, group=group), fill="gray50") +
+  geom_point(aes(x=LONGITUDE, y=LATITUDE, color=biomeName), size=0.5) +
+  scale_color_manual(name="biome", values=biome.pall.all) +
+  guides(color="none") +
+  theme_bw() +
+  theme(legend.position="top",
+        legend.title=element_text(color="black", face="bold", size=rel(1.5)),
+        legend.text=element_text(color="black"),
+        legend.background=element_blank(),
+        panel.background = element_rect(fill="NA"),
+        panel.grid = element_blank(),
+        axis.text=element_blank(),
+        axis.ticks=element_blank(),
+        axis.title=element_blank(),
+        plot.margin = margin(0.5, 2, 1, 3, "lines"))
+
+# biome.map
+png(file.path(path.figs, "CityDistribution_Biomes.png"), height=8, width=8, units="in", res=220)
+plot_grid(biome.map, biome.hist, ncol=1, rel_heights = c(0.45, 0.55))
+dev.off()
+# ##########################################
+
+
+# ##########################################
+# Exploratory of raw output ----
+# ##########################################
+
+# ##########################
+# Start with looking at some patterns of overall model fit (R2adj) ----
+# ##########################
+summary(cityAll.stats$model.R2adj)
+hist(cityAll.stats$model.R2adj)
+
+# don't save it, but do a quick map of model performance
+ggplot(data=cityAll.stats[!is.na(cityAll.stats$biome),])+
+  geom_histogram(aes(x=model.R2adj, fill=biomeName)) +
+  scale_fill_manual(name="biome", values=biome.pall.all) +
+  theme_bw()
+
+# The models with weird tree slopes are not the ones with low R2
+ggplot(data=cityAll.stats[!is.na(cityAll.stats$biome),])+
+  geom_point(aes(x=model.R2adj, y=model.tree.slope, color=biomeName)) +
+  scale_color_manual(name="biome", values=biome.pall.all) +
+  theme_bw()
+
+
+
+png(file.path(path.figs, "ModelFit_R2adj_Map.png"), height=6, width=12, units="in", res=220)
+ggplot(data=cityAll.stats[!is.na(cityAll.stats$biome),]) +
+  coord_equal(expand=0, ylim=c(-65,80)) +
+  geom_polygon(data=world, aes(x=long, y=lat, group=group), fill="gray50") +
+  geom_point(aes(x=LONGITUDE, y=LATITUDE, color=model.R2adj), size=0.5) +
+  # scale_color_manual(name="Tree Cooling\n(deg. C / % cover)", values=colors.cut) +
+  # scale_color_gradient2(name="Tree Cooling\n(deg. C / % cover)", low = "dodgerblue2", high = "red3", mid = "white", midpoint =0) +
+  theme_bw() +
+  theme(legend.position="top",
+        legend.title=element_text(color="black", face="bold"),
+        legend.text=element_text(color="black"),
+        legend.background=element_blank(),
+        panel.background = element_rect(fill="NA"),
+        panel.grid = element_blank(),
+        axis.text=element_blank(),
+        axis.ticks=element_blank(),
+        axis.title=element_blank(),
+        plot.margin=margin(0,0.5,0,1, "lines"))
+dev.off()
+# ##########################
+
+
+# ##########################
+# Now looking at the model slopes for trees ----
+# ##########################
+summary(cityAll.stats$model.tree.slope)
+cityAll.stats$tree.slope.cut <- cut(cityAll.stats$model.tree.slope, breaks=c(-Inf, -1, -0.5, -0.25, -0.1, -0.05, -0.025, 0, 0.025, 0.5, Inf))
+summary(cityAll.stats$tree.slope.cut)
+colors.cut <- c("#084594", "#2171b5", "#4292c6", "#6baed6", "#9ecae1", "#c6dbef", "#eff3ff", "#fee0d2", "#fc9272", "#de2d26")
+
+
+cooling.map <- ggplot(data=cityAll.stats[!is.na(cityAll.stats$biome),]) +
+  coord_equal(expand=0, ylim=c(-65,80)) +
+  geom_polygon(data=world, aes(x=long, y=lat, group=group), fill="gray50") +
+  geom_point(aes(x=LONGITUDE, y=LATITUDE, color=tree.slope.cut), size=0.5) +
+  scale_color_manual(name="Tree Cooling\n(deg. C / % cover)", values=colors.cut) +
+  # scale_color_gradient2(name="Tree Cooling\n(deg. C / % cover)", low = "dodgerblue2", high = "red3", mid = "white", midpoint =0) +
+  theme_bw() +
+  theme(legend.position="top",
+        legend.title=element_text(color="black", face="bold"),
+        legend.text=element_text(color="black"),
+        legend.background=element_blank(),
+        panel.background = element_rect(fill="NA"),
+        panel.grid = element_blank(),
+        axis.text=element_blank(),
+        axis.ticks=element_blank(),
+        axis.title=element_blank(),
+        plot.margin=margin(0,0.5,0,1, "lines"))
+
+TreeCoolingLat <- ggplot(data=cityAll.stats,) +
+  coord_flip(xlim=c(-65,80)) +
+  # coord_cartesian(, ylim=c(-65,80))
+  # geom_point(aes(x=LATITUDE, y=exp(model.tree.slope), color=biomeName)) +
+  geom_hline(yintercept=0, linetype="dashed") +
+  # geom_vline(xintercept=0, linetype="dashed", size=0.5, color="red") +
+  stat_smooth(aes(x=LATITUDE, y=model.tree.slope), color="black") +
+  scale_color_manual(values=biome.pall.all[]) +
+  scale_fill_manual(values=biome.pall.all[]) +
+  labs(y="Tree Cooling\n(deg C / % cover)", x="Latitude") +
+  # guides(fill="none") +
+  theme_bw()+
+  theme(legend.title=element_blank(),
+        panel.background = element_rect(fill=NA),
+        panel.grid=element_blank(),
+        axis.text=element_text(color="black"),
+        axis.title=element_text(color="black", face="bold"),
+        plot.margin=margin(8,1, 1.5, 0.5, "lines"))
+
+png(file.path(path.figs, "TreeCooling_PercentEffect_LatitudeCombo.png"), height=6, width=12, units="in", res=220)
+plot_grid(cooling.map, TreeCoolingLat, nrow=1, rel_widths = c(0.8, 0.2))
+dev.off()
+
+
 
 # Quick summary of places with significant tree cover trends -- most places (so far) have been INCREASING in cover, but also still getting warmer on average; how much would these cities have warmed without their trees??  
 summary(cityAll.stats[!is.na(cityAll.stats$trend.tree.slope) & cityAll.stats$trend.tree.p<0.01,])
 summary(cityAll.stats[!is.na(cityAll.stats$model.tree.slope) & cityAll.stats$model.tree.p<0.01,])
+summary(cityAll.stats[!is.na(cityAll.stats$model.tree.slope) & cityAll.stats$model.tree.p>0.01,])
+nrow(cityAll.stats[!is.na(cityAll.stats$model.tree.slope) & cityAll.stats$model.tree.p<0.01,]);
+nrow(cityAll.stats[!is.na(cityAll.stats$model.tree.slope) & cityAll.stats$model.tree.p>0.01,])
+
+nrow(cityAll.stats[!is.na(cityAll.stats$model.tree.slope) & cityAll.stats$model.tree.slope<0,]);
+nrow(cityAll.stats[!is.na(cityAll.stats$model.tree.slope) & cityAll.stats$model.tree.slope>0,])
+
+nrow(cityAll.stats[!is.na(cityAll.stats$model.tree.slope) & cityAll.stats$model.tree.slope<0 & cityAll.stats$model.tree.p<0.01,]);
+nrow(cityAll.stats[!is.na(cityAll.stats$model.tree.slope) & cityAll.stats$model.tree.slope<0 & cityAll.stats$model.tree.p<0.01,])/nrow(cityAll.stats[!is.na(cityAll.stats$model.tree.slope),])
 
 
-# Currently no actual statistical correlation between these two though.
-plot(trend.LST.slope ~ trend.tree.slope, data=cityAll.stats[!is.na(cityAll.stats$trend.LST.slope),])
-slopes.lm <- lm(trend.LST.slope ~ trend.tree.slope, data=cityAll.stats[!is.na(cityAll.stats$trend.LST.slope),])
-summary(slopes.lm)
+# Cities with significant warming effect of trees
+nrow(cityAll.stats[!is.na(cityAll.stats$model.tree.slope) & cityAll.stats$model.tree.slope>0 & cityAll.stats$model.tree.p<0.01,])
+nrow(cityAll.stats[!is.na(cityAll.stats$model.tree.slope) & cityAll.stats$model.tree.slope>0 & cityAll.stats$model.tree.p<0.01,])/nrow(cityAll.stats[!is.na(cityAll.stats$model.tree.slope),])
 
-slopes.lm.biome <- lm(trend.LST.slope ~ trend.tree.slope*biome, data=cityAll.stats[!is.na(cityAll.stats$trend.LST.slope),])
-anova(slopes.lm.biome)
-summary(slopes.lm.biome)
+# There are a couple in the US --> lets find those 
+cityAll.stats[!is.na(cityAll.stats$model.tree.slope) & cityAll.stats$model.tree.slope>0 & cityAll.stats$model.tree.p<0.01 & cityAll.stats$ISO3=="USA",]
+cityAll.stats[cityAll.stats$ISO3=="USA" & cityAll.stats$NAME=="Chicago",]
+
+ggplot(data=cityAll.stats[,]) +
+  geom_point(aes(x=tree.sd, y=model.tree.slope))
+ggplot(data=cityAll.stats[,]) +
+  geom_point(aes(x=veg.mean, y=model.tree.slope))
+ggplot(data=cityAll.stats[,]) +
+  geom_point(aes(x=100-(veg.mean + tree.mean), y=model.tree.slope))
+ggplot(data=cityAll.stats[,]) +
+  geom_point(aes(x=100-(veg.mean + tree.mean), y=model.R2adj))
+
+
+# Looking at the tree slope by biome & by MST
+TreeSlope.lm.biome <- lm(model.tree.slope ~ biome-1, data=cityAll.stats[!is.na(cityAll.stats$model.tree.slope),])
+anova(TreeSlope.lm.biome)
+summary(TreeSlope.lm.biome)
+
+TreeSlope.lm.mst <- lm(model.tree.slope ~ biome-1, data=cityAll.stats[!is.na(cityAll.stats$model.tree.slope),])
+anova(TreeSlope.lm.mst)
+summary(TreeSlope.lm.mst)
+
+
+ggplot(data=cityAll.stats[!is.na(cityAll.stats$model.R2adj),]) +
+  geom_histogram(aes(x=model.tree.slope, fill=biomeName, y=log(stat(count)))) +
+  geom_vline(xintercept=0, linetype="dashed") +
+  scale_fill_manual(values=biome.pall.all[]) +
+  scale_alpha_manual(values=c(0.4,1)) +
+  scale_y_continuous(expand=c(0,0)) +
+  theme_bw()+
+  theme(legend.title=element_blank(),
+        panel.background = element_rect(fill=NA),
+        panel.grid=element_blank(),
+        axis.text=element_text(color="black"),
+        axis.title=element_text(color="black", face="bold"))
+
+# Tree cooling as a funciton of LST
+ggplot(data=cityAll.stats[!is.na(cityAll.stats$model.R2adj) & cityAll.stats$model.tree.p<0.01,]) +
+  geom_point(aes(x = LST.mean, y=model.tree.slope, color=biomeName)) +
+  geom_hline(yintercept=0, linetype="dashed") +
+  scale_color_manual(values=biome.pall.all[]) +
+  scale_y_continuous(expand=c(0,0)) +
+  # guides(fill="none") +
+  theme_bw()+
+  theme(legend.title=element_blank(),
+        panel.background = element_rect(fill=NA),
+        panel.grid=element_blank(),
+        axis.text=element_text(color="black"),
+        axis.title=element_text(color="black", face="bold"))
+
+# Tree Cooling as a funciton of mean tree cover -- where do we get diminishing returns?
+ggplot(data=cityAll.stats[!is.na(cityAll.stats$model.R2adj) & cityAll.stats$model.tree.p<0.01,]) +
+  coord_cartesian(ylim=c(-2.5, 0.5)) +
+  geom_point(aes(x = tree.mean, y=model.tree.slope, color=biomeName)) +
+  geom_hline(yintercept=0, linetype="dashed") +
+  scale_color_manual(values=biome.pall.all[]) +
+  scale_y_continuous(expand=c(0,0)) +
+  # guides(fill="none") +
+  theme_bw()+
+  theme(legend.title=element_blank(),
+        panel.background = element_rect(fill=NA),
+        panel.grid=element_blank(),
+        axis.text=element_text(color="black"),
+        axis.title=element_text(color="black", face="bold"))
+
+ggplot(data=cityAll.stats[!is.na(cityAll.stats$model.R2adj) & cityAll.stats$model.tree.p<0.01,]) +
+  coord_cartesian(ylim=c(0, 1.5)) +
+  geom_point(aes(x = tree.mean, y=exp(model.tree.slope), color=biomeName), alpha=0.5) +
+  geom_hline(yintercept=exp(0), linetype="dashed") +
+  scale_color_manual(values=biome.pall.all[]) +
+  scale_y_continuous(expand=c(0,0)) +
+  # guides(fill="none") +
+  theme_bw()+
+  theme(legend.title=element_blank(),
+        panel.background = element_rect(fill=NA),
+        panel.grid=element_blank(),
+        axis.text=element_text(color="black"),
+        axis.title=element_text(color="black", face="bold"))
+
+# Ross had the suggestion of plotting the best fit lines for each biome, but to do that, we'll need to compute the trends by hand 
+biome.npts <- aggregate(model.tree.slope ~ biomeName, data=cityAll.stats, FUN = length)
+
+ggplot(data=cityAll.stats[!is.na(cityAll.stats$model.R2adj) & cityAll.stats$biomeName %in% biome.npts$biomeName[biome.npts$model.tree.slope>20],]) +
+  coord_cartesian(xlim=c(0, 20)) +
+  # geom_point(aes(x = tree.mean, y=model.tree.slope, color=biomeName), size=0.1) +
+  stat_smooth(aes(x = tree.mean, y=model.tree.slope, color=biomeName, fill=biomeName), alpha=0.3) +
+  geom_hline(yintercept=0, linetype="dashed") +
+  scale_color_manual(values=biome.pall.all[]) +
+  scale_fill_manual(values=biome.pall.all[]) +
+  scale_y_continuous(expand=c(0,0)) +
+  # guides(fill="none") +
+  theme_bw()+
+  theme(legend.title=element_blank(),
+        panel.background = element_rect(fill=NA),
+        panel.grid=element_blank(),
+        axis.text=element_text(color="black"),
+        axis.title=element_text(color="black", face="bold"))
+
+
+
+cityAll.stats[cityAll.stats$model.tree.slope< -2.5 & !is.na(cityAll.stats$model.tree.slope),]
+
+# ##########################
+
+
+
+
+ 
+
+
+
+####################################################
+####################################################
+# Everything that follows is OLD and has not been updated/incorporated yet
+####################################################
+####################################################
+
+
+
+
+
 
 
 # Trying to find Buenos Aires as an example to post in Slack
@@ -35,12 +365,21 @@ usa[order(usa$ES00POP, decreasing=T),c("ISOURBID", "NAME", "ES00POP", "biome", "
 # Sydney = AUS66430
 
 
+# Forest: Dark Greens (tropical); Dark Reds (Temperate); Dark Blue (Boreal)
+# Grasslands: Yellows
+# Dry: Oranges
 
 
-library(ggplot2); library(RColorBrewer)
-# path.figs <- "../figures/v6_vegonly"
-path.figs <- "/Volumes/GoogleDrive/My Drive/TreeBenefits_UrbanHeatIsland/figures/veg_only"
-dir.create(path.figs, recursive=T, showWarnings=F)
+
+
+biomes.all.df <- data.frame(biome=names(biome.pall.all), color=biome.pall.all)
+ggplot(data=biomes.all.df) +
+  geom_bar(aes(x=biome, fill=biome)) +
+  scale_fill_manual(values=biome.pall.all) +
+  scale_y_continuous(expand=c(0,0)) +
+  theme_bw() 
+
+
 
 biome.pall = data.frame(biome=c("Desert", "Grassland/Savanna", "Mediterranean", "Tropical Forest", "Temperate Forest", "Boreal"),
                         color=c("#D55E00", "#E69F00", "#CC79A7", "#009E73", "#56B4E9", "#0072B2"),
@@ -60,30 +399,15 @@ grad.bare <- c("#5e3c99", "#b2abd2", "#f7f7f7", "#fbd863", "#e66101") # Ends wit
 # --------------------------------------------------------------
 # Look at output
 # --------------------------------------------------------------
-dat.uhi <- read.csv("../data_processed/analysis_cities_summary_sdei_v6.csv")
-dat.filter <- dat.uhi$prop.missing<0.33 & dat.uhi$prop.temp.n.lo<0.33
+# dat.uhi <- read.csv("../data_processed/analysis_cities_summary_sdei_v6.csv")
+# dat.filter <- dat.uhi$prop.missing<0.33 & dat.uhi$prop.temp.n.lo<0.33
+# 
+# # Fix some biome mis-specifications
+# dat.uhi$WWF_ECO <- as.character(dat.uhi$WWF_ECO)
+# dat.uhi$WWF_BIOME <- as.character(dat.uhi$WWF_BIOME)
+# dat.uhi[is.na(dat.uhi$WWF_BIOME),]
+# dat.uhi[!is.na(dat.uhi$WWF_BIOME) & dat.uhi$WWF_BIOME=="98",]
 
-# Fix some biome mis-specifications
-dat.uhi$WWF_ECO <- as.character(dat.uhi$WWF_ECO)
-dat.uhi$WWF_BIOME <- as.character(dat.uhi$WWF_BIOME)
-dat.uhi[is.na(dat.uhi$WWF_BIOME),]
-dat.uhi[!is.na(dat.uhi$WWF_BIOME) & dat.uhi$WWF_BIOME=="98",]
-
-# Ecoregions based on looking at them on a map on a websites
-dat.uhi[dat.uhi$NAME=="NewYork", c("WWF_ECO", "WWF_BIOME")] <- c("Northeastern coastal forests", "temperate broadleaf/mixed forest")
-dat.uhi[dat.uhi$NAME=="SanJose", c("WWF_ECO", "WWF_BIOME")] <- c("California interior chaparral and woodlands", "mediterranean")
-dat.uhi[dat.uhi$NAME=="VirginiaBeach", c("WWF_ECO", "WWF_BIOME")] <- c("Middle Atlantic coastal forests", "temperate coniferous forest")
-dat.uhi[dat.uhi$NAME=="as-Sib", c("WWF_ECO", "WWF_BIOME")] <- c("Gulf of Oman desert and semi-desert", "desert/xeric shrublands")
-dat.uhi[dat.uhi$NAME=="Genova", c("WWF_ECO", "WWF_BIOME")] <- c("Italian sclerophyllous and semi-deciduous forests", "mediterranean")
-dat.uhi[dat.uhi$NAME=="Itaquari", c("WWF_ECO", "WWF_BIOME")] <- c("Bahia coastal forests", "tropical moist broadleaf forest")
-dat.uhi[dat.uhi$NAME=="Maracaibo", c("WWF_ECO", "WWF_BIOME")] <- c("Guajira-Barranquilla xeric scrub", "desert/xeric shrublands")
-dat.uhi[dat.uhi$NAME=="Shenzhen", c("WWF_ECO", "WWF_BIOME")] <- c("South China-Vietnam subtropical evergreen forests", "tropical moist broadleaf forest")
-dat.uhi[dat.uhi$NAME=="Toronto", c("WWF_ECO", "WWF_BIOME")] <- c("Southern Great Lakes forests", "temperate broadleaf/mixed forest")
-dat.uhi[dat.uhi$NAME=="Rasht", c("WWF_ECO", "WWF_BIOME")] <- c("Caspian Hyrcanian mixed forests", "temperate coniferous forest")
-dat.uhi$WWF_ECO <- as.factor(dat.uhi$WWF_ECO)
-dat.uhi$WWF_BIOME <- as.factor(dat.uhi$WWF_BIOME)
-dat.uhi[dat.uhi$WWF_BIOME=="mangroves",]
-summary(dat.uhi$WWF_BIOME)
 
 # Lumping the biomes a bit more to make easier to see figures
 dat.uhi$Biome2 <- car::recode(dat.uhi$WWF_BIOME, 
