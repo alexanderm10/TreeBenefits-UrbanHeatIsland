@@ -125,21 +125,17 @@ summary(cityAll.stats$model.R2adj)
 hist(cityAll.stats$model.R2adj)
 
 # don't save it, but do a quick map of model performance
-ggplot(data=cityAll.stats[!is.na(cityAll.stats$biome),])+
-  geom_histogram(aes(x=model.R2adj, fill=biomeName)) +
-  scale_fill_manual(name="biome", values=biome.pall.all) +
-  theme_bw()
+# # The models with weird tree slopes are not the ones with low R2
+# ggplot(data=cityAll.stats[!is.na(cityAll.stats$biome),])+
+#   geom_point(aes(x=model.R2adj, y=model.tree.slope, color=biomeName)) +
+#   scale_color_manual(name="biome", values=biome.pall.all) +
+#   theme_bw()
 
-# The models with weird tree slopes are not the ones with low R2
-ggplot(data=cityAll.stats[!is.na(cityAll.stats$biome),])+
-  geom_point(aes(x=model.R2adj, y=model.tree.slope, color=biomeName)) +
-  scale_color_manual(name="biome", values=biome.pall.all) +
-  theme_bw()
+mod.r2.biome <- lm(model.R2adj ~ biomeName-1, data=cityAll.stats)
+anova(mod.r2.biome)
+summary(mod.r2.biome)
 
-
-
-png(file.path(path.figs, "ModelFit_R2adj_Map.png"), height=6, width=12, units="in", res=220)
-ggplot(data=cityAll.stats[!is.na(cityAll.stats$biome),]) +
+r2.map <- ggplot(data=cityAll.stats[!is.na(cityAll.stats$biome),]) +
   coord_equal(expand=0, ylim=c(-65,80)) +
   geom_polygon(data=world, aes(x=long, y=lat, group=group), fill="gray50") +
   geom_point(aes(x=LONGITUDE, y=LATITUDE, color=model.R2adj), size=0.5) +
@@ -156,12 +152,32 @@ ggplot(data=cityAll.stats[!is.na(cityAll.stats$biome),]) +
         axis.ticks=element_blank(),
         axis.title=element_blank(),
         plot.margin=margin(0,0.5,0,1, "lines"))
+
+png(file.path(path.figs, "ModelFit_R2adj_Map.png"), height=6, width=12, units="in", res=220)
+r2.map
 dev.off()
+
+r2.histo.biome <- ggplot(data=cityAll.stats[!is.na(cityAll.stats$biome),])+
+  geom_histogram(aes(x=model.R2adj, fill=biomeName)) +
+  scale_fill_manual(name="biome", values=biome.pall.all) +
+  theme_bw() +
+  theme(legend.position="right",
+        legend.title=element_text(color="black", face="bold"),
+        legend.text=element_text(size=rel(0.8), color="black"),
+        legend.background=element_blank(),
+        panel.background = element_rect(fill="NA"),
+        panel.grid = element_blank())
+
+
+png(file.path(path.figs, "ModelFit_R2adj_histogram.png"), height=8, width=8, units="in", res=220)
+plot_grid(r2.map, r2.histo.biome, ncol=1, rel_heights = c(0.6, 0.4))
+dev.off()
+
 # ##########################
 
 hist(cityAll.stats$model.elev.slope)
 summary(cityAll.stats$model.elev.slope)
-
+nrow(cityAll.stats)
 # ##########################
 # Now looking at the model slopes for trees ----
 # ##########################
