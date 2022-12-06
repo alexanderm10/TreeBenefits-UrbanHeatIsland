@@ -9,7 +9,6 @@ overwrite=F
 path.cities <- "/Volumes/GoogleDrive/Shared drives/Urban Ecological Drought/Trees-UHI Manuscript/Analysis/data_processed_final/data_cities_all"
 if(!dir.exists(path.cities)) dir.create(path.cities, recursive=T, showWarnings = F)
 file.cityStatsRegion <- file.path(path.cities, "../city_stats_all.csv")
-file.cityStatsCat <- file.path(path.cities, "../city_stats_core-buffer.csv")
 
 # Path to where Earth Engine is saving the spatial extractions
 path.EEout <- "/Volumes/GoogleDrive/My Drive/UHI_Analysis_Output_Final/"
@@ -62,7 +61,6 @@ if(!file.exists(file.cityStatsRegion) | overwrite){
   # cityStatsRegion <- read.csv("../sdei-global-uhi-2013.csv")
   cols.keep <-  c("ISOURBID", "ISO3", "URBID", "NAME", "LATITUDE", "LONGITUDE", "ES00POP")
   cityStatsRegion <- data.frame(sdei.urb[, cols.keep])[,1:length(cols.keep)]
-  cityStatsCat <- merge(data.frame(sdei.urb[, cols.keep])[,1:length(cols.keep)], data.frame(City.Buff = c("City", "Buffer")))
   # head(cityStatsRegion)
   
   # ------------------
@@ -91,30 +89,11 @@ if(!file.exists(file.cityStatsRegion) | overwrite){
   # ------------------
  
   
-  # ------------------
-  # Setting up a sheet that compares urban core and buffer
-  # ------------------
-  cityStatsCat[,c("biome", "n.pixels", "LST.mean", "LST.sd", "LST.min", "LST.max", "tree.mean", "tree.sd", "tree.min", "tree.max", "veg.mean", "veg.sd", "veg.min", "veg.max", "elev.mean", "elev.sd", "elev.min", "elev.max")] <- NA
-  
-  cityStatsCat[,c("trend.LST.slope", "trend.LST.slope.sd", "trend.LST.p")] <- NA
-  cityStatsCat[,c("trend.tree.slope", "trend.tree.slope.sd", "trend.tree.p")] <- NA
-  cityStatsCat[,c("trend.veg.slope", "trend.veg.slope.sd", "trend.veg.p")] <- NA
-  
-  summary(cityStatsCat)
-  dim(cityStatsCat)
-  
-  write.csv(cityStatsCat, file.cityStatsCat, row.names=F)  
-  
-  # ------------------
-  
+
 }
 
 cityStatsRegion <- read.csv(file.cityStatsRegion)
 summary(cityStatsRegion); dim(cityStatsRegion)
-
-cityStatsCat <- read.csv(file.cityStatsCat)
-summary(cityStatsCat); dim(cityStatsCat)
-
 
 # Get a list of the files that are done
 # # Note: Some cities (2-3) seems to have >1 file, which is weird.  Can do a spot check or just roll with the last file like I think I have coded in
@@ -145,7 +124,6 @@ for(CITY in citiesAnalyze){
   # # Good Test Cities: Sydney (AUS66430)
   # CITY="AUS66430"; CITY="USA26687"
   row.city <- which(cityStatsRegion$ISOURBID==CITY)
-  row.cityCat <- which(cityStatsCat$ISOURBID==CITY)
   print(CITY)
   citySP <- sdei.urb[sdei.urb$ISOURBID==CITY, ]
   cityBuff <- st_buffer(citySP, dist=10e3)
@@ -159,17 +137,14 @@ for(CITY in citiesAnalyze){
   if(nrow(biome)>0){ # Some aren't quite aligning-- we'll figure those out later
     if(nrow(biome)==1){
       cityStatsRegion$biome[row.city] <- biome$biome.name
-      cityStatsCat$biome[row.cityCat] <- biome$biome.name
     } else {
       biome$area <- st_area(biome)
       biome.sum <- aggregate(area ~ biome.name, data=biome, FUN=sum)
 
       if(nrow(biome.sum)>1){
         cityStatsRegion$biome[row.city] <- biome.sum$biome.name[biome.sum$area==max(biome.sum$area)]
-        cityStatsCat$biome[row.cityCat] <- biome.sum$biome.name[biome.sum$area==max(biome.sum$area)]
       } else {
         cityStatsRegion$biome[row.city] <- biome.sum$biome.name
-        cityStatsCat$biome[row.cityCat] <- biome.sum$biome.name
       }
 
       rm(biome.sum)
@@ -353,29 +328,7 @@ for(CITY in citiesAnalyze){
   cityStatsRegion$elev.max[row.city] <- max(valsCity$elevation, na.rm=T)
   # cityStatsRegion[row.city,]
   
-  # also doing all fo the stats for core vs buffer
-  # Note that in the cityStatsCat, city is listed before buffer, this means we have to reverse the order we write things in
-  cityStatsCat$n.pixels[row.cityCat] <- rev(aggregate(location ~ cityBounds, data=valsCity, FUN=function(x){ length(unique(x))})[,2])
-  cityStatsCat$LST.mean[row.cityCat] <- rev(aggregate(LST_Day ~ cityBounds, data=valsCity, FUN=mean)[,2])
-  cityStatsCat$LST.sd[row.cityCat] <- rev(aggregate(LST_Day ~ cityBounds, data=valsCity, FUN=sd)[,2])
-  cityStatsCat$LST.min[row.cityCat] <- rev(aggregate(LST_Day ~ cityBounds, data=valsCity, FUN=min)[,2])
-  cityStatsCat$LST.max[row.cityCat] <- rev(aggregate(LST_Day ~ cityBounds, data=valsCity, FUN=max)[,2])
-  cityStatsCat$tree.mean[row.cityCat] <- rev(aggregate(cover.tree ~ cityBounds, data=valsCity, FUN=mean)[,2])
-  cityStatsCat$tree.sd[row.cityCat] <- rev(aggregate(cover.tree ~ cityBounds, data=valsCity, FUN=sd)[,2])
-  cityStatsCat$tree.min[row.cityCat] <- rev(aggregate(cover.tree ~ cityBounds, data=valsCity, FUN=min)[,2])
-  cityStatsCat$tree.max[row.cityCat] <- rev(aggregate(cover.tree ~ cityBounds, data=valsCity, FUN=max)[,2])
-  cityStatsCat$veg.mean[row.cityCat] <- rev(aggregate(cover.veg ~ cityBounds, data=valsCity, FUN=mean)[,2])
-  cityStatsCat$veg.sd[row.cityCat] <- rev(aggregate(cover.veg ~ cityBounds, data=valsCity, FUN=sd)[,2])
-  cityStatsCat$veg.min[row.cityCat] <- rev(aggregate(cover.veg ~ cityBounds, data=valsCity, FUN=min)[,2])
-  cityStatsCat$veg.max[row.cityCat] <- rev(aggregate(cover.veg ~ cityBounds, data=valsCity, FUN=max)[,2])
-  cityStatsCat$elev.mean[row.cityCat] <- rev(aggregate(elevation ~ cityBounds, data=valsCity, FUN=mean)[,2])
-  cityStatsCat$elev.sd[row.cityCat] <- rev(aggregate(elevation ~ cityBounds, data=valsCity, FUN=sd)[,2])
-  cityStatsCat$elev.min[row.cityCat] <- rev(aggregate(elevation ~ cityBounds, data=valsCity, FUN=min)[,2])
-  cityStatsCat$elev.max[row.cityCat] <- rev(aggregate(elevation ~ cityBounds, data=valsCity, FUN=max)[,2])
-  
-  # cityStatsCat[row.cityCat,] # City first, then buffer
-  
-  
+
   # Running the actual model! Woot Woot
   modCity <- gam(LST_Day ~ cover.tree + cover.veg + elevation + s(x,y) + as.factor(year)-1, data=valsCity)
   sum.modCity <- summary(modCity)
@@ -525,16 +478,6 @@ for(CITY in citiesAnalyze){
     cityStatsRegion$trend.veg.slope.sd[row.city] <- sd(summaryCity$veg.trend, na.rm=T)
     veg.out <- t.test(summaryCity$veg.trend)
     cityStatsRegion$trend.veg.p[row.city] <- veg.out$p.value
-    
-    
-    cityStatsCat$trend.LST.slope[row.cityCat] <- rev(aggregate(LST.trend ~ cityBounds, data=summaryCity, FUN=mean)[,2])
-    cityStatsCat$trend.LST.slope.sd[row.cityCat] <- rev(aggregate(LST.trend ~ cityBounds, data=summaryCity, FUN=sd)[,2])
-    cityStatsCat$trend.tree.slope[row.cityCat] <- rev(aggregate(tree.trend ~ cityBounds, data=summaryCity, FUN=mean)[,2])
-    cityStatsCat$trend.tree.slope.sd[row.cityCat] <- rev(aggregate(tree.trend ~ cityBounds, data=summaryCity, FUN=sd)[,2])
-    cityStatsCat$trend.veg.slope[row.cityCat] <- rev(aggregate(veg.trend ~ cityBounds, data=summaryCity, FUN=mean)[,2])
-    cityStatsCat$trend.veg.slope.sd[row.cityCat] <- rev(aggregate(veg.trend ~ cityBounds, data=summaryCity, FUN=sd)[,2])
-    # cityStatsCat[row.cityCat,]
-    
     
     
     # Creating and saving some maps of those trends
