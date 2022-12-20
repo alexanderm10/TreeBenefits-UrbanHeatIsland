@@ -75,6 +75,7 @@ biome.order <- aggregate(LST.mean ~ biomeName, data=cityAll.stats, FUN=mean)
 biome.order <- biome.order[order(biome.order$LST.mean),]
 
 cityAll.stats$biomeName <- factor(cityAll.stats$biomeName, levels=biome.order$biomeName)
+# ##########################################
 
 
 

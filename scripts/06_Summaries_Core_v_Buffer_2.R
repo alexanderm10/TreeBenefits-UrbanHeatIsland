@@ -1,0 +1,115 @@
+# # Script to go through the pixel-level data and calculate the core vs buffer stats
+library(ggplot2); library(RColorBrewer); library(cowplot)
+
+###########################################
+# Establish file paths etc ----
+###########################################
+path.cities <- "/Volumes/GoogleDrive/Shared drives/Urban Ecological Drought/Trees-UHI Manuscript/Analysis/data_processed_final"
+
+path.figs <- file.path(path.cities, "figures")
+dir.create(path.figs, recursive=T, showWarnings=F)
+
+grad.lst <- c("#2c7bb6", "#abd9e9", "#f7f7f7", "#fdae61", "#d7191c") # ends with red
+grad.tree <- c("#a6611a", "#dfc27d", "#f5f5f5", "#80cdc1", "#018571") # ends with teal
+grad.other <- c("#d01c8b", "#f1b6da", "#f7f7f7", "#b8e186", "#4dac26") # ends with green
+
+
+biome.pall.all = c("Taiga"= "#2c5c74", 
+                   "Tundra"="#6d8e9d",
+                   "Temperate Broadleaf Forest" = "#7f310f",
+                   "Temperate Conifer Forest" = "#4d1e10",
+                   "Temperate Grassland/Savanna" = "#b09c41",
+                   "Montane Grassland/Savanna" = "#a0b8c7",
+                   "Mediterranean" = "#bf772e",
+                   "Desert" = "#c89948",
+                   "Flooded Grassland/Savanna" = "#e0dfa1",
+                   "Tropical Grassland/Savanna" = "#a6b39e",
+                   "Tropical Dry Broadleaf Forest" = "#7a9c64",
+                   "Tropical Conifer Forest" = "#488458",
+                   "Tropical Moist Broadleaf Forest"= "#266240",
+                   "Mangroves" = "#9c8c94")
+
+world <- map_data("world")
+# ##########################################
+
+
+# ##########################################
+# Read in base datasets ----
+# ##########################################
+# Regional Sumary Stuff ----
+cityAll.stats <- read.csv(file.path(path.cities, "city_stats_all.csv"))
+summary(cityAll.stats[!is.na(cityAll.stats$model.R2adj),])
+
+cityAll.stats$biome <- gsub("flodded", "flooded", cityAll.stats$biome) # Whoops, had a typo!  Not going to reprocess now.
+summary(as.factor(cityAll.stats$biome))
+
+cityAll.stats$biomeName <- car::recode(cityAll.stats$biome, 
+                                       "'boreal forest/taiga'='Taiga';
+                                       'tundra'='Tundra';
+                                       'montane grassland/savanna'='Montane Grassland/Savanna';
+                                       'temperate broadleaf/mixed forest'='Temperate Broadleaf Forest';
+                                       'temperate coniferous forest'='Temperate Conifer Forest';
+                                       'temperate grassland/savanna'='Temperate Grassland/Savanna';
+                                       'mediterranean'='Mediterranean';
+                                       'desert/xeric shrublands'='Desert';
+                                       'flooded grassland/savanna'='Flooded Grassland/Savanna';
+                                       'tropical grassland/savannas'='Tropical Grassland/Savanna';
+                                       'tropical dry broadleaf forest'='Tropical Dry Broadleaf Forest';
+                                       'tropical coniferous forest'='Tropical Conifer Forest';
+                                       'tropical moist broadleaf forest'='Tropical Moist Broadleaf Forest';
+                                       'mangroves'='Mangroves'")
+
+biome.order <- aggregate(LST.mean ~ biomeName, data=cityAll.stats, FUN=mean)
+biome.order <- biome.order[order(biome.order$LST.mean),]
+
+cityAll.stats$biomeName <- factor(cityAll.stats$biomeName, levels=biome.order$biomeName)
+# ##########################################
+
+
+# ##########################################
+# Exploring Core vs. Buffer data -----
+# ##########################################
+CityBuffStats <- read.csv(file.path(path.cities, "city_stats_core-buffer.csv"))
+summary(CityBuffStats)
+
+# need
+# library(tidyr)
+# spread(dat1, key = numbers, value = value)
+valMean <- reshape(CityBuffStats[,c("ISOURBID", "factor", "value.mean.core")], idvar="ISOURBID", timevar="factor", direction="wide")
+valMean2 <- reshape(CityBuffStats[,c("ISOURBID", "factor", "value.mean.buffer")], idvar="ISOURBID", timevar="factor", direction="wide")
+head(valMean2)
+valMean[,names(valMean2)[2:4]] <- valMean2[,2:4]
+
+# Merge in metadata
+valMean <- merge(valMean, cityAll.stats[,c("ISOURBID", "NAME",  "LATITUDE", "LONGITUDE", "ES00POP", "biomeName", "model.tree.slope", "model.veg.slope")], all=T)
+summary(valMean)
+
+# Looking at the difference in tree cover between the metro core & buffer
+valMean$LST.diff <- valMean$value.mean.core.LST-valMean$value.mean.buffer.LST
+
+valMean$Tree.diff <- valMean$value.mean.core.tree-valMean$value.mean.buffer.tree
+valMean$Tree.diff.degC <- valMean$Tree.diff*valMean$model.tree.slope
+
+summary(valMean)
+mean(valMean$Tree.diff); sd(valMean$Tree.diff)
+mean(valMean$Tree.diff.degC); sd(valMean$Tree.diff.degC)
+
+# Proportion of the LST diff attributable to Tree Cover ----
+valMean$percentTreeCool <- valMean$Tree.diff.degC/valMean$LST.diff
+
+mean(valMean$percentTreeCool); sd(valMean$percentTreeCool)
+
+# Looking at temporal trends in the urban core ----
+valTrendCore <- reshape(CityBuffStats[,c("ISOURBID", "factor", "trend.mean.core")], idvar="ISOURBID", timevar="factor", direction="wide")
+valTrendCore <- merge(valTrendCore, cityAll.stats[,c("ISOURBID", "NAME",  "LATITUDE", "LONGITUDE", "ES00POP", "biomeName", "model.tree.slope", "model.veg.slope")], all=T)
+
+# Converting the tree trend to deg. C per year ----
+valTrendCore$LST.change.Tree <- valTrendCore$trend.mean.core.tree*valTrendCore$model.tree.slope
+valTrendCore$LST.change.NoTree <- valTrendCore$trend.mean.core.LST - valTrendCore$LST.change.Tree
+summary(valTrendCore)
+
+summary(valTrendCore[ ,c("trend.mean.core.LST", "LST.change.Tree", "LST.change.NoTree")]*20)
+summary(valTrendCore$LST.change.NoTree/valTrendCore$LST.change.Tree)
+
+# hist(valTrendCore$LST.change.Tree/valTrendCore$LST.change.NoTree, xlim=-)
+
