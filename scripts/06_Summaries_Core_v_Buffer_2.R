@@ -90,6 +90,9 @@ valMean$LST.diff <- valMean$value.mean.core.LST-valMean$value.mean.buffer.LST
 valMean$Tree.diff <- valMean$value.mean.core.tree-valMean$value.mean.buffer.tree
 valMean$Tree.diff.degC <- valMean$Tree.diff*valMean$model.tree.slope
 
+valMean$Veg.diff <- valMean$`value.mean.core.other veg`-valMean$`value.mean.buffer.other veg`
+valMean$Veg.diff.degC <- valMean$Veg.diff*valMean$model.veg.slope
+
 summary(valMean)
 mean(valMean$Tree.diff); sd(valMean$Tree.diff)
 mean(valMean$Tree.diff.degC); sd(valMean$Tree.diff.degC)
@@ -99,7 +102,53 @@ valMean$percentTreeCool <- valMean$Tree.diff.degC/valMean$LST.diff
 
 mean(valMean$percentTreeCool); sd(valMean$percentTreeCool)
 
-# Looking at temporal trends in the urban core ----
+#### Exploring statements from our outline ----
+# https://docs.google.com/document/d/1jzRpgNR8pWvmhS0bCULx4iAG5QjX5b0GcW8YPAs01VI/edit?usp=sharing
+
+# Of the cities with showing UHI effects, XX% have decreased tree canopy cover, with a mean differences  XX% between the core metropolitan area and surrounding landscape.
+hist(valMean$Tree.diff[valMean$LST.diff>0])
+mean(valMean$Tree.diff[valMean$LST.diff>0]); sd(valMean$Tree.diff[valMean$LST.diff>0]) 
+quantile(valMean$Tree.diff[valMean$LST.diff>0], c(0.05, 0.5, 0.95))
+
+hist(valMean$Tree.diff.degC[valMean$LST.diff>0])
+mean(valMean$Tree.diff.degC[valMean$LST.diff>0]); sd(valMean$Tree.diff.degC[valMean$LST.diff>0]) 
+t.test(valMean$Tree.diff[valMean$LST.diff>0])
+t.test(valMean$Tree.diff.degC[valMean$LST.diff>0])
+
+summary(valMean$Tree.diff.degC[valMean$LST.diff>0]/valMean$LST.diff[valMean$LST.diff>0])
+mean(valMean$Tree.diff.degC[valMean$LST.diff>0]/valMean$LST.diff[valMean$LST.diff>0]); sd(valMean$Tree.diff.degC[valMean$LST.diff>0]/valMean$LST.diff[valMean$LST.diff>0])
+
+mean(valMean$Tree.diff.degC[valMean$LST.diff>0 & valMean$Tree.diff<0]/valMean$LST.diff[valMean$LST.diff>0 & valMean$Tree.diff<0])
+
+length(valMean$Tree.diff.degC[valMean$LST.diff>0 & valMean$Tree.diff<0])
+mean(valMean$Tree.diff.degC[valMean$LST.diff>0 & valMean$Tree.diff<0]); sd(valMean$Tree.diff.degC[valMean$LST.diff>0 & valMean$Tree.diff<0])
+# t.test(valMean$value.mean.core.tree[valMean$LST.diff>0], valMean$value.mean.buffer.tree[valMean$LST.diff>0], paired=T)
+
+hist(valMean$Veg.diff[valMean$LST.diff>0])
+mean(valMean$Veg.diff[valMean$LST.diff>0]); sd(valMean$Veg.diff[valMean$LST.diff>0]) 
+mean(valMean$Veg.diff.degC[valMean$LST.diff>0]); sd(valMean$Veg.diff.degC[valMean$LST.diff>0]) 
+t.test(valMean$Veg.diff[valMean$LST.diff>0])
+
+
+nrow(valMean[valMean$LST.diff>0 & valMean$Veg.diff<0,])/nrow(valMean[valMean$LST.diff>0,])
+nrow(valMean[valMean$LST.diff>0 & valMean$Veg.diff>0,])/nrow(valMean[valMean$LST.diff>0,])
+
+mean(valMean$Tree.diff[valMean$LST.diff>0 & valMean$Tree.diff<0]); sd(valMean$Tree.diff[valMean$LST.diff>0 & valMean$Tree.diff<0])
+
+# Conversely -- looking at the cities with negative LST diff
+hist(valMean$Tree.diff[valMean$LST.diff<0])
+mean(valMean$Tree.diff[valMean$LST.diff<0]); sd(valMean$Tree.diff[valMean$LST.diff<0]) 
+quantile(valMean$Tree.diff[valMean$LST.diff<0], c(0.025, 0.5, 0.975))
+t.test(valMean$Tree.diff[valMean$LST.diff<0])
+
+nrow(valMean[valMean$LST.diff<0 & valMean$Tree.diff>0,])/nrow(valMean[valMean$LST.diff<0,])
+
+mean(valMean$Tree.diff[valMean$LST.diff>0 & valMean$Tree.diff<0]); sd(valMean$Tree.diff[valMean$LST.diff>0 & valMean$Tree.diff<0])
+
+
+
+
+### # Looking at temporal trends in the urban core ----
 valTrendCore <- reshape(CityBuffStats[,c("ISOURBID", "factor", "trend.mean.core")], idvar="ISOURBID", timevar="factor", direction="wide")
 valTrendCore <- merge(valTrendCore, cityAll.stats[,c("ISOURBID", "NAME",  "LATITUDE", "LONGITUDE", "ES00POP", "biomeName", "model.tree.slope", "model.veg.slope")], all=T)
 
@@ -112,4 +161,5 @@ summary(valTrendCore[ ,c("trend.mean.core.LST", "LST.change.Tree", "LST.change.N
 summary(valTrendCore$LST.change.NoTree/valTrendCore$LST.change.Tree)
 
 # hist(valTrendCore$LST.change.Tree/valTrendCore$LST.change.NoTree, xlim=-)
+
 

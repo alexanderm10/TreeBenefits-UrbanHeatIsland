@@ -100,6 +100,9 @@ mean(CityBuffStats$value.mean.diff[CityBuffStats$factor=="LST"]); sd(CityBuffSta
 nrow(CityBuffStats[CityBuffStats$factor=="LST" & CityBuffStats$value.mean.diff<0 & CityBuffStats$value.mean.diff.p<0.01,])
 nrow(CityBuffStats[CityBuffStats$factor=="LST" & CityBuffStats$value.mean.diff<0 & CityBuffStats$value.mean.diff.p<0.01 & (grepl("Grassland", CityBuffStats$biomeName) | CityBuffStats$biomeName %in% c("Mediterranean", "Desert")),])
 
+nrow(CityBuffStats[CityBuffStats$factor=="LST" & CityBuffStats$value.mean.diff<0 & CityBuffStats$value.mean.diff.p<0.01,])/nrow(CityBuffStats[CityBuffStats$factor=="LST",])
+
+
 summary(CityBuffStats[CityBuffStats$factor=="LST" & CityBuffStats$value.mean.diff<0 & CityBuffStats$value.mean.diff.p<0.01,])
 summary(CityBuffStats$biomeName[CityBuffStats$factor=="LST" & CityBuffStats$value.mean.diff<0 & CityBuffStats$value.mean.diff.p<0.01])
 
