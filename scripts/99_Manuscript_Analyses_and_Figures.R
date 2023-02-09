@@ -126,11 +126,10 @@ cityAll.stats$biomeName <- factor(cityAll.stats$biomeName, levels=biome.order$bi
 summary(cityAll.stats)
 
 CityBuffStats <- read.csv(file.path(path.cities, "city_stats_core-buffer.csv"))
-CityBuffStats$factor <- as.factor(CityBuffStats$factor)
+CityBuffStats$factor <- factor(CityBuffStats$factor, levels=c("LST", "tree", "other veg"))
+CityBuffStats <- merge(CityBuffStats, cityAll.stats[,c("ISOURBID", "NAME", "LONGITUDE", "LATITUDE", "biomeName", "ES00POP")], all.x=T)
 summary(CityBuffStats)
 
-# MErging some of the useful city metadata with the BuffStats file
-CityBuffStats <- merge(CityBuffStats, cityAll.stats[,c("ISOURBID", "NAME", "LONGITUDE", "LATITUDE", "biomeName", "ES00POP")], all.x=T)
 
 CityBuffStats[CityBuffStats$value.mean.core==0,] # This is for tree cover, so VERY very low.
 summary(CityBuffStats[CityBuffStats$value.mean.core<1,]) # This is for tree cover, so VERY very low.
@@ -200,7 +199,7 @@ ggplot(data=BuffCoreComparison[BuffCoreComparison$factor=="LST",]) +
   scale_x_discrete(name="Biome Type") +
   scale_fill_manual(values=biome.pall.all, guide="none") +
   scale_alpha_manual(values=c("core"=1, "buffer"=0.3)) +
-  annotate(geom="text", x=1, y=5, label="dark fill = urban core; light fill= 10 km buffer", hjust=0) +
+  labs(caption="dark fill = urban core; light fill= 10 km buffer") +
   theme_bw() +
   theme(legend.position="none",
         legend.title=element_text(color="black", face="bold", size=rel(1.5)),
@@ -211,7 +210,7 @@ ggplot(data=BuffCoreComparison[BuffCoreComparison$factor=="LST",]) +
         axis.text.x=element_text(angle=-15, hjust=0))
 dev.off()
 
-# Creating a summary Tabls
+# Creating a summary Tables
 LSTbiome <- aggregate(value.mean.diff ~ biomeName, data=CityBuffStats[CityBuffStats$factor=="LST",], FUN=length)
 names(LSTbiome) <- c("Biome", "N.Cities")
 LSTbiome$LST.CITY <- aggregate(value.mean.core ~ biomeName, data=CityBuffStats[CityBuffStats$factor=="LST",], FUN=mean)[,2]
@@ -337,6 +336,7 @@ avgGlobal <- mean(CityBuffStats$trend.mean.core[which(CityBuffStats$factor=="LST
 avgTBF <- mean(CityBuffStats$trend.mean.core[which(CityBuffStats$factor=="LST" & !is.na(CityBuffStats$trend.mean.core) & CityBuffStats$biomeName=="Temperate Broadleaf Forest")])
 
 avgTBF/avgGlobal
+## ----------
 ##########################################
 
 
@@ -352,6 +352,145 @@ avgTBF/avgGlobal
 #    2.2 Temporal Trends 
 #         - Calculate City + Buffer mean gain/loss in tree cover relative to time period mean; present as map/biome
 #         - Highlight specific cities that are doing much better or worse than expected for their biome
+##########################################
+summary(cityAll.stats)
+summary(CityBuffStats)
+## ----------
+#    2.1. Correlating differences in UHI with spatial & temporal patterns in vegetation (establish the baseline)
+#         - Compare magnitude of mean difference in urban area *relative* to its buffer -- (CITY-Buffer)/Buffer
+#         - Need to calculate/present mean tree cover in buffer first; present biome means?
+#         - **Present all results as standardized to biome mean**
+## ----------
+summary(CityBuffStats[CityBuffStats$factor!="LST","value.mean.diff"])
+
+png(file.path(path.figs, "Vegetation_Patterns_Difference_map.png"), height=8, width=8, units="in", res=220)
+ggplot(data=CityBuffStats[CityBuffStats$factor!="LST",]) +
+  facet_grid(factor~.) +
+  coord_equal(expand=0, ylim=c(-60,75)) +
+  geom_polygon(data=world, aes(x=long, y=lat, group=group), fill="gray50") +
+  geom_point(aes(x=LONGITUDE, y=LATITUDE, color=value.mean.diff), size=0.5) +
+  scale_color_gradientn(name="Veg. Diff.\n(% cover)", colors=grad.tree,  limits=c(-45, 45)) +
+  theme_bw() +
+  theme(legend.position="top",
+        legend.title=element_text(color="black", face="bold", size=rel(1.5)),
+        legend.text=element_text(color="black"),
+        legend.background=element_blank(),
+        panel.background = element_rect(fill="NA"),
+        panel.grid = element_blank())
+dev.off()
+
+BuffCoreComparison <- stack(CityBuffStats[,c("value.mean.core", "value.mean.buffer")])
+names(BuffCoreComparison) <- c("value.mean", "location")
+BuffCoreComparison$location <- factor(ifelse(grepl("core", BuffCoreComparison$location), "core", "buffer"), levels=c("core", "buffer"))
+# BuffCoreComparison$location <-
+BuffCoreComparison[,c("ISOURBID", "factor", "NAME", "biomeName")] <- CityBuffStats[,c("ISOURBID", "factor", "NAME", "biomeName")]
+BuffCoreComparison$factor <- factor(BuffCoreComparison$factor, levels=c("LST", "tree", "other veg"))
+
+png(file.path(path.figs, "Vegetation_Patterns_Values_boxplot.png"), height=8, width=8, units="in", res=220)
+ggplot(data=BuffCoreComparison[BuffCoreComparison$factor!="LST",]) +
+  facet_grid(factor~.) +
+  geom_boxplot(aes(x=biomeName, y=value.mean, fill=biomeName, alpha=location), position="dodge") +
+  # geom_boxplot(aes(x=biomeName, y=value.mean.buffer, fill=biomeName, alpha="Buffer"), position="dodge") +
+  geom_hline(yintercept=0, linetype="dashed") +
+  scale_y_continuous(name="Mean Summer LST (deg. C)", expand=c(0,0)) +
+  scale_x_discrete(name="Biome Type") +
+  scale_fill_manual(values=biome.pall.all, guide="none") +
+  scale_alpha_manual(values=c("core"=1, "buffer"=0.3)) +
+  labs(caption="dark fill = urban core; light fill= 10 km buffer") +
+  theme_bw() +
+  theme(legend.position="none",
+        legend.title=element_text(color="black", face="bold", size=rel(1.5)),
+        legend.text=element_text(color="black"),
+        legend.background=element_blank(),
+        panel.background = element_rect(fill="NA"),
+        panel.grid = element_blank(),
+        axis.text.x=element_text(angle=-15, hjust=0))
+dev.off()
+
+png(file.path(path.figs, "Vegetation_Patterns_Difference_histogram.png"), height=8, width=8, units="in", res=220)
+ggplot(data=CityBuffStats[CityBuffStats$factor!="LST",]) +
+  facet_grid(factor~.) +
+  geom_histogram(aes(x=value.mean.diff, fill=biomeName)) +
+  geom_vline(xintercept=0, linetype="dashed") +
+  scale_y_continuous(expand=c(0,0)) +
+  scale_x_continuous(name="Difference: Metro Core - 10 km Buffer", expand=c(0,0)) +
+  scale_fill_manual(values=biome.pall.all[]) +
+  theme_bw() +
+  theme(legend.position="top",
+        legend.title=element_text(color="black", face="bold", size=rel(1.5)),
+        legend.text=element_text(color="black"),
+        legend.background=element_blank(),
+        panel.background = element_rect(fill="NA"),
+        panel.grid = element_blank())
+dev.off()
+
+
+# Creating a summary Tables
+VegBiome <- aggregate(value.mean.diff ~ biomeName, data=CityBuffStats[CityBuffStats$factor=="tree",], FUN=length)
+names(VegBiome) <- c("Biome", "N.Cities")
+VegBiome$Tree.CITY <- aggregate(value.mean.core ~ biomeName, data=CityBuffStats[CityBuffStats$factor=="tree",], FUN=mean)[,2]
+VegBiome$Tree.CITY.SD <- aggregate(value.mean.core ~ biomeName, data=CityBuffStats[CityBuffStats$factor=="tree",], FUN=sd)[,2]
+VegBiome$Tree.BUFF <- aggregate(value.mean.buffer ~ biomeName, data=CityBuffStats[CityBuffStats$factor=="tree",], FUN=mean)[,2]
+VegBiome$Tree.BUFF.SD <- aggregate(value.mean.buffer ~ biomeName, data=CityBuffStats[CityBuffStats$factor=="tree",], FUN=sd)[,2]
+VegBiome$Tree.Diff <- aggregate(value.mean.diff ~ biomeName, data=CityBuffStats[CityBuffStats$factor=="tree",], FUN=mean)[,2]
+VegBiome$Tree.Diff.SD <- aggregate(value.mean.diff ~ biomeName, data=CityBuffStats[CityBuffStats$factor=="tree",], FUN=sd)[,2]
+
+VegBiome$Other.CITY <- aggregate(value.mean.core ~ biomeName, data=CityBuffStats[CityBuffStats$factor=="other veg",], FUN=mean)[,2]
+VegBiome$Other.CITY.SD <- aggregate(value.mean.core ~ biomeName, data=CityBuffStats[CityBuffStats$factor=="other veg",], FUN=sd)[,2]
+VegBiome$Other.BUFF <- aggregate(value.mean.buffer ~ biomeName, data=CityBuffStats[CityBuffStats$factor=="other veg",], FUN=mean)[,2]
+VegBiome$Other.BUFF.SD <- aggregate(value.mean.buffer ~ biomeName, data=CityBuffStats[CityBuffStats$factor=="other veg",], FUN=sd)[,2]
+VegBiome$Other.Diff <- aggregate(value.mean.diff ~ biomeName, data=CityBuffStats[CityBuffStats$factor=="other veg",], FUN=mean)[,2]
+VegBiome$Other.Diff.SD <- aggregate(value.mean.diff ~ biomeName, data=CityBuffStats[CityBuffStats$factor=="other veg",], FUN=sd)[,2]
+# Vegbiome$Veg.SE <- Vegbiome$Veg.SD/sqrt(Vegbiome$N.Cities)
+# Vegbiome[c("Veg.CITY", "Veg.Diff", "Veg.SD", "Veg.SE")] <- round(Vegbiome[c("Veg.Diff", "Veg.SD", "Veg.SE")], 2)
+
+# Add in percent of cities with stat sig warming 
+VegBiome.Sig <- aggregate(value.mean.diff ~ biomeName, data=CityBuffStats[CityBuffStats$factor=="tree" &  CityBuffStats$value.mean.diff<0 & CityBuffStats$value.mean.diff.p<0.01,], FUN=length)
+names(VegBiome.Sig) <- c("Biome", "N.Tree.sig.lo")
+VegBiome.Sig$N.Other.sig.hi <- aggregate(value.mean.diff ~ biomeName, data=CityBuffStats[CityBuffStats$factor=="other veg" &  CityBuffStats$value.mean.diff>0 & CityBuffStats$value.mean.diff.p<0.01,], FUN=length)[,2]
+
+VegBiome.Sig2 <- aggregate(value.mean.diff ~ biomeName, data=CityBuffStats[CityBuffStats$factor=="tree" &  CityBuffStats$value.mean.diff>0 & CityBuffStats$value.mean.diff.p<0.01,], FUN=length)
+names(VegBiome.Sig2) <- c("Biome", "N.Tree.sig.hi")
+# VegBiome.Sig <- merge(VegBiome.Sig, VegBiome.Sig2, all=T)
+
+VegBiome.Sig3 <- aggregate(value.mean.diff ~ biomeName, data=CityBuffStats[CityBuffStats$factor=="other veg" &  CityBuffStats$value.mean.diff<0 & CityBuffStats$value.mean.diff.p<0.01,], FUN=length)
+names(VegBiome.Sig3) <- c("Biome", "N.Other.sig.lo")
+
+VegBiome.Sig <- merge(merge(VegBiome.Sig, VegBiome.Sig2, all=T), VegBiome.Sig3, all=T)
+VegBiome.Sig[is.na(VegBiome.Sig)] <- 0
+
+VegBiome <- merge(VegBiome, VegBiome.Sig, all=T)
+VegBiome <- VegBiome[order(VegBiome$Biome),] # Sorting to make in a consistent order
+VegBiome
+# 
+tableTreeBiome <- data.frame(Biome=VegBiome$Biome, N.Cities=VegBiome$N.Cities,
+                            CityTree=paste0(round(VegBiome$Tree.CITY, 0), " (",round(VegBiome$Tree.CITY.SD, 0), ")"),
+                            BufferTree=paste0(round(VegBiome$Tree.BUFF, 0), " (",round(VegBiome$Tree.BUFF.SD, 0), ")"),
+                            TreeDiff=paste0(round(VegBiome$Tree.Diff, 0), " (",round(VegBiome$Tree.Diff.SD, 0), ")"),
+                            pCityTreeLo=paste0(round(VegBiome$N.Tree.sig.lo/VegBiome$N.Cities*100), "%"),
+                            pCityTreehi=paste0(round(VegBiome$N.Tree.sig.hi/VegBiome$N.Cities*100), "%"))
+tableTreeBiome
+write.csv(tableTreeBiome, file.path(path.figs, "Vegetation-Tree_Patterns_Biome.csv"), row.names=F)
+
+tableOtherVegBiome <- data.frame(Biome=VegBiome$Biome, N.Cities=VegBiome$N.Cities,
+                             CityOther=paste0(round(VegBiome$Other.CITY, 0), " (",round(VegBiome$Other.CITY.SD, 0), ")"),
+                             BufferOther=paste0(round(VegBiome$Other.BUFF, 0), " (",round(VegBiome$Other.BUFF.SD, 0), ")"),
+                             OtherDiff=paste0(round(VegBiome$Other.Diff, 0), " (",round(VegBiome$Other.Diff.SD, 0), ")"),
+                             pCityOtherLo=paste0(round(VegBiome$N.Other.sig.lo/VegBiome$N.Cities*100), "%"),
+                             pCityOtherhi=paste0(round(VegBiome$N.Other.sig.hi/VegBiome$N.Cities*100), "%"))
+tableOtherVegBiome
+write.csv(tableOtherVegBiome, file.path(path.figs, "Vegetation-Other_Patterns_Biome.csv"), row.names=F)
+
+
+# *** Standardizing Percent Cover to Biome Means ***
+
+
+## ----------
+#    2.2 Temporal Trends 
+#         - Calculate City + Buffer mean gain/loss in tree cover relative to time period mean; present as map/biome
+#         - Highlight specific cities that are doing much better or worse than expected for their biome
+## ----------
+
 ##########################################
 
 
