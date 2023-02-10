@@ -134,6 +134,44 @@ summary(CityBuffStats)
 CityBuffStats[CityBuffStats$value.mean.core==0,] # This is for tree cover, so VERY very low.
 summary(CityBuffStats[CityBuffStats$value.mean.core<1,]) # This is for tree cover, so VERY very low.
 
+
+biome.hist <- ggplot(data=cityAll.stats[!is.na(cityAll.stats$biome),]) +
+  geom_bar(aes(x=biomeName, fill=biomeName)) +
+  scale_fill_manual(values=biome.pall.all[]) +
+  scale_y_continuous(expand=c(0,0)) +
+  scale_x_discrete(name="Biome") +
+  guides(fill="none") +
+  theme_bw()+
+  theme(legend.title=element_blank(),
+        axis.text.x = element_text(angle=-30, hjust=0),
+        panel.background = element_rect(fill=NA),
+        panel.grid=element_blank(),
+        axis.text=element_text(color="black"),
+        axis.title=element_text(color="black", face="bold"), 
+        plot.margin = margin(1, 2, 0.5, 1, "lines"))
+
+biome.map <- ggplot(data=cityAll.stats[!is.na(cityAll.stats$biome),]) +
+  coord_equal(expand=0, ylim=c(-65,80)) +
+  geom_polygon(data=world, aes(x=long, y=lat, group=group), fill="gray50") +
+  geom_point(aes(x=LONGITUDE, y=LATITUDE, color=biomeName), size=0.5) +
+  scale_color_manual(name="biome", values=biome.pall.all) +
+  guides(color="none") +
+  theme_bw() +
+  theme(legend.position="top",
+        legend.title=element_text(color="black", face="bold", size=rel(1.5)),
+        legend.text=element_text(color="black"),
+        legend.background=element_blank(),
+        panel.background = element_rect(fill="NA"),
+        panel.grid = element_blank(),
+        axis.text=element_blank(),
+        axis.ticks=element_blank(),
+        axis.title=element_blank(),
+        plot.margin = margin(0.5, 2, 1, 3, "lines"))
+
+# biome.map
+png(file.path(path.figs, "CityDistribution_Biomes.png"), height=8, width=8, units="in", res=220)
+plot_grid(biome.map, biome.hist, ncol=1, rel_heights = c(0.45, 0.55))
+dev.off()
 # ##########################################
 
 
@@ -482,8 +520,28 @@ tableOtherVegBiome
 write.csv(tableOtherVegBiome, file.path(path.figs, "Vegetation-Other_Patterns_Biome.csv"), row.names=F)
 
 
-# For example, although XXX cities (X%) have statistically higher tree cover in cities, XXX% of those are in in desert biomes and an additional XXX% are in temperate grasslands which had mean tree cover in the 10 km regional buffer of XXX and XXX, respectively (Table)
+# # Text snippets
+# X% of all cities had lower tree cover in the urban core relative to the surrounding region, but both the magnitude of difference and frequency of this pattern were greatest in mesic forested biomes (Table-Trees).  
+citiesTreeLo <- which(CityBuffStats$factor=="tree" &  CityBuffStats$value.mean.diff<0 & CityBuffStats$value.mean.diff.p<0.01)
+length(citiesTreeLo)
+length(citiesTreeLo)/length(which(CityBuffStats$factor=="tree" &  !is.na(CityBuffStats$value.mean.diff)))
+
+#Across all forested biomes, more than three-quarters of cities had lowered tree cover, with a mean difference of X%.
+citiesTreeLoForest <- which(CityBuffStats$factor=="tree" &  CityBuffStats$value.mean.diff<0 & CityBuffStats$value.mean.diff.p<0.01 & grepl("Forest", CityBuffStats$biomeName))
+length(citiesTreeLoForest)
+length(citiesTreeLoForest)/length(which(CityBuffStats$factor=="tree" &  !is.na(CityBuffStats$value.mean.diff) &  grepl("Forest", CityBuffStats$biomeName)))
+
+mean(CityBuffStats$value.mean.diff[citiesTreeLoForest]); sd(CityBuffStats$value.mean.diff[citiesTreeLoForest])
+
+
+
 citiesTreeHi <- which(CityBuffStats$factor=="tree" &  CityBuffStats$value.mean.diff>0 & CityBuffStats$value.mean.diff.p<0.01)
+length(citiesTreeHi)
+length(citiesTreeHi)/length(which(CityBuffStats$factor=="tree" &  !is.na(CityBuffStats$value.mean.diff)))
+
+
+# Although the dominant pattern, reduced tree cover in cities is not universal, particularly in arid or semi-arid regions.  In temperate grassland biomes (mean buffer tree cover = 8%), 50% of cities had higher tree cover than the surrounding area and desert regions (mean buffer tree cover = 5%) had similar proportions of cities with lower (43%) versus higher (39%) tree cover (Table, Figure).  Many of the cities in temperate forest biomes where tree cover is higher in urban areas occur in regions that have heavily converted to agriculture, such as the midwestern U.S. and northeastern China (Figure-Map).
+                                                                                                                                                        citiesTreeHi <- which(CityBuffStats$factor=="tree" &  CityBuffStats$value.mean.diff>0 & CityBuffStats$value.mean.diff.p<0.01)
 length(citiesTreeHi)
 length(citiesTreeHi)/length(which(CityBuffStats$factor=="tree" &  !is.na(CityBuffStats$value.mean.diff)))
 
@@ -491,7 +549,8 @@ summary(CityBuffStats[citiesTreeHi,])
 summary(as.factor(substr(CityBuffStats$ISOURBID[citiesTreeHi], 1, 3)))
 
 
-# *** Standardizing Percent Cover in a couple ways ***
+*** Standardizing Percent Cover in a couple ways ***
+# --> This doesn't make a giant difference in our figures, so I think we just skip this for now...
 # # 1. looking at difference as a proportion of what's in the buffer
 CityBuffStats$value.mean.pDiff[CityBuffStats$factor!="LST"] <- CityBuffStats$value.mean.diff[CityBuffStats$factor!="LST"]/CityBuffStats$value.mean.buffer[CityBuffStats$factor!="LST"]
 
@@ -501,7 +560,7 @@ for(BIOME in unique(VegBiome$Biome)){
   rowBiomeOther <- which(CityBuffStats$biomeName==BIOME & CityBuffStats$factor=="other veg")
   refTree <- VegBiome$Tree.BUFF[VegBiome$Biome==BIOME]
   refOther <- VegBiome$Other.BUFF[VegBiome$Biome==BIOME]
-  
+
   CityBuffStats[rowBiomeTree, "dValueBiome.core"] <- CityBuffStats$value.mean.core[rowBiomeTree] - refTree
   CityBuffStats[rowBiomeTree, "pValueBiome.core"] <- CityBuffStats$value.mean.core[rowBiomeTree]/refTree
   CityBuffStats[rowBiomeTree, "dValueBiome.buffer"] <- CityBuffStats$value.mean.buffer[rowBiomeTree] - refTree
@@ -580,11 +639,43 @@ ggplot(data=CityBuffStats[CityBuffStats$factor=="tree",]) +
 dev.off()
 
 
+
 ## ----------
 #    2.2 Temporal Trends 
 #         - Calculate City + Buffer mean gain/loss in tree cover relative to time period mean; present as map/biome
 #         - Highlight specific cities that are doing much better or worse than expected for their biome
 ## ----------
+png(file.path(path.figs, "LST_Trends_Cities_map.png"), height=8, width=8, units="in", res=220)
+ggplot(data=CityBuffStats[CityBuffStats$factor=="LST",]) +
+  coord_equal(expand=0, ylim=c(-60,75)) +
+  geom_polygon(data=world, aes(x=long, y=lat, group=group), fill="gray50") +
+  geom_point(aes(x=LONGITUDE, y=LATITUDE, color=trend.mean.core), size=0.5) +
+  scale_color_gradientn(name="Core LST Trend.\n(deg. C / yr)", colors=grad.lst,  limits=c(-0.4, 0.4)) +
+  theme_bw() +
+  theme(legend.position="top",
+        legend.title=element_text(color="black", face="bold", size=rel(1.5)),
+        legend.text=element_text(color="black"),
+        legend.background=element_blank(),
+        panel.background = element_rect(fill="NA"),
+        panel.grid = element_blank())
+dev.off()
+
+png(file.path(path.figs, "LST_Trends_Difference_histogram.png"), height=8, width=8, units="in", res=220)
+ggplot(data=CityBuffStats[CityBuffStats$factor=="LST",]) +
+  geom_histogram(aes(x=trend.mean.diff, fill=biomeName)) +
+  geom_vline(xintercept=0, linetype="dashed") +
+  scale_y_continuous(expand=c(0,0)) +
+  scale_x_continuous(name="Trend Difference: Metro Core - 10 km Buffer", expand=c(0,0)) +
+  scale_fill_manual(values=biome.pall.all[]) +
+  theme_bw() +
+  theme(legend.position="top",
+        legend.title=element_text(color="black", face="bold", size=rel(1.5)),
+        legend.text=element_text(color="black"),
+        legend.background=element_blank(),
+        panel.background = element_rect(fill="NA"),
+        panel.grid = element_blank())
+dev.off()
+
 
 ##########################################
 
