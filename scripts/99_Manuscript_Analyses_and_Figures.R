@@ -482,7 +482,102 @@ tableOtherVegBiome
 write.csv(tableOtherVegBiome, file.path(path.figs, "Vegetation-Other_Patterns_Biome.csv"), row.names=F)
 
 
-# *** Standardizing Percent Cover to Biome Means ***
+# For example, although XXX cities (X%) have statistically higher tree cover in cities, XXX% of those are in in desert biomes and an additional XXX% are in temperate grasslands which had mean tree cover in the 10 km regional buffer of XXX and XXX, respectively (Table)
+citiesTreeHi <- which(CityBuffStats$factor=="tree" &  CityBuffStats$value.mean.diff>0 & CityBuffStats$value.mean.diff.p<0.01)
+length(citiesTreeHi)
+length(citiesTreeHi)/length(which(CityBuffStats$factor=="tree" &  !is.na(CityBuffStats$value.mean.diff)))
+
+summary(CityBuffStats[citiesTreeHi,])
+summary(as.factor(substr(CityBuffStats$ISOURBID[citiesTreeHi], 1, 3)))
+
+
+# *** Standardizing Percent Cover in a couple ways ***
+# # 1. looking at difference as a proportion of what's in the buffer
+CityBuffStats$value.mean.pDiff[CityBuffStats$factor!="LST"] <- CityBuffStats$value.mean.diff[CityBuffStats$factor!="LST"]/CityBuffStats$value.mean.buffer[CityBuffStats$factor!="LST"]
+
+# # 2. Standardizing Percent Cover to the Biome Mean of the BUFFER ***
+for(BIOME in unique(VegBiome$Biome)){
+  rowBiomeTree <- which(CityBuffStats$biomeName==BIOME & CityBuffStats$factor=="tree")
+  rowBiomeOther <- which(CityBuffStats$biomeName==BIOME & CityBuffStats$factor=="other veg")
+  refTree <- VegBiome$Tree.BUFF[VegBiome$Biome==BIOME]
+  refOther <- VegBiome$Other.BUFF[VegBiome$Biome==BIOME]
+  
+  CityBuffStats[rowBiomeTree, "dValueBiome.core"] <- CityBuffStats$value.mean.core[rowBiomeTree] - refTree
+  CityBuffStats[rowBiomeTree, "pValueBiome.core"] <- CityBuffStats$value.mean.core[rowBiomeTree]/refTree
+  CityBuffStats[rowBiomeTree, "dValueBiome.buffer"] <- CityBuffStats$value.mean.buffer[rowBiomeTree] - refTree
+  CityBuffStats[rowBiomeTree, "pValueBiome.buffer"] <- CityBuffStats$value.mean.buffer[rowBiomeTree]/refTree
+  CityBuffStats[rowBiomeTree, "dValueBiome.core"] <- CityBuffStats$value.mean.core[rowBiomeTree] - refTree
+  CityBuffStats[rowBiomeTree, "pValueBiome.core"] <- CityBuffStats$value.mean.core[rowBiomeTree]/refTree
+  # CityBuffStats[rowBiomeTree, "dValueBiome.diff"] <- CityBuffStats$value.mean.diff[rowBiomeTree] - refTree
+  CityBuffStats[rowBiomeTree, "pValueBiome.diff"] <- CityBuffStats$value.mean.diff[rowBiomeTree]/refTree
+}
+summary(CityBuffStats)
+
+png(file.path(path.figs, "Vegetation-Tree_Patterns_Difference_map.png"), height=8, width=8, units="in", res=220)
+ggplot(data=CityBuffStats[CityBuffStats$factor=="tree",]) +
+  facet_grid(factor~.) +
+  coord_equal(expand=0, ylim=c(-60,75)) +
+  geom_polygon(data=world, aes(x=long, y=lat, group=group), fill="gray50") +
+  geom_point(aes(x=LONGITUDE, y=LATITUDE, color=value.mean.diff), size=0.5) +
+  scale_color_gradientn(name="Cover Diff.\n(%)", colors=grad.tree, limits=c(-40,40)) +
+  theme_bw() +
+  theme(legend.position="top",
+        legend.title=element_text(color="black", face="bold", size=rel(1.5)),
+        legend.text=element_text(color="black"),
+        legend.background=element_blank(),
+        panel.background = element_rect(fill="NA"),
+        panel.grid = element_blank())
+dev.off()
+
+png(file.path(path.figs, "Vegetation-Tree_Patterns_Difference-Proportion_map.png"), height=8, width=8, units="in", res=220)
+ggplot(data=CityBuffStats[CityBuffStats$factor=="tree",]) +
+  facet_grid(factor~.) +
+  coord_equal(expand=0, ylim=c(-60,75)) +
+  geom_polygon(data=world, aes(x=long, y=lat, group=group), fill="gray50") +
+  geom_point(aes(x=LONGITUDE, y=LATITUDE, color=pValueBiome.diff), size=0.5) +
+  scale_color_gradientn(name="Biome Rel. Diff.\n(prop.)", colors=grad.tree, limits=c(-1.5,1.5)) +
+  theme_bw() +
+  theme(legend.position="top",
+        legend.title=element_text(color="black", face="bold", size=rel(1.5)),
+        legend.text=element_text(color="black"),
+        legend.background=element_blank(),
+        panel.background = element_rect(fill="NA"),
+        panel.grid = element_blank())
+dev.off()
+
+png(file.path(path.figs, "Vegetation-Tree_Patterns_Difference-Proportion.png"), height=8, width=8, units="in", res=220)
+ggplot(data=CityBuffStats[CityBuffStats$factor=="tree",]) +
+  facet_grid(factor~.) +
+  geom_histogram(aes(x=value.mean.diff, fill=biomeName)) +
+  geom_vline(xintercept=0, linetype="dashed") +
+  scale_y_continuous(expand=c(0,0)) +
+  scale_x_continuous(name="Difference: Metro Core - 10 km Buffer", expand=c(0,0)) +
+  scale_fill_manual(values=biome.pall.all[]) +
+  theme_bw() +
+  theme(legend.position="top",
+        legend.title=element_text(color="black", face="bold", size=rel(1.5)),
+        legend.text=element_text(color="black"),
+        legend.background=element_blank(),
+        panel.background = element_rect(fill="NA"),
+        panel.grid = element_blank())
+dev.off()
+
+png(file.path(path.figs, "Vegetation-Tree_Patterns_Difference-Proportion_histogram.png"), height=8, width=8, units="in", res=220)
+ggplot(data=CityBuffStats[CityBuffStats$factor=="tree",]) +
+  facet_grid(factor~.) +
+  geom_histogram(aes(x=pValueBiome.diff, fill=biomeName)) +
+  geom_vline(xintercept=0, linetype="dashed") +
+  scale_y_continuous(expand=c(0,0)) +
+  scale_x_continuous(name="Proportional Difference: (Core - Buffer)/[Biome Buffer]", expand=c(0,0)) +
+  scale_fill_manual(values=biome.pall.all[]) +
+  theme_bw() +
+  theme(legend.position="top",
+        legend.title=element_text(color="black", face="bold", size=rel(1.5)),
+        legend.text=element_text(color="black"),
+        legend.background=element_blank(),
+        panel.background = element_rect(fill="NA"),
+        panel.grid = element_blank())
+dev.off()
 
 
 ## ----------
