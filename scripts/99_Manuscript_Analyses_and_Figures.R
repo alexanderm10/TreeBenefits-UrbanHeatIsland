@@ -38,6 +38,7 @@
 #    3.2. Converting slopes into cooling of surface temperature
 #         - Slope x mean Tree Cover = estimated contribution to surface temperature
 #         - Change in tree cover relative to temporal trend → what would the UHI be without gains or losses in the urban canopy?
+#    3.3. Comparing cooling & tree trends to global warming and other urban warming processes
 # ---------
 
 # ---------
@@ -133,8 +134,12 @@ summary(CityBuffStats)
 
 CityBuffStats[CityBuffStats$value.mean.core==0,] # This is for tree cover, so VERY very low.
 summary(CityBuffStats[CityBuffStats$value.mean.core<1,]) # This is for tree cover, so VERY very low.
+# ##########################################
 
 
+# ##########################################
+# Making the baseline maps of city/biome distribution ----
+# ##########################################
 biome.hist <- ggplot(data=cityAll.stats[!is.na(cityAll.stats$biome),]) +
   geom_bar(aes(x=biomeName, fill=biomeName)) +
   scale_fill_manual(values=biome.pall.all[]) +
@@ -549,7 +554,7 @@ summary(CityBuffStats[citiesTreeHi,])
 summary(as.factor(substr(CityBuffStats$ISOURBID[citiesTreeHi], 1, 3)))
 
 
-*** Standardizing Percent Cover in a couple ways ***
+# # *** Standardizing Percent Cover in a couple ways ***
 # --> This doesn't make a giant difference in our figures, so I think we just skip this for now...
 # # 1. looking at difference as a proportion of what's in the buffer
 CityBuffStats$value.mean.pDiff[CityBuffStats$factor!="LST"] <- CityBuffStats$value.mean.diff[CityBuffStats$factor!="LST"]/CityBuffStats$value.mean.buffer[CityBuffStats$factor!="LST"]
@@ -645,12 +650,14 @@ dev.off()
 #         - Calculate City + Buffer mean gain/loss in tree cover relative to time period mean; present as map/biome
 #         - Highlight specific cities that are doing much better or worse than expected for their biome
 ## ----------
-png(file.path(path.figs, "LST_Trends_Cities_map.png"), height=8, width=8, units="in", res=220)
-ggplot(data=CityBuffStats[CityBuffStats$factor=="LST",]) +
+summary(CityBuffStats[CityBuffStats$factor=="tree",])
+
+png(file.path(path.figs, "Vegetation-Tree_Trends_Cities_map.png"), height=8, width=8, units="in", res=220)
+ggplot(data=CityBuffStats[CityBuffStats$factor=="tree",]) +
   coord_equal(expand=0, ylim=c(-60,75)) +
   geom_polygon(data=world, aes(x=long, y=lat, group=group), fill="gray50") +
   geom_point(aes(x=LONGITUDE, y=LATITUDE, color=trend.mean.core), size=0.5) +
-  scale_color_gradientn(name="Core LST Trend.\n(deg. C / yr)", colors=grad.lst,  limits=c(-0.4, 0.4)) +
+  scale_color_gradientn(name="Core Tree Trend.\n(% / yr)", colors=grad.tree,  limits=c(-1, 1)) +
   theme_bw() +
   theme(legend.position="top",
         legend.title=element_text(color="black", face="bold", size=rel(1.5)),
@@ -660,9 +667,9 @@ ggplot(data=CityBuffStats[CityBuffStats$factor=="LST",]) +
         panel.grid = element_blank())
 dev.off()
 
-png(file.path(path.figs, "LST_Trends_Difference_histogram.png"), height=8, width=8, units="in", res=220)
-ggplot(data=CityBuffStats[CityBuffStats$factor=="LST",]) +
-  geom_histogram(aes(x=trend.mean.diff, fill=biomeName)) +
+png(file.path(path.figs, "Vegetation-Tree_Trends_Cities_histogram.png"), height=8, width=8, units="in", res=220)
+ggplot(data=CityBuffStats[CityBuffStats$factor=="tree",]) +
+  geom_histogram(aes(x=trend.mean.core, fill=biomeName)) +
   geom_vline(xintercept=0, linetype="dashed") +
   scale_y_continuous(expand=c(0,0)) +
   scale_x_continuous(name="Trend Difference: Metro Core - 10 km Buffer", expand=c(0,0)) +
@@ -677,6 +684,142 @@ ggplot(data=CityBuffStats[CityBuffStats$factor=="LST",]) +
 dev.off()
 
 
+png(file.path(path.figs, "Vegetation-Tree_Trends_Difference_histogram.png"), height=8, width=8, units="in", res=220)
+ggplot(data=CityBuffStats[CityBuffStats$factor=="tree",]) +
+  geom_histogram(aes(x=trend.mean.diff, fill=biomeName)) +
+  geom_vline(xintercept=0, linetype="dashed") +
+  scale_y_continuous(expand=c(0,0)) +
+  scale_x_continuous(name="Trend Difference: Metro Core - 10 km Buffer", expand=c(0,0)) +
+  scale_fill_manual(values=biome.pall.all[]) +
+  theme_bw() +
+  theme(legend.position="top",
+        legend.title=element_text(color="black", face="bold", size=rel(1.5)),
+        legend.text=element_text(color="black"),
+        legend.background=element_blank(),
+        panel.background = element_rect(fill="NA"),
+        panel.grid = element_blank())
+dev.off()
+
+BuffCoreCompTrend <- stack(CityBuffStats[,c("trend.mean.core", "trend.mean.buffer")])
+names(BuffCoreCompTrend) <- c("trend.mean", "location")
+BuffCoreCompTrend$location <- factor(ifelse(grepl("core", BuffCoreCompTrend$location), "core", "buffer"), levels=c("core", "buffer"))
+# BuffCoreComparison$location <-
+BuffCoreCompTrend[,c("ISOURBID", "factor", "NAME", "biomeName")] <- CityBuffStats[,c("ISOURBID", "factor", "NAME", "biomeName")]
+BuffCoreCompTrend$factor <- factor(BuffCoreCompTrend$factor, levels=c("LST", "tree", "other veg"))
+
+png(file.path(path.figs, "Vegetation-Tree_Trends_boxplot.png"), height=8, width=8, units="in", res=220)
+ggplot(data=BuffCoreCompTrend[BuffCoreCompTrend$factor=="tree",]) +
+  # facet_grid(factor~.) +
+  geom_boxplot(aes(x=biomeName, y=trend.mean, fill=biomeName, alpha=location), position="dodge") +
+  # geom_boxplot(aes(x=biomeName, y=value.mean.buffer, fill=biomeName, alpha="Buffer"), position="dodge") +
+  geom_hline(yintercept=0, linetype="dashed") +
+  scale_y_continuous(name="Tree Trend (%/yr)", expand=c(0,0)) +
+  scale_x_discrete(name="Biome Type") +
+  scale_fill_manual(values=biome.pall.all, guide="none") +
+  scale_alpha_manual(values=c("core"=1, "buffer"=0.3)) +
+  labs(caption="dark fill = urban core; light fill= 10 km buffer") +
+  theme_bw() +
+  theme(legend.position="none",
+        legend.title=element_text(color="black", face="bold", size=rel(1.5)),
+        legend.text=element_text(color="black"),
+        legend.background=element_blank(),
+        panel.background = element_rect(fill="NA"),
+        panel.grid = element_blank(),
+        axis.text.x=element_text(angle=-15, hjust=0))
+dev.off()
+
+# Creating a summary Tables
+VegBiomeTrend <- aggregate(trend.mean.diff ~ biomeName, data=CityBuffStats[CityBuffStats$factor=="tree",], FUN=length)
+names(VegBiomeTrend) <- c("Biome", "N.Cities")
+VegBiomeTrend$Tree.CITY <- aggregate(trend.mean.core ~ biomeName, data=CityBuffStats[CityBuffStats$factor=="tree",], FUN=mean)[,2]
+VegBiomeTrend$Tree.CITY.SD <- aggregate(trend.mean.core ~ biomeName, data=CityBuffStats[CityBuffStats$factor=="tree",], FUN=sd)[,2]
+VegBiomeTrend$Tree.BUFF <- aggregate(trend.mean.buffer ~ biomeName, data=CityBuffStats[CityBuffStats$factor=="tree",], FUN=mean)[,2]
+VegBiomeTrend$Tree.BUFF.SD <- aggregate(trend.mean.buffer ~ biomeName, data=CityBuffStats[CityBuffStats$factor=="tree",], FUN=sd)[,2]
+VegBiomeTrend$Tree.Diff <- aggregate(trend.mean.diff ~ biomeName, data=CityBuffStats[CityBuffStats$factor=="tree",], FUN=mean)[,2]
+VegBiomeTrend$Tree.Diff.SD <- aggregate(trend.mean.diff ~ biomeName, data=CityBuffStats[CityBuffStats$factor=="tree",], FUN=sd)[,2]
+
+VegBiomeTrend$Other.CITY <- aggregate(trend.mean.core ~ biomeName, data=CityBuffStats[CityBuffStats$factor=="other veg",], FUN=mean)[,2]
+VegBiomeTrend$Other.CITY.SD <- aggregate(trend.mean.core ~ biomeName, data=CityBuffStats[CityBuffStats$factor=="other veg",], FUN=sd)[,2]
+VegBiomeTrend$Other.BUFF <- aggregate(trend.mean.buffer ~ biomeName, data=CityBuffStats[CityBuffStats$factor=="other veg",], FUN=mean)[,2]
+VegBiomeTrend$Other.BUFF.SD <- aggregate(trend.mean.buffer ~ biomeName, data=CityBuffStats[CityBuffStats$factor=="other veg",], FUN=sd)[,2]
+VegBiomeTrend$Other.Diff <- aggregate(trend.mean.diff ~ biomeName, data=CityBuffStats[CityBuffStats$factor=="other veg",], FUN=mean)[,2]
+VegBiomeTrend$Other.Diff.SD <- aggregate(trend.mean.diff ~ biomeName, data=CityBuffStats[CityBuffStats$factor=="other veg",], FUN=sd)[,2]
+
+
+# Add in percent of cities with stat sig warming
+VegBiomeTrend.Sig <- aggregate(trend.mean.diff ~ biomeName, data=CityBuffStats[CityBuffStats$factor=="tree" &  CityBuffStats$trend.mean.diff<0 & CityBuffStats$trend.mean.diff.p<0.01,], FUN=length)
+names(VegBiomeTrend.Sig) <- c("Biome", "N.Tree.sig.lo")
+VegBiomeTrend.Sig$N.Other.sig.hi <- aggregate(trend.mean.diff ~ biomeName, data=CityBuffStats[CityBuffStats$factor=="other veg" &  CityBuffStats$trend.mean.diff>0 & CityBuffStats$trend.mean.diff.p<0.01,], FUN=length)[,2]
+VegBiomeTrend.Sig$N.Tree.City.Neg <- aggregate(trend.mean.core ~ biomeName, data=CityBuffStats[CityBuffStats$factor=="tree" &  CityBuffStats$trend.mean.core<0 & CityBuffStats$trend.p.core<0.01,], FUN=length)[,2]
+
+VegBiomeTrend.Sig2 <- aggregate(trend.mean.diff ~ biomeName, data=CityBuffStats[CityBuffStats$factor=="tree" &  CityBuffStats$trend.mean.diff>0 & CityBuffStats$trend.mean.diff.p<0.01,], FUN=length)
+names(VegBiomeTrend.Sig2) <- c("Biome", "N.Tree.sig.hi")
+VegBiomeTrend.Sig2$N.Tree.City.Pos <- aggregate(trend.mean.core ~ biomeName, data=CityBuffStats[CityBuffStats$factor=="tree" &  CityBuffStats$trend.mean.core>0 & CityBuffStats$trend.p.core<0.01,], FUN=length)[,2]
+
+# VegBiomeTrend.Sig <- merge(VegBiomeTrend.Sig, VegBiomeTrend.Sig2, all=T)
+
+VegBiomeTrend.Sig3 <- aggregate(trend.mean.diff ~ biomeName, data=CityBuffStats[CityBuffStats$factor=="other veg" &  CityBuffStats$trend.mean.diff<0 & CityBuffStats$trend.mean.diff.p<0.01,], FUN=length)
+names(VegBiomeTrend.Sig3) <- c("Biome", "N.Other.sig.lo")
+
+VegBiomeTrend.Sig <- merge(merge(VegBiomeTrend.Sig, VegBiomeTrend.Sig2, all=T), VegBiomeTrend.Sig3, all=T)
+VegBiomeTrend.Sig[is.na(VegBiomeTrend.Sig)] <- 0
+
+VegBiomeTrend <- merge(VegBiomeTrend, VegBiomeTrend.Sig, all=T)
+VegBiomeTrend <- VegBiomeTrend[order(VegBiomeTrend$Biome),] # Sorting to make in a consistent order
+VegBiomeTrend
+
+
+tableTreeTrendBiome <- data.frame(Biome=VegBiomeTrend$Biome, N.Cities=VegBiomeTrend$N.Cities,
+                                  CityTree=paste0(round(VegBiomeTrend$Tree.CITY, 2), " (",round(VegBiomeTrend$Tree.CITY.SD, 2), ")"),
+                                  BufferTree=paste0(round(VegBiomeTrend$Tree.BUFF, 2), " (",round(VegBiomeTrend$Tree.BUFF.SD, 2), ")"),
+                                  TreeDiff=paste0(round(VegBiomeTrend$Tree.Diff, 2), " (",round(VegBiomeTrend$Tree.Diff.SD, 2), ")"),
+                                  pCityTreePos=paste0(round(VegBiomeTrend$N.Tree.City.Pos/VegBiomeTrend$N.Cities*100), "%"),
+                                  pCityTreeNeg=paste0(round(VegBiomeTrend$N.Tree.City.Neg/VegBiomeTrend$N.Cities*100), "%"),
+                                  pCityTreeLo=paste0(round(VegBiomeTrend$N.Tree.sig.lo/VegBiomeTrend$N.Cities*100), "%"),
+                                  pCityTreehi=paste0(round(VegBiomeTrend$N.Tree.sig.hi/VegBiomeTrend$N.Cities*100), "%"))
+tableTreeTrendBiome
+write.csv(tableTreeTrendBiome, file.path(path.figs, "Vegetation-Tree_Trend_Biome.csv"), row.names=F)
+
+
+# Now backign up some text
+ncities <- length(which(CityBuffStats$factor=="tree" &  !is.na(CityBuffStats$trend.mean.diff)))
+
+# Tree cover is increasing in the majority of cities (XX%) across all biomes with more than half of cities in most biomes showing significant increases (figure, table).
+citiesTreePos <- which(CityBuffStats$factor=="tree" &  CityBuffStats$trend.mean.core>0 & CityBuffStats$trend.p.core<0.01)
+length(citiesTreePos)
+length(citiesTreePos)/ncities
+
+citiesTreeNeg <- which(CityBuffStats$factor=="tree" &  CityBuffStats$trend.mean.core<0 & CityBuffStats$trend.p.core<0.01)
+length(citiesTreeNeg)
+length(citiesTreeNeg)/ncities
+
+# Globally, tree cover across all core metropolitan areas is increasing at a rate of XX%/yr.
+mean(CityBuffStats$trend.mean.core[CityBuffStats$factor=="tree" &  !is.na(CityBuffStats$trend.mean.core)]); sd(CityBuffStats$trend.mean.core[CityBuffStats$factor=="tree" &  !is.na(CityBuffStats$trend.mean.core)])
+mean(CityBuffStats$trend.mean.core[CityBuffStats$factor=="tree" &  !is.na(CityBuffStats$trend.mean.core)])*20
+
+# However, the rate of tree cover increase is typically slower in the urban core compare to the surrounding 10 km buffer, with a mean difference of X %/yr (SD X%/yr) across all cities.
+mean(CityBuffStats$trend.mean.diff[CityBuffStats$factor=="tree" &  !is.na(CityBuffStats$trend.mean.core)]); sd(CityBuffStats$trend.mean.diff[CityBuffStats$factor=="tree" &  !is.na(CityBuffStats$trend.mean.core)])
+
+citiesTreeSlow <- which(CityBuffStats$factor=="tree" & CityBuffStats$trend.mean.diff<0 & CityBuffStats$trend.mean.diff.p<0.01)
+length(citiesTreeSlow)
+length(citiesTreeSlow)/ncities
+
+
+# In X% of cities, tree cover is increasing more slowly than the buffer and in an additional X%, the urban core is losing tree cover while the surrounding region is gaining or maintaining tree cover.
+citiesTreePosSlow <- which(CityBuffStats$factor=="tree" &  CityBuffStats$trend.mean.core>0 & CityBuffStats$trend.mean.buffer>=0 & CityBuffStats$trend.mean.diff<0 & CityBuffStats$trend.mean.diff.p<0.01)
+length(citiesTreePosSlow)
+length(citiesTreePosSlow)/ncities
+
+citiesTreeOpposite <- which(CityBuffStats$factor=="tree" &  CityBuffStats$trend.mean.core<0 & CityBuffStats$trend.mean.buffer>=0 & CityBuffStats$trend.mean.diff<0 & CityBuffStats$trend.mean.diff.p<0.01)
+length(citiesTreeOpposite)
+length(citiesTreeOpposite)/ncities
+
+
+# Conversely, X% of cities show a more positive trend in tree cover than the surrounding buffer region between 2000 and 2020.  
+citiesTreePosFast <- which(CityBuffStats$factor=="tree" & CityBuffStats$trend.mean.diff>0 & CityBuffStats$trend.mean.diff.p<0.01)
+length(citiesTreePosFast)
+length(citiesTreePosSlow)/ncities
+
 ##########################################
 
 
@@ -689,7 +832,93 @@ dev.off()
 #    3.2. Converting slopes into cooling of surface temperature
 #         - Slope x mean Tree Cover = estimated contribution to surface temperature
 #         - Change in tree cover relative to temporal trend → what would the UHI be without gains or losses in the urban canopy?
+#    3.3. Comparing cooling & tree trends to global warming and other urban warming processes
 ##########################################
+summary(cityAll.stats)
+## ----------
+#    3.1: Effects of temperature on surface temperature (degrees C per percent cover stats)
+#         - Present model slopes (˚C/% cover)
+## ----------
+nCityAll  <- nrow(cityAll.stats)
+
+# Trees have a clear, consistent cooling effect on global urban surface temperatures, with a mean effect of -XX˚C per % tree cover across all XXXX cities analyzed and a significant cooling effect in XX% of cities
+mean(cityAll.stats$model.tree.slope); sd(cityAll.stats$model.tree.slope)
+
+TreeCool <- which(cityAll.stats$model.tree.slope<0 & cityAll.stats$model.tree.p<0.01)
+length(TreeCool)/nCityAll
+
+# For comparison, non-tree vegetation had a mean effect of -X ˚C per percent cover, with a significant effect in XX % of cities. 
+mean(cityAll.stats$model.veg.slope); sd(cityAll.stats$model.veg.slope)
+
+mean(cityAll.stats$model.veg.slope)/mean(cityAll.stats$model.tree.slope)
+
+OtherCool <- which(cityAll.stats$model.veg.slope<0 & cityAll.stats$model.veg.p<0.01)
+length(OtherCool)/nCityAll
+
+
+
+# Getting biome-specific breakdowns
+VegSlopeBiome <- aggregate(cbind(model.R2adj, model.tree.slope, model.veg.slope) ~ biomeName, data=cityAll.stats, FUN=mean)
+# names(VegSlopeBiome)[] <- c("Biome", "N.Cities")
+VegSlopeBiome[,paste0(c("model.R2adj", "model.tree.slope", "model.veg.slope"), ".SD")] <- aggregate(cbind(model.R2adj, model.tree.slope, model.veg.slope) ~ biomeName, data=cityAll.stats, FUN=mean)[,c("model.R2adj", "model.tree.slope", "model.veg.slope")]
+VegSlopeBiome$N.Cities <- aggregate(model.R2adj ~ biomeName, data=cityAll.stats[,], FUN=length)[,2]
+VegSlopeBiome$N.TreeSigCool <- aggregate(model.tree.slope ~ biomeName, data=cityAll.stats[cityAll.stats$model.tree.slope<0 & cityAll.stats$model.tree.p<0.01,], FUN=length)[,2]
+VegSlopeBiome$N.OtherSigCool <- aggregate(model.veg.slope ~ biomeName, data=cityAll.stats[cityAll.stats$model.veg.slope<0 & cityAll.stats$model.veg.p<0.01,], FUN=length)[,2]
+VegSlopeBiome
+
+tableVegSlopeBiome <- data.frame(Biome=VegSlopeBiome$biomeName, N.Cities=VegSlopeBiome$N.Cities,
+                                 modelR2adj=paste0(round(VegSlopeBiome$model.R2adj, 2), " (",round(VegSlopeBiome$model.R2adj.SD, 2), ")"),
+                                 TreeSlope=paste0(round(VegSlopeBiome$model.tree.slope, 2), " (",round(VegSlopeBiome$model.tree.slope.SD, 2), ")"),
+                                 OtherVegSlope=paste0(round(VegSlopeBiome$model.veg.slope, 2), " (",round(VegSlopeBiome$model.veg.slope.SD, 2), ")"),
+                                 pTreeSigCool=paste0(round(VegSlopeBiome$N.TreeSigCool/VegSlopeBiome$N.Cities*100), "%"),
+                                 pOtherSigCool=paste0(round(VegSlopeBiome$N.OtherSigCool/VegSlopeBiome$N.Cities*100), "%"))
+tableVegSlopeBiome
+write.csv(tableVegSlopeBiome, file.path(path.figs, "Vegetation_Slope_Biome.csv"), row.names=F)
+
+slopes.stack <- stack(cityAll.stats[,c("model.tree.slope", "model.veg.slope")])
+names(slopes.stack) <- c("model.slope", "vegType")
+slopes.stack$vegType <- factor(ifelse(grepl("tree", slopes.stack$vegType), "tree", "other veg"), levels=c("tree", "other veg"))
+slopes.stack[,c("ISOURBID", "NAME", "biomeName")] <- cityAll.stats[,c("ISOURBID", "NAME", "biomeName")]
+# BuffCoreCompTrend$factor <- factor(BuffCoreCompTrend$factor, levels=c("LST", "tree", "other veg"))
+
+
+  
+png(file.path(path.figs, "Vegetation_Slopes_boxplot.png"), height=8, width=8, units="in", res=220)
+ggplot(data=slopes.stack[,]) +
+  # facet_grid(factor~.) +
+  coord_cartesian(ylim=quantile(slopes.stack$model.slope, c(0.005, 0.995))) +
+  geom_boxplot(aes(x=biomeName, y=model.slope, fill=biomeName, alpha=vegType), position="dodge") +
+  geom_hline(yintercept=0, linetype="dashed") +
+  scale_y_continuous(name="Model Slopes (deg C / % cover)", expand=c(0,0)) +
+  scale_x_discrete(name="Biome Type") +
+  scale_fill_manual(values=biome.pall.all, guide="none") +
+  scale_alpha_manual(values=c("tree"=1, "other veg"=0.4)) +
+  labs(caption="dark fill = tree slope; light fill= other veg; y-axis scaled to middle 99% of data") +
+  theme_bw() +
+  theme(legend.position="none",
+        legend.title=element_text(color="black", face="bold", size=rel(1.5)),
+        legend.text=element_text(color="black"),
+        legend.background=element_blank(),
+        panel.background = element_rect(fill="NA"),
+        panel.grid = element_blank(),
+        axis.text.x=element_text(angle=-15, hjust=0))
+dev.off()
+
+
+## ----------
+#    3.2. Converting slopes into cooling of surface temperature
+#         - Slope x mean Tree Cover = estimated contribution to surface temperature
+#         - Change in tree cover relative to temporal trend → what would the UHI be without gains or losses in the urban canopy?
+## ----------
+
+## ----------
+#    3.3. Comparing cooling & tree trends to global warming and other urban warming processes
+## ----------
+
+
+##########################################
+
+
 
 ##########################################
 # 4. Value of Trees: Direct comparison of trees compared to other vegetation
