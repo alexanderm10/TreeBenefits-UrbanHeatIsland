@@ -1036,6 +1036,10 @@ tableVegEffectBiome
 write.csv(tableVegEffectBiome, file.path(path.figs, "Vegetation_Effects-All_Biome.csv"), row.names=F)
 
 
+# Across all biomes, trees cool cities an average of X˚C (SD X˚C), although there is large variation among biomes based on both regional variation in tree cooling potential (model slopes) and tree cover in the metroregion core (figure, table)
+mean(StatsCombined$TempContrib.Tree[!StatsCombined$Outlier]); sd(StatsCombined$TempContrib.Tree[!StatsCombined$Outlier])
+
+
 # png(file.path(path.figs, "Vegetation_TempEffects_boxplot.png"), height=8, width=8, units="in", res=220)
 ggplot(data=slopes.stack[,]) +
   # facet_grid(factor~.) +
