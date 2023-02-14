@@ -74,6 +74,7 @@ dir.create(path.figs, recursive=T, showWarnings=F)
 grad.lst <- c("#2c7bb6", "#abd9e9", "#f7f7f7", "#fdae61", "#d7191c") # ends with red
 grad.tree <- c("#a6611a", "#dfc27d", "#f5f5f5", "#80cdc1", "#018571") # ends with teal
 grad.other <- c("#d01c8b", "#f1b6da", "#f7f7f7", "#b8e186", "#4dac26") # ends with green
+grad.modfit <- c("#edf8fb", "#b3cde3", "#8c96c6", "#8856a7", "#810f7c")
 
 
 biome.pall.all = c("Taiga"= "#2c5c74", 
@@ -835,35 +836,71 @@ length(citiesTreePosSlow)/ncities
 #    3.3. Comparing cooling & tree trends to global warming and other urban warming processes
 ##########################################
 summary(cityAll.stats)
+
+# Background figure showing the performance across all regions
+png(file.path(path.figs, "Model_R2adj_Cities_map.png"), height=8, width=8, units="in", res=220)
+ggplot(data=cityAll.stats) +
+  coord_equal(expand=0, ylim=c(-60,75)) +
+  geom_polygon(data=world, aes(x=long, y=lat, group=group), fill="gray50") +
+  geom_point(aes(x=LONGITUDE, y=LATITUDE, color=model.R2adj), size=0.5) +
+  scale_color_gradientn(name="Model Adj. R2", colors=grad.modfit,  limits=c(0, 1)) +
+  theme_bw() +
+  theme(legend.position="top",
+        legend.title=element_text(color="black", face="bold", size=rel(1.5)),
+        legend.text=element_text(color="black"),
+        legend.background=element_blank(),
+        panel.background = element_rect(fill="NA"),
+        panel.grid = element_blank())
+dev.off()
+
+
 ## ----------
 #    3.1: Effects of temperature on surface temperature (degrees C per percent cover stats)
 #         - Present model slopes (˚C/% cover)
 ## ----------
+
+# Knowing that some of our model estimates of tree and other veg effect are outliers, lets add a flag so we can remove them down the road
+sig.thresh <- 4 # Using 4-sigma 
+tree.slope.mean <- mean(cityAll.stats$model.tree.slope); 
+tree.slope.sd <- sd(cityAll.stats$model.tree.slope)
+other.slope.mean <- mean(cityAll.stats$model.veg.slope); 
+other.slope.sd <- sd(cityAll.stats$model.veg.slope)
+
+
+cityAll.stats$Outlier.TreeSlope <- NA
+cityAll.stats$Outlier.TreeSlope <- ifelse(cityAll.stats$model.tree.slope>tree.slope.mean+sig.thresh*tree.slope.sd | cityAll.stats$model.tree.slope<tree.slope.mean-sig.thresh*tree.slope.sd, T, F)
+cityAll.stats$Outlier.OtherSlope <- ifelse(cityAll.stats$model.veg.slope>other.slope.mean+sig.thresh*other.slope.sd | cityAll.stats$model.veg.slope<other.slope.mean-sig.thresh*other.slope.sd, T, F)
+summary(cityAll.stats)
+
 nCityAll  <- nrow(cityAll.stats)
+NoOutliers  <- which(!cityAll.stats$Outlier.TreeSlope & !cityAll.stats$Outlier.OtherSlope)
+CityOutliers  <- which(cityAll.stats$Outlier.TreeSlope  | cityAll.stats$Outlier.OtherSlope)
+nCityNoOutlier <- length(NoOutliers)
 
 # Trees have a clear, consistent cooling effect on global urban surface temperatures, with a mean effect of -XX˚C per % tree cover across all XXXX cities analyzed and a significant cooling effect in XX% of cities
-mean(cityAll.stats$model.tree.slope); sd(cityAll.stats$model.tree.slope)
+mean(cityAll.stats$model.tree.slope[NoOutliers]); sd(cityAll.stats$model.tree.slope[NoOutliers])
+length(cityAll.stats$model.tree.slope[NoOutliers])
 
-TreeCool <- which(cityAll.stats$model.tree.slope<0 & cityAll.stats$model.tree.p<0.01)
-length(TreeCool)/nCityAll
+TreeCool <- which(cityAll.stats$model.tree.slope<0 & cityAll.stats$model.tree.p<0.01 & !cityAll.stats$Outlier.TreeSlope & !cityAll.stats$Outlier.OtherSlope)
+length(TreeCool)/nCityNoOutTree
 
 # For comparison, non-tree vegetation had a mean effect of -X ˚C per percent cover, with a significant effect in XX % of cities. 
-mean(cityAll.stats$model.veg.slope); sd(cityAll.stats$model.veg.slope)
+mean(cityAll.stats$model.veg.slope[NoOutliers]); sd(cityAll.stats$model.veg.slope[NoOutliers])
 
-mean(cityAll.stats$model.veg.slope)/mean(cityAll.stats$model.tree.slope)
+mean(cityAll.stats$model.veg.slope[NoOutliers])/mean(cityAll.stats$model.tree.slope[NoOutliers])
 
-OtherCool <- which(cityAll.stats$model.veg.slope<0 & cityAll.stats$model.veg.p<0.01)
-length(OtherCool)/nCityAll
+OtherCool <- which(cityAll.stats$model.veg.slope<0 & cityAll.stats$model.veg.p<0.01 & !cityAll.stats$Outlier.TreeSlope & !cityAll.stats$Outlier.OtherSlope)
+length(OtherCool)/length(NoOutliers)
 
 
 
 # Getting biome-specific breakdowns
-VegSlopeBiome <- aggregate(cbind(model.R2adj, model.tree.slope, model.veg.slope) ~ biomeName, data=cityAll.stats, FUN=mean)
+VegSlopeBiome <- aggregate(cbind(model.R2adj, model.tree.slope, model.veg.slope) ~ biomeName, data=cityAll.stats[NoOutliers,], FUN=mean)
 # names(VegSlopeBiome)[] <- c("Biome", "N.Cities")
-VegSlopeBiome[,paste0(c("model.R2adj", "model.tree.slope", "model.veg.slope"), ".SD")] <- aggregate(cbind(model.R2adj, model.tree.slope, model.veg.slope) ~ biomeName, data=cityAll.stats, FUN=mean)[,c("model.R2adj", "model.tree.slope", "model.veg.slope")]
+VegSlopeBiome[,paste0(c("model.R2adj", "model.tree.slope", "model.veg.slope"), ".SD")] <- aggregate(cbind(model.R2adj, model.tree.slope, model.veg.slope) ~ biomeName, data=cityAll.stats[NoOutliers,], FUN=sd)[,c("model.R2adj", "model.tree.slope", "model.veg.slope")]
 VegSlopeBiome$N.Cities <- aggregate(model.R2adj ~ biomeName, data=cityAll.stats[,], FUN=length)[,2]
-VegSlopeBiome$N.TreeSigCool <- aggregate(model.tree.slope ~ biomeName, data=cityAll.stats[cityAll.stats$model.tree.slope<0 & cityAll.stats$model.tree.p<0.01,], FUN=length)[,2]
-VegSlopeBiome$N.OtherSigCool <- aggregate(model.veg.slope ~ biomeName, data=cityAll.stats[cityAll.stats$model.veg.slope<0 & cityAll.stats$model.veg.p<0.01,], FUN=length)[,2]
+VegSlopeBiome$N.TreeSigCool <- aggregate(model.tree.slope ~ biomeName, data=cityAll.stats[cityAll.stats$model.tree.slope<0 & cityAll.stats$model.tree.p<0.01 & !cityAll.stats$Outlier.TreeSlope & !cityAll.stats$Outlier.OtherSlope,], FUN=length)[,2]
+VegSlopeBiome$N.OtherSigCool <- aggregate(model.veg.slope ~ biomeName, data=cityAll.stats[cityAll.stats$model.veg.slope<0 & cityAll.stats$model.veg.p<0.01 & !cityAll.stats$Outlier.TreeSlope & !cityAll.stats$Outlier.OtherSlope,], FUN=length)[,2]
 VegSlopeBiome
 
 tableVegSlopeBiome <- data.frame(Biome=VegSlopeBiome$biomeName, N.Cities=VegSlopeBiome$N.Cities,
@@ -875,10 +912,10 @@ tableVegSlopeBiome <- data.frame(Biome=VegSlopeBiome$biomeName, N.Cities=VegSlop
 tableVegSlopeBiome
 write.csv(tableVegSlopeBiome, file.path(path.figs, "Vegetation_Slope_Biome.csv"), row.names=F)
 
-slopes.stack <- stack(cityAll.stats[,c("model.tree.slope", "model.veg.slope")])
+slopes.stack <- stack(cityAll.stats[NoOutliers,c("model.tree.slope", "model.veg.slope")])
 names(slopes.stack) <- c("model.slope", "vegType")
 slopes.stack$vegType <- factor(ifelse(grepl("tree", slopes.stack$vegType), "tree", "other veg"), levels=c("tree", "other veg"))
-slopes.stack[,c("ISOURBID", "NAME", "biomeName")] <- cityAll.stats[,c("ISOURBID", "NAME", "biomeName")]
+slopes.stack[,c("ISOURBID", "NAME", "biomeName")] <- cityAll.stats[NoOutliers,c("ISOURBID", "NAME", "biomeName")]
 # BuffCoreCompTrend$factor <- factor(BuffCoreCompTrend$factor, levels=c("LST", "tree", "other veg"))
 
 
@@ -886,14 +923,13 @@ slopes.stack[,c("ISOURBID", "NAME", "biomeName")] <- cityAll.stats[,c("ISOURBID"
 png(file.path(path.figs, "Vegetation_Slopes_boxplot.png"), height=8, width=8, units="in", res=220)
 ggplot(data=slopes.stack[,]) +
   # facet_grid(factor~.) +
-  coord_cartesian(ylim=quantile(slopes.stack$model.slope, c(0.005, 0.995))) +
   geom_boxplot(aes(x=biomeName, y=model.slope, fill=biomeName, alpha=vegType), position="dodge") +
   geom_hline(yintercept=0, linetype="dashed") +
-  scale_y_continuous(name="Model Slopes (deg C / % cover)", expand=c(0,0)) +
+  scale_y_continuous(name="Model Slopes (deg C / % cover)") +
   scale_x_discrete(name="Biome Type") +
   scale_fill_manual(values=biome.pall.all, guide="none") +
   scale_alpha_manual(values=c("tree"=1, "other veg"=0.4)) +
-  labs(caption="dark fill = tree slope; light fill= other veg; y-axis scaled to middle 99% of data") +
+  labs(caption="4-sigma outliers removed; dark fill = tree slope; light fill= other veg") +
   theme_bw() +
   theme(legend.position="none",
         legend.title=element_text(color="black", face="bold", size=rel(1.5)),
@@ -905,11 +941,120 @@ ggplot(data=slopes.stack[,]) +
 dev.off()
 
 
+# Estimated cooling effect of trees on a per-percent coverage basis varied among biomes, with the greatest tree cooling potential in arid and semi-arid regions such as grasslands (XX˚C/% cover SD XXX ˚C/% across all grasslands), Mediterranean biomes (-0.18 ˚C/% SD 0.23), and deserts (-0.36˚C/% SD 0.75˚C/%)
+cities.grassland <- which(grepl("Grassland", cityAll.stats$biomeName) & !cityAll.stats$Outlier.TreeSlope & !cityAll.stats$Outlier.OtherSlope)
+mean(cityAll.stats$model.tree.slope[cities.grassland]); sd(cityAll.stats$model.tree.slope[cities.grassland])
+
+
 ## ----------
 #    3.2. Converting slopes into cooling of surface temperature
 #         - Slope x mean Tree Cover = estimated contribution to surface temperature
 #         - Change in tree cover relative to temporal trend → what would the UHI be without gains or losses in the urban canopy?
 ## ----------
+summary(cityAll.stats[NoOutliers,])
+summary(CityBuffStats[NoOutliers,])
+cityAll.stats$Outlier <- cityAll.stats$Outlier.TreeSlope | cityAll.stats$Outlier.OtherSlope
+summary(cityAll.stats)
+
+# # ** IMPORTANT ** Create a new data frame that merges some of the city-level stats with the key differences between cities & buffers
+cityTree <- CityBuffStats[CityBuffStats$factor=="tree", c("ISOURBID", "value.mean.core", "value.mean.diff", "value.mean.diff.p", "trend.mean.core", "trend.p.core", "trend.mean.diff", "trend.mean.diff.p")]
+names(cityTree) <- gsub("mean", "tree", names(cityTree))
+names(cityTree)[which(names(cityTree)=="trend.p.core")] <- "trend.tree.p.core"
+
+cityOther <- CityBuffStats[CityBuffStats$factor=="other veg", c("ISOURBID", "value.mean.core", "value.mean.diff", "value.mean.diff.p", "trend.mean.core", "trend.p.core", "trend.mean.diff", "trend.mean.diff.p")]
+names(cityOther) <- gsub("mean", "other", names(cityOther))
+names(cityOther)[which(names(cityOther)=="trend.p.core")] <- "trend.other.p.core"
+
+cityVeg <- merge(cityTree, cityOther, all=T)
+summary(cityVeg)
+
+summary(cityAll.stats[,c("ISOURBID", "ISO3", "NAME", "LATITUDE", "LONGITUDE", "biomeName", "model.R2adj", "model.tree.slope", "model.tree.p", "model.veg.slope", "model.veg.p")])
+StatsCombined <- merge(cityAll.stats[,c("ISOURBID", "ISO3", "NAME", "LATITUDE", "LONGITUDE", "biomeName", "model.R2adj", "model.tree.slope", "model.tree.p", "model.veg.slope", "model.veg.p","Outlier")],
+                       cityVeg, all=T)
+summary(StatsCombined)
+
+# Oh yeah, we need the LST differences too!
+cityLST <- CityBuffStats[CityBuffStats$factor=="LST", c("ISOURBID", "value.mean.core", "value.mean.diff", "value.mean.diff.p", "trend.mean.core", "trend.p.core", "trend.mean.diff", "trend.mean.diff.p")]
+names(cityLST) <- gsub("mean", "LST", names(cityLST))
+names(cityLST)[which(names(cityLST)=="trend.p.core")] <- "trend.LST.p.core"
+
+StatsCombined <- merge(StatsCombined, cityLST, all=T)
+summary(StatsCombined)
+
+
+# Calculating the realized effect of trees & other veg in degrees celcsius
+StatsCombined$TempContrib.Tree <- StatsCombined$model.tree.slope*StatsCombined$value.tree.core 
+StatsCombined$TempContrib.Other <- StatsCombined$model.veg.slope*StatsCombined$value.other.core
+
+# Using the difference in veg cover to determine the estimated contribution to the UHI
+StatsCombined$UHIContrib.Tree <- StatsCombined$model.tree.slope*StatsCombined$value.tree.diff
+StatsCombined$UHIContrib.Other <- StatsCombined$model.veg.slope*StatsCombined$value.other.diff
+StatsCombined$pUHIContrib.Tree <- StatsCombined$UHIContrib.Tree/StatsCombined$value.LST.diff
+StatsCombined$pUHIContrib.Other <- StatsCombined$UHIContrib.Other/StatsCombined$value.LST.diff
+summary(StatsCombined)
+
+
+# For the XXXX cities showing urban heat island effects, differences in tree cover account for an average XX% of that, an average of X˚C (SD X˚C). 
+cityUHI <- which(StatsCombined$value.LST.diff>0 & !StatsCombined$Outlier)
+
+length(cityUHI)
+
+mean(StatsCombined$pUHIContrib.Tree[cityUHI]); sd(StatsCombined$pUHIContrib.Tree[cityUHI])
+mean(StatsCombined$UHIContrib.Tree[cityUHI]); sd(StatsCombined$UHIContrib.Tree[cityUHI])
+mean(StatsCombined$UHIContrib.Tree[cityUHI]/StatsCombined$UHIContrib.Other[cityUHI]); sd(StatsCombined$UHIContrib.Tree[cityUHI]/StatsCombined$UHIContrib.Other[cityUHI])
+
+# Despite much higher cover of non-tree vegetation in cities (table), trees contribute an average 6.5 times the cooling on average (non-tree veg cooling: -0.05˚C SD 0.27˚C)
+mean(StatsCombined$UHIContrib.Other[cityUHI]); sd(StatsCombined$UHIContrib.Other[cityUHI])
+mean(StatsCombined$pUHIContrib.Other[cityUHI]); sd(StatsCombined$pUHIContrib.Other[cityUHI])
+
+# However, because non-tree vegetation cover is higher in metroregion cores relative to the surrounding region (table), non-tree urban green spaces playing a crucial role offsetting the UHI effect with a net impact of -0.05˚C (SD 0.27˚C), or X% of the total observed UHI
+mean(StatsCombined$UHIContrib.Other[cityUHI]); sd(StatsCombined$UHIContrib.Other[cityUHI])
+
+# Now Getting the Biome Breakdown
+summary(StatsCombined)
+
+VegEffectsBiome <- aggregate(cbind(value.LST.diff, model.R2adj, value.tree.core, value.other.core, model.tree.slope, model.veg.slope, TempContrib.Tree, TempContrib.Other, UHIContrib.Tree, UHIContrib.Other, pUHIContrib.Tree, pUHIContrib.Other) ~ biomeName, data=StatsCombined[!StatsCombined$Outlier,], FUN=mean)
+# names(VegSlopeBiome)[] <- c("Biome", "N.Cities")
+VegEffectsBiome[,paste0(c("value.LST.diff", "model.R2adj", "value.tree.core", "value.other.core", "model.tree.slope", "model.veg.slope",  "TempContrib.Tree", "TempContrib.Other", "UHIContrib.Tree", "UHIContrib.Other", "pUHIContrib.Tree", "pUHIContrib.Other"), ".SD")] <- aggregate(cbind(value.LST.diff, model.R2adj, value.tree.core, value.other.core, model.tree.slope, model.veg.slope, TempContrib.Tree, TempContrib.Other, UHIContrib.Tree, UHIContrib.Other, pUHIContrib.Tree, pUHIContrib.Other) ~ biomeName, data=StatsCombined[!StatsCombined$Outlier,], FUN=sd)[,c("value.LST.diff", "model.R2adj", "value.tree.core", "value.other.core", "model.tree.slope", "model.veg.slope", "TempContrib.Tree", "TempContrib.Other", "UHIContrib.Tree", "UHIContrib.Other", "pUHIContrib.Tree", "pUHIContrib.Other")]
+VegEffectsBiome$N.Cities <- aggregate(value.LST.diff ~ biomeName, data=StatsCombined[NoOutliers,], FUN=length)[,2]
+VegEffectsBiome$N.TreeSigCool <- aggregate(model.tree.slope ~ biomeName, data=StatsCombined[!StatsCombined$Outlier & StatsCombined$model.tree.slope<0 & StatsCombined$model.tree.p<0.01,], FUN=length)[,2]
+VegEffectsBiome$N.OtherSigCool <- aggregate(model.veg.slope ~ biomeName, data=StatsCombined[!StatsCombined$Outlier & StatsCombined$model.veg.slope<0 & StatsCombined$model.veg.p<0.01,], FUN=length)[,2]
+VegEffectsBiome
+
+tableVegEffectBiome <- data.frame(Biome=VegEffectsBiome$biomeName, N.Cities=VegEffectsBiome$N.Cities,
+                                  LSTdiff=paste0(round(VegEffectsBiome$value.LST.diff, 2), " (",round(VegEffectsBiome$value.LST.diff, 2), ")"),
+                                  modelR2adj=paste0(round(VegEffectsBiome$model.R2adj, 2), " (",round(VegEffectsBiome$model.R2adj.SD, 2), ")"),
+                                  TreeSlope=paste0(round(VegEffectsBiome$model.tree.slope, 2), " (",round(VegEffectsBiome$model.tree.slope.SD, 2), ")"),
+                                  OtherVegSlope=paste0(round(VegEffectsBiome$model.veg.slope, 2), " (",round(VegEffectsBiome$model.veg.slope.SD, 2), ")"),
+                                  TreeEffect.degC=paste0(round(VegEffectsBiome$TempContrib.Tree, 2), " (",round(VegEffectsBiome$TempContrib.Tree.SD, 2), ")"),
+                                  OtherEffect.degC=paste0(round(VegEffectsBiome$TempContrib.Other, 2), " (",round(VegEffectsBiome$TempContrib.Other.SD, 2), ")"),
+                                  TreeContribUHI=paste0(round(VegEffectsBiome$UHIContrib.Tree, 2), " (",round(VegEffectsBiome$UHIContrib.Tree.SD, 2), ")"),
+                                  OtherContribUHI=paste0(round(VegEffectsBiome$UHIContrib.Other, 2), " (",round(VegEffectsBiome$UHIContrib.Other.SD, 2), ")"),
+                                  pUHI.Tree=paste0(round(VegEffectsBiome$pUHIContrib.Tree, 2), " (",round(VegEffectsBiome$pUHIContrib.Tree.SD, 2), ")"),
+                                  pUHI.Other=paste0(round(VegEffectsBiome$pUHIContrib.Other, 2), " (",round(VegEffectsBiome$pUHIContrib.Other.SD, 2), ")"))
+tableVegEffectBiome
+write.csv(tableVegEffectBiome, file.path(path.figs, "Vegetation_Effects-All_Biome.csv"), row.names=F)
+
+
+# png(file.path(path.figs, "Vegetation_TempEffects_boxplot.png"), height=8, width=8, units="in", res=220)
+ggplot(data=slopes.stack[,]) +
+  # facet_grid(factor~.) +
+  geom_boxplot(aes(x=biomeName, y=model.slope, fill=biomeName, alpha=vegType), position="dodge") +
+  geom_hline(yintercept=0, linetype="dashed") +
+  scale_y_continuous(name="Model Slopes (deg C / % cover)") +
+  scale_x_discrete(name="Biome Type") +
+  scale_fill_manual(values=biome.pall.all, guide="none") +
+  scale_alpha_manual(values=c("tree"=1, "other veg"=0.4)) +
+  labs(caption="4-sigma outliers removed; dark fill = tree slope; light fill= other veg") +
+  theme_bw() +
+  theme(legend.position="none",
+        legend.title=element_text(color="black", face="bold", size=rel(1.5)),
+        legend.text=element_text(color="black"),
+        legend.background=element_blank(),
+        panel.background = element_rect(fill="NA"),
+        panel.grid = element_blank(),
+        axis.text.x=element_text(angle=-15, hjust=0))
+dev.off()
 
 ## ----------
 #    3.3. Comparing cooling & tree trends to global warming and other urban warming processes
