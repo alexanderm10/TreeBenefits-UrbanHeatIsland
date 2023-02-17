@@ -1040,10 +1040,18 @@ write.csv(tableVegEffectBiome, file.path(path.figs, "Vegetation_Effects-All_Biom
 mean(StatsCombined$TempContrib.Tree[!StatsCombined$Outlier]); sd(StatsCombined$TempContrib.Tree[!StatsCombined$Outlier])
 
 
-# png(file.path(path.figs, "Vegetation_TempEffects_boxplot.png"), height=8, width=8, units="in", res=220)
-ggplot(data=slopes.stack[,]) +
+
+effects.stack <- stack(StatsCombined[,c("TempContrib.Tree", "TempContrib.Other")])
+names(effects.stack) <- c("TempContrib", "vegType")
+effects.stack$vegType <- factor(ifelse(grepl("Tree", effects.stack$vegType), "tree", "other veg"), levels=c("tree", "other veg"))
+effects.stack[,c("ISOURBID", "NAME", "biomeName", "Outlier")] <- StatsCombined[,c("ISOURBID", "NAME", "biomeName", "Outlier")]
+summary(effects.stack)
+
+
+png(file.path(path.figs, "Vegetation_TempEffects_boxplot.png"), height=8, width=8, units="in", res=220)
+ggplot(data=effects.stack[!effects.stack$Outlier,]) +
   # facet_grid(factor~.) +
-  geom_boxplot(aes(x=biomeName, y=model.slope, fill=biomeName, alpha=vegType), position="dodge") +
+  geom_boxplot(aes(x=biomeName, y=TempContrib, fill=biomeName, alpha=vegType), position="dodge") +
   geom_hline(yintercept=0, linetype="dashed") +
   scale_y_continuous(name="Model Slopes (deg C / % cover)") +
   scale_x_discrete(name="Biome Type") +
@@ -1060,10 +1068,289 @@ ggplot(data=slopes.stack[,]) +
         axis.text.x=element_text(angle=-15, hjust=0))
 dev.off()
 
+
+summary(StatsCombined)
+StatsCombined$TempContrib.NoVeg <- StatsCombined$value.LST.diff - StatsCombined$TempContrib.Tree - StatsCombined$TempContrib.Other
+StatsCombined$UHIContrib.NoVeg <- StatsCombined$value.LST.diff - StatsCombined$UHIContrib.Tree - StatsCombined$UHIContrib.Other
+
+summary(StatsCombined)
+summary(StatsCombined[!StatsCombined$Outlier,])
+
+TempEstimates <- stack(StatsCombined[,c("value.LST.diff", "TempContrib.Tree", "TempContrib.Other", "TempContrib.NoVeg")])
+names(TempEstimates) <- c("TempContrib", "ind")
+TempEstimates$UHIContrib <- stack(StatsCombined[,c("value.LST.diff", "UHIContrib.Tree", "UHIContrib.Other", "UHIContrib.NoVeg")])[,1]
+TempEstimates$ind <- car::recode(TempEstimates$ind, "'value.LST.diff'='UHI (Observed)'; 'TempContrib.Tree'='Tree Effect'; 'TempContrib.Other'='Other Veg Effect'; 'TempContrib.NoVeg'='No Veg Temp (Estimated)'")
+TempEstimates[,c("ISOURBID", "NAME", "biomeName", "Outlier")] <- StatsCombined[,c("ISOURBID", "NAME", "biomeName", "Outlier")]
+summary(TempEstimates)
+
+
+
+
+png(file.path(path.figs, "LST_Contributions_densityplot.png"), height=8, width=8, units="in", res=220)
+ggplot(data=TempEstimates) +
+  # facet_grid(ind~.) +
+  geom_density(aes(x=TempContrib, fill=ind), alpha=0.5) +
+  geom_vline(xintercept=0, linetype="dashed") +
+  scale_x_continuous(name="Effect on LST (deg. C)", expand=c(0,0)) +
+  scale_y_continuous(name="Proportion of Cities", expand=c(0,0)) +
+  scale_fill_manual(values=c("UHI (Observed)"="black", "Tree Effect"="#1b9e77", "Other Veg Effect"="#7570b3", "No Veg Temp (Estimated)"="#d95f02")) +
+  theme_bw() +
+  theme(legend.position="top",
+        legend.title=element_blank(),
+        legend.text=element_text(color="black"),
+        legend.background=element_blank(),
+        panel.background = element_rect(fill="NA"),
+        panel.grid = element_blank())
+dev.off()
+
+png(file.path(path.figs, "LST_Contributions-Biomes_densityplot.png"), height=8, width=11, units="in", res=220)
+ggplot(data=TempEstimates) +
+  facet_wrap(~biomeName, scales="free") +
+  geom_density(aes(x=TempContrib, fill=ind), alpha=0.5) +
+  geom_vline(xintercept=0, linetype="dashed") +
+  scale_x_continuous(name="Effect on LST (deg. C)", expand=c(0,0)) +
+  scale_y_continuous(name="Proportion of Cities", expand=c(0,0)) +
+  scale_fill_manual(values=c("UHI (Observed)"="black", "Tree Effect"="#1b9e77", "Other Veg Effect"="#7570b3", "No Veg Temp (Estimated)"="#d95f02")) +
+  theme_bw() +
+  theme(legend.position="top",
+        legend.title=element_blank(),
+        legend.text=element_text(color="black"),
+        legend.background=element_blank(),
+        panel.background = element_rect(fill="NA"),
+        panel.grid = element_blank())
+dev.off()
+
+
+png(file.path(path.figs, "UHI_Contributions_densityplot.png"), height=8, width=8, units="in", res=220)
+ggplot(data=TempEstimates[!TempEstimates$Outlier,]) +
+  # facet_grid(ind~.) +
+  coord_cartesian(xlim=quantile(TempEstimates$UHIContrib[!TempEstimates$Outlier], c(0.005, 0.995), na.rm = T)) +
+  geom_density(aes(x=UHIContrib, fill=ind), alpha=0.5) +
+  geom_vline(xintercept=0, linetype="dashed") +
+  scale_x_continuous(name="UHI Contribution (deg. C)", expand=c(0,0)) +
+  scale_y_continuous(name="Proportion of Cities", expand=c(0,0)) +
+  scale_fill_manual(values=c("UHI (Observed)"="black", "Tree Effect"="#1b9e77", "Other Veg Effect"="#7570b3", "No Veg Effect (Estimated)"="#d95f02")) +
+  theme_bw() +
+  theme(legend.position="top",
+        legend.title=element_blank(),
+        legend.text=element_text(color="black"),
+        legend.background=element_blank(),
+        panel.background = element_rect(fill="NA"),
+        panel.grid = element_blank())
+dev.off()
+
+
+# Looking at how much higher tree cover would need to be to offset the UHI by trees alone
+# Because of 
+
+StatsCombined$TempDeficit.Trees <- StatsCombined$value.LST.diff/StatsCombined$model.tree.slope
+StatsCombined$TempDeficit.Trees.Trim <- StatsCombined$TempDeficit.Trees
+StatsCombined$TempDeficit.Trees.Trim[StatsCombined$TempDeficit.Trees.Trim<quantile(StatsCombined$TempDeficit.Trees, 0.025) | StatsCombined$TempDeficit.Trees.Trim>quantile(StatsCombined$TempDeficit.Trees, 0.975) | StatsCombined$Outlier] <- NA
+summary(StatsCombined)
+length(which(!is.na(StatsCombined$TempDeficit.Trees.Trim)))
+mean(StatsCombined$TempDeficit.Trees.Trim, na.rm=T); sd(StatsCombined$TempDeficit.Trees.Trim, na.rm=T)
+
+# Setting a Tree-based UHI Offset Goal
+StatsCombined$TreeTempOffsetGoal <- StatsCombined$value.tree.core - StatsCombined$TempDeficit.Trees
+StatsCombined$TreeTempOffsetGoal.Trimmed <- StatsCombined$TreeTempOffsetGoal
+StatsCombined$TreeTempOffsetGoal.Trimmed[StatsCombined$TreeTempOffsetGoal.Trimmed<quantile(StatsCombined$TreeTempOffsetGoal, 0.025) | StatsCombined$TreeTempOffsetGoal.Trimmed>quantile(StatsCombined$TreeTempOffsetGoal, 0.975) | StatsCombined$Outlier] <- NA
+
+# StatsCombined$Ratio.TreeTempOffsetGoal <- StatsCombined$TreeTempOffsetGoal/StatsCombined$value.tree.core
+# StatsCombined$Ratio.TreeTempOffsetGoal[StatsCombined$Ratio.TreeTempOffsetGoal==Inf] <- NA
+# summary(StatsCombined)
+
+# For trees to be the sole nature-based solution for offsetting UHI effects, globally tree cover would need to be an average XX % higher (SD XX%), a near doubling of current average tree cover, when analyzing the middle 95% of cities.
+mean(StatsCombined$TreeTempOffsetGoal.Trimmed, na.rm=T); sd(StatsCombined$TreeTempOffsetGoal.Trimmed, na.rm=T)
+mean(StatsCombined$TreeTempOffsetGoal.Trimmed, na.rm=T)/mean(StatsCombined$value.tree.core, na.rm=T)
+median(StatsCombined$TreeTempOffsetGoal.Trimmed, na.rm=T)/median(StatsCombined$value.tree.core, na.rm=T)
+
+
+TreeDeficitBiome <- aggregate(cbind(TreeTempOffsetGoal.Trimmed, TempDeficit.Trees.Trim) ~ biomeName, data=StatsCombined[,], FUN=mean, na.rm=T)
+# # names(VegSlopeBiome)[] <- c("Biome", "N.Cities")
+TreeDeficitBiome[,paste0(c("TreeTempOffsetGoal.Trimmed", "TempDeficit.Trees.Trim"), ".SD")] <- aggregate(cbind(TreeTempOffsetGoal.Trimmed, TempDeficit.Trees.Trim) ~ biomeName, data=StatsCombined[,], FUN=sd, na.rm=T)[,c("TreeTempOffsetGoal.Trimmed", "TempDeficit.Trees.Trim")]
+TreeDeficitBiome$N.OffsetGoal <- aggregate(TreeTempOffsetGoal.Trimmed ~ biomeName, data=StatsCombined[!is.na(StatsCombined$TreeTempOffsetGoal.Trimmed),], FUN=length)[,c("TreeTempOffsetGoal.Trimmed")]
+TreeDeficitBiome$N.Deficit <- aggregate(TempDeficit.Trees.Trim ~ biomeName, data=StatsCombined[!is.na(StatsCombined$TreeTempOffsetGoal.Trimmed),], FUN=length)[,c("TempDeficit.Trees.Trim")]
+TreeDeficitBiome
+
+tableTreeDeficitBiome <- data.frame(Biome=TreeDeficitBiome$biomeName, 
+                                    N.Cities.Offset=TreeDeficitBiome$N.OffsetGoal,
+                                    N.Cities.Deficit=TreeDeficitBiome$N.Deficit,
+                                    TreeOffsetGoal=paste0(round(TreeDeficitBiome$TreeTempOffsetGoal.Trimmed, 0), " (",round(TreeDeficitBiome$TreeTempOffsetGoal.Trimmed.SD, 0), ")"),
+                                    TreeGoalDeficit=paste0(round(TreeDeficitBiome$TempDeficit.Trees.Trim, 0), " (",round(TreeDeficitBiome$TempDeficit.Trees.Trim.SD, 0), ")"))
+tableTreeDeficitBiome
+write.csv(tableTreeDeficitBiome, file.path(path.figs, "UHI-Offset_GoalsDeficts_Biome.csv"), row.names=F)
+
+
+
+
+png(file.path(path.figs, "UHI-Offset_TreeGoalTotal_histogram.png"), height=8, width=8, units="in", res=220)
+ggplot(data=StatsCombined[,]) +
+  geom_histogram(aes(x=TreeTempOffsetGoal.Trimmed, fill=biomeName)) +
+  geom_vline(xintercept=0, linetype="dashed") +
+  scale_y_continuous(expand=c(0,0)) +
+  scale_x_continuous(name="Trees Needed to Offset UHI (%)", expand=c(0,0)) +
+  scale_fill_manual(values=biome.pall.all[]) +
+  labs(caption="**Warming Cities Only*; Display shown is 2% trimmed") +
+  theme_bw() +
+  theme(legend.position="top",
+        legend.title=element_text(color="black", face="bold", size=rel(1.5)),
+        legend.text=element_text(color="black"),
+        legend.background=element_blank(),
+        panel.background = element_rect(fill="NA"),
+        panel.grid = element_blank())
+dev.off()
+
+
+
+png(file.path(path.figs, "UHI-Offset_TreeDeficit_histogram.png"), height=8, width=8, units="in", res=220)
+ggplot(data=StatsCombined[,]) +
+  geom_histogram(aes(x=TempDeficit.Trees.Trim, fill=biomeName)) +
+  geom_vline(xintercept=0, linetype="dashed") +
+  scale_y_continuous(expand=c(0,0)) +
+  scale_x_continuous(name="Trees Deficit to Offset UHI (%)", expand=c(0,0)) +
+  scale_fill_manual(values=biome.pall.all[]) +
+  labs(caption="**Warming Cities Only*; Display shown is 2% trimmed") +
+  theme_bw() +
+  theme(legend.position="top",
+        legend.title=element_text(color="black", face="bold", size=rel(1.5)),
+        legend.text=element_text(color="black"),
+        legend.background=element_blank(),
+        panel.background = element_rect(fill="NA"),
+        panel.grid = element_blank())
+dev.off()
+
+png(file.path(path.figs, "UHI-Offset_TreeDeficit_map.png"), height=8, width=8, units="in", res=220)
+ggplot(data=StatsCombined[,]) +
+  coord_equal(expand=0, ylim=c(-60,75)) +
+  geom_polygon(data=world, aes(x=long, y=lat, group=group), fill="gray50") +
+  geom_point(aes(x=LONGITUDE, y=LATITUDE, color=TempDeficit.Trees.Trim), size=0.5) +
+  scale_color_gradientn(name="Tree UHI\nOffset Deficit\n(%)", colors=grad.tree,  limits=c(-max(abs(StatsCombined$TempDeficit.Trees.Trim), na.rm=T), max(abs(StatsCombined$TempDeficit.Trees.Trim), na.rm=T))) +
+  theme_bw() +
+  theme(legend.position="top",
+        legend.title=element_text(color="black", face="bold", size=rel(1.5)),
+        legend.text=element_text(color="black"),
+        legend.background=element_blank(),
+        panel.background = element_rect(fill="NA"),
+        panel.grid = element_blank())
+dev.off()
+
+
+
 ## ----------
 #    3.3. Comparing cooling & tree trends to global warming and other urban warming processes
 ## ----------
+# Figure out how much the LST would change if there wasn't the widespread gains (or losses) we saw in tree cover 
+StatsCombined$trend.LST.core.tree <- StatsCombined$trend.tree.core*StatsCombined$model.tree.slope # Tree Trend Effect on temperature (deg C/yr)
+StatsCombined$trend.LST.core.StatTree <- StatsCombined$trend.LST.core - StatsCombined$trend.LST.core.tree # What the LST trend would be without changes in tree cover (Deg C/yr)
+StatsCombined$pTrendAdd.Tree <- StatsCombined$trend.LST.core.StatTree/StatsCombined$trend.LST.core -1 # proporitional LST trend if there was no change in cover
+StatsCombined$trend.LST.core.other <- StatsCombined$trend.other.core*StatsCombined$model.veg.slope
+StatsCombined$trend.LST.core.StatOther <- StatsCombined$trend.LST.core - StatsCombined$trend.LST.core.other
+StatsCombined$pTrendAdd.Other <- StatsCombined$trend.LST.core.StatOther/StatsCombined$trend.LST.core -1 # How much worse would warming be without tree gains 
+summary(StatsCombined)
 
+summary(StatsCombined$pTrendAdd.Tree[!StatsCombined$Outlier]*100)
+quantile(StatsCombined$pTrendAdd.Tree[!StatsCombined$Outlier]*100, c(0.05, 0.95), na.rm=T)
+
+# ggplot(data=TempEstimates) +
+#   facet_wrap(~biomeName, scales="free") +
+#   geom_density(aes(x=TempContrib, fill=ind), alpha=0.5) +
+#   geom_vline(xintercept=0, linetype="dashed") +
+#   scale_x_continuous(name="Effect on LST (deg. C)", expand=c(0,0)) +
+#   scale_y_continuous(name="Proportion of Cities", expand=c(0,0)) +
+#   scale_fill_manual(values=c("UHI (Observed)"="black", "Tree Effect"="#1b9e77", "Other Veg Effect"="#7570b3", "No Veg Temp (Estimated)"="#d95f02")) +
+#   theme_bw() +
+#   theme(legend.position="top",
+#         legend.title=element_blank(),
+#         legend.text=element_text(color="black"),
+#         legend.background=element_blank(),
+#         panel.background = element_rect(fill="NA"),
+#         panel.grid = element_blank())
+
+
+# On average, changes in tree cover from 2000-2020 contribute a global mean cooling effect of XXX˚C/yr (SD XX˚C/yr) in urban areas, which is equivalent to an average XX˚C over the 20-year analysis period. 
+mean(StatsCombined$trend.LST.core.tree[!StatsCombined$Outlier], na.rm=T); sd(StatsCombined$trend.LST.core.tree[!StatsCombined$Outlier], na.rm=T)
+mean(StatsCombined$trend.LST.core.tree[!StatsCombined$Outlier], na.rm=T)*20; sd(StatsCombined$trend.LST.core.tree[!StatsCombined$Outlier], na.rm=T)*20
+
+
+# While significant and the opposite pattern than seen from changes in other vegetation cover (XX˚C/yr SD XX˚C/yr), cooling from increased tree cover only accounts for a median 1% of the observed urban land surface temperature trend.  
+mean(StatsCombined$trend.LST.core.other[!StatsCombined$Outlier], na.rm=T); sd(StatsCombined$trend.LST.core.other[!StatsCombined$Outlier], na.rm=T)
+
+median(StatsCombined$pTrendAdd.Tree[!StatsCombined$Outlier], na.rm=T)
+mean(StatsCombined$pTrendAdd.Tree[!StatsCombined$Outlier], na.rm=T)
+
+# In order to have offset the recent warming observed in cities, tree cover would have needed to increase at a median rate of 0.4%/yr – more than 6 times the median rate of tree cover increase detected in our data set.
+# LST Trend (deg C / year) / tree effect (deg C / %) = deg C/yr * %/deg C??
+StatsCombined$TreeTrendToOffsetLST <- StatsCombined$trend.LST.core/-StatsCombined$model.tree.slope
+
+StatsCombined$TreeTrendRatio <- StatsCombined$TreeTrendToOffsetLST/-StatsCombined$trend.tree.core
+summary(StatsCombined)
+summary(StatsCombined[!StatsCombined$Outlier,])
+
+mean(StatsCombined$TreeTrendToOffsetLST[!StatsCombined$Outlier], na.rm=T); sd(StatsCombined$TreeTrendToOffsetLST[!StatsCombined$Outlier], na.rm=T)
+median(StatsCombined$TreeTrendToOffsetLST[!StatsCombined$Outlier], na.rm=T)
+
+median(StatsCombined$TreeTrendToOffsetLST[!StatsCombined$Outlier], na.rm=T)/median(StatsCombined$trend.tree.core[!StatsCombined$Outlier], na.rm=T)
+
+summary(StatsCombined$TreeTrendToOffsetLST)
+summary(StatsCombined$TreeTrendToOffsetLST[!StatsCombined$Outlier])
+
+quantile(StatsCombined$TreeTrendToOffsetLST[!StatsCombined$Outlier], c(0.005, 0.995), na.rm=T)
+summary(StatsCombined$TreeTrendToOffsetLST[!StatsCombined$Outlier], c(0.005, 0.995), na.rm=T)
+
+# png(file.path(path.figs, "Vegetation-Tree_Trends_Difference_histogram.png"), height=8, width=8, units="in", res=220)
+ggplot(data=StatsCombined[!StatsCombined$Outlier,]) +
+  # coord_cartesian(xlim=quantile(StatsCombined$TreeTrendToOffsetLST[!StatsCombined$Outlier], c(0.005, 0.995), na.rm=T)) +
+  geom_histogram(aes(x=TreeTrendToOffsetLST, fill=biomeName)) +
+  geom_vline(xintercept=0, linetype="dashed") +
+  scale_y_continuous(expand=c(0,0)) +
+  scale_x_continuous(name="Tree Trend Needed to Offset LST Trend (%/yr)", expand=c(0,0), limits=quantile(StatsCombined$TreeTrendToOffsetLST[!StatsCombined$Outlier], c(0.01, 0.99), na.rm=T)) +
+  scale_fill_manual(values=biome.pall.all[]) +
+  labs(caption="Display shown is 2% trimmed") +
+  theme_bw() +
+  theme(legend.position="top",
+        legend.title=element_text(color="black", face="bold", size=rel(1.5)),
+        legend.text=element_text(color="black"),
+        legend.background=element_blank(),
+        panel.background = element_rect(fill="NA"),
+        panel.grid = element_blank())
+# dev.off()
+
+ggplot(data=StatsCombined[!StatsCombined$Outlier & StatsCombined$trend.LST.core>0,]) +
+  geom_histogram(aes(x=TreeTrendToOffsetLST, fill=biomeName)) +
+  geom_vline(xintercept=0, linetype="dashed") +
+  scale_y_continuous(expand=c(0,0)) +
+  scale_x_continuous(name="Tree Trend Needed to Offset LST Trend (%/yr)", expand=c(0,0), limits=quantile(StatsCombined$TreeTrendToOffsetLST[!StatsCombined$Outlier], c(0.01, 0.99), na.rm=T)) +
+  scale_fill_manual(values=biome.pall.all[]) +
+  labs(caption="**Warming Cities Only*; Display shown is 2% trimmed") +
+  theme_bw() +
+  theme(legend.position="top",
+        legend.title=element_text(color="black", face="bold", size=rel(1.5)),
+        legend.text=element_text(color="black"),
+        legend.background=element_blank(),
+        panel.background = element_rect(fill="NA"),
+        panel.grid = element_blank())
+
+
+summary(StatsCombined$TreeTrendToOffsetLST - StatsCombined$trend.tree.core)
+
+# looking at tree trend deficits
+mean(StatsCombined$TreeTrendToOffsetLST[!StatsCombined$Outlier] - StatsCombined$trend.tree.core[!StatsCombined$Outlier], na.rm=T); sd(StatsCombined$TreeTrendToOffsetLST[!StatsCombined$Outlier] - StatsCombined$trend.tree.core[!StatsCombined$Outlier], na.rm=T)
+median(StatsCombined$TreeTrendToOffsetLST[!StatsCombined$Outlier] - StatsCombined$trend.tree.core[!StatsCombined$Outlier], na.rm=T)
+
+ggplot(data=StatsCombined[!StatsCombined$Outlier,]) +
+  geom_histogram(aes(x=TreeTrendToOffsetLST-trend.tree.core, fill=biomeName)) +
+  geom_vline(xintercept=0, linetype="dashed") +
+  scale_y_continuous(expand=c(0,0)) +
+  scale_x_continuous(name="Tree Deficit (%/yr)", expand=c(0,0), limits=quantile(StatsCombined$TreeTrendToOffsetLST[!StatsCombined$Outlier], c(0.01, 0.99), na.rm=T)) +
+  scale_fill_manual(values=biome.pall.all[]) +
+  labs(caption="**Warming Cities Only*; Display shown is 2% trimmed") +
+  theme_bw() +
+  theme(legend.position="top",
+        legend.title=element_text(color="black", face="bold", size=rel(1.5)),
+        legend.text=element_text(color="black"),
+        legend.background=element_blank(),
+        panel.background = element_rect(fill="NA"),
+        panel.grid = element_blank())
 
 ##########################################
 
