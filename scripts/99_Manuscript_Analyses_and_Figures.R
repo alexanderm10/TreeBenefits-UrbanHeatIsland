@@ -1053,7 +1053,7 @@ ggplot(data=effects.stack[!effects.stack$Outlier,]) +
   # facet_grid(factor~.) +
   geom_boxplot(aes(x=biomeName, y=TempContrib, fill=biomeName, alpha=vegType), position="dodge") +
   geom_hline(yintercept=0, linetype="dashed") +
-  scale_y_continuous(name="Model Slopes (deg C / % cover)") +
+  scale_y_continuous(name="Veg Effect on Temp (deg C)") +
   scale_x_discrete(name="Biome Type") +
   scale_fill_manual(values=biome.pall.all, guide="none") +
   scale_alpha_manual(values=c("tree"=1, "other veg"=0.4)) +
