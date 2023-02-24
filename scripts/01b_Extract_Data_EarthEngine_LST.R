@@ -166,7 +166,6 @@ extractTempEE <- function(CitySP, CityNames, TEMPERATURE, GoogleFolderSave, over
 
     ## ----------------
     # Now remove outliers
-    # #  NOTE : THIS DOESN"T WORK YET!
     # Once it DOES work, we can re-run the the setNPts
     ## ----------------
     lstOutliers <- function(img){

@@ -18,7 +18,7 @@ dir.create(path.figs, recursive=T, showWarnings=F)
 cityAll.stats <- read.csv(file.path(path.cities, "city_stats_all.csv"))
 head(cityAll.stats)
 
-# Chicago: USA26687; Vancouver: CAN16375; Berlin: DEU10109; Atlanta: USA40447; Sydney: AUS66430; Santiago (Chile): CHL66311; Cairo (AlQahirah): EGY44702; Beijing: CHN31890
+# Chicago: USA26687; Vancouver: CAN16375; Berlin: DEU10109; Atlanta: USA40447; Sydney: AUS66430; Santiago (Chile): CHL66311; Cairo (AlQahirah): EGY44702; Beijing: CHN31890; Johannesburg (South Africa): ZAF64524; Rio de Janeiro: BRA63739
 cityAll.stats$ISOURBID[cityAll.stats$NAME=="Chicago" & !is.na(cityAll.stats$NAME)]
 cityAll.stats$ISOURBID[cityAll.stats$NAME=="Vancouver" & !is.na(cityAll.stats$NAME)]
 cityAll.stats$ISOURBID[cityAll.stats$NAME=="Berlin" & !is.na(cityAll.stats$NAME)]
@@ -27,8 +27,10 @@ cityAll.stats$ISOURBID[cityAll.stats$NAME=="Sydney" & !is.na(cityAll.stats$NAME)
 cityAll.stats$ISOURBID[cityAll.stats$NAME=="Santiago" & !is.na(cityAll.stats$NAME)]
 cityAll.stats$ISOURBID[cityAll.stats$NAME=="AlQahirah" & !is.na(cityAll.stats$NAME)]
 cityAll.stats$ISOURBID[cityAll.stats$NAME=="BEJING" & !is.na(cityAll.stats$NAME)]
+cityAll.stats$ISOURBID[cityAll.stats$NAME=="JOHANNESBURG" & !is.na(cityAll.stats$NAME)]
+cityAll.stats$ISOURBID[cityAll.stats$NAME=="Rio de Janeiro" & !is.na(cityAll.stats$NAME)]
 
-unique(cityAll.stats$NAME[cityAll.stats$ISO3=="EGY"])
+# unique(cityAll.stats$NAME[cityAll.stats$ISO3=="ZAF"])
 
 CityBuff.stats <- data.frame(ISOURBID = rep(unique(cityAll.stats$ISOURBID), each=3), 
                              factor=c("LST", "tree", "other veg"), 
