@@ -18,6 +18,12 @@ addTime <- function(image){
 setYear <- function(img){
   return(img$set("year", img$date()$get("year")))
 }
+
+bitwiseExtract <- function(input, fromBit, toBit) {
+  maskSize <- ee$Number(1)$add(toBit)$subtract(fromBit)
+  mask <- ee$Number(1)$leftShift(maskSize)$subtract(1)
+  return(input$rightShift(fromBit)$bitwiseAnd(mask))
+}
 ##################### 
 
 ##################### 
@@ -83,12 +89,6 @@ lstConvert <- function(img){
 # //   var mask = qaMask.and(dataQualityMask).and(lstErrorMask)
 # //   var lstDayMasked = lstDay.updateMask(mask)  
 # // }
-bitwiseExtract <- function(input, fromBit, toBit) {
-  maskSize <- ee$Number(1)$add(toBit)$subtract(fromBit)
-  mask <- ee$Number(1)$leftShift(maskSize)$subtract(1)
-  return(input$rightShift(fromBit)$bitwiseAnd(mask))
-}
-
 lstMask <- function(img){
   qcDay <- img$select('QC_Day')
   qaMask <- bitwiseExtract(qcDay, 0, 1)$lte(1);
@@ -159,21 +159,91 @@ lstDayGoodSH <- tempJanFeb$map(lstMask)
 # -----------
 # 2.b MODIS Tree Data
 # -----------
+vizTree <- list(
+  # bands: ['Percent_Tree_Cover'],
+  min=0.0,
+  max=100.0,
+  palette=c('bbe029', '0a9501', '074b03')
+);
+
+vizBit <- list(
+  # bands: ['Percent_Tree_Cover'],
+  min=0.0,
+  max=1,
+  palette=c('bbe029', '074b03')
+);
+vizBit2 <- list(
+  min=0,
+  max=8,
+  palette=tempColors
+);
+
+
+
 mod44b <- ee$ImageCollection('MODIS/006/MOD44B')$filter(ee$Filter$date("2001-01-01", "2020-12-31"))
 mod44b <- mod44b$map(setYear)
 # ee_print(mod44b)
 # Map$addLayer(mod44b$select('Percent_Tree_Cover')$first(), vizTree, 'Percent Tree Cover')
 
+# // Cleaning Up and getting just Good MODIS VCF data
+# // Code adapted from https://gis.stackexchange.com/a/349401/5160
+# // Let's extract all pixels from the input image where
+# Bit Input Layers    State
+# 0   DOY 065 – 097   0 Clear; 1 Cloudy
+# 1   DOY 113 – 145   0 Clear; 1 Cloudy
+# 2   DOY 161 – 193   0 Clear; 1 Cloudy
+# 3   DOY 209 – 241   0 Clear; 1 Cloudy
+# 4   DOY 257 – 289   0 Clear; 1 Cloudy
+# 5   DOY 305 – 337   0 Clear; 1 Cloudy
+# 6   DOY 353 – 017   0 Clear; 1 Cloudy
+# 7   DOY 033 – 045   0 Clear; 1 Cloudy
+# img <- mod44b$first()
+vegBitMask <- function(img){
+  qcVeg <- img$select('Quality')
+  # test <- ee$Image
+  bit0 <- bitwiseExtract(qcVeg, 0, 0);
+  bit1 <- bitwiseExtract(qcVeg, 1, 1);
+  bit2 <- bitwiseExtract(qcVeg, 2, 2);
+  bit3 <- bitwiseExtract(qcVeg, 3, 3);  
+  bit4 <- bitwiseExtract(qcVeg, 4, 4);
+  bit5 <- bitwiseExtract(qcVeg, 5, 5);
+  bit6 <- bitwiseExtract(qcVeg, 6, 6);
+  bit7 <- bitwiseExtract(qcVeg, 7, 7);
+  # Map$addLayer(bit5, vizBit)
+  # ee_print(bit0)
+  
+  imgBitColl <- ee$ImageCollection$fromImages(c(bit0, bit1, bit2, bit3, bit4, bit5, bit6, bit7))
+  bitSumVeg <- imgBitColl$reduce("sum")
+  
+  # From the MODIS VCF 6.1 guide: "If the data are “bad” for 2 or more of the 8 time periods the user should be cautious with the vegetation cover value as it may be erroneous due to the poor inputs"  (https://modis-land.gsfc.nasa.gov/pdf/VCF_C61_UserGuide_September2019.pdf)
+  bitmaskVeg <- bitSumVeg$lte(6) # from 
+  # ee_print(bitmaskVeg)
+  # Map$addLayer(bitSumVeg, vizBit2)
+  # Map$addLayer(bitmaskVeg, vizBit)
+  
+  # Could add the gte50 part here
+  VegMasked <- img$updateMask(bitmaskVeg)
+  # ee_print(VegMasked)
+  # Map$addLayer(img$select('Percent_Tree_Cover'), vizTree, 'Percent Tree Cover')
+  # Map$addLayer(VegMasked$select('Percent_Tree_Cover'), vizTree, 'Percent Tree Cover')
+  return(VegMasked)
+}
+
+mod44bGood <- mod44b$map(vegBitMask)
+# Map$addLayer(mod44bGood$select('Percent_Tree_Cover')$first(), vizTree, 'Percent Tree Cover')
 
 # This seems to work, but seems to be very slow
-mod44bReproj = mod44b$map(function(img){
+mod44bReproj = mod44bGood$map(function(img){
   return(img$reduceResolution(reducer=ee$Reducer$mean())$reproject(projLST))
 })$map(addTime); # add year here!
+# Map$addLayer(mod44bReproj$select('Percent_Tree_Cover')$first(), vizTree, 'Percent Tree Cover')
+
+
 
 # Create a noVeg Mask
 vegMask <- mod44bReproj$first()$select("Percent_Tree_Cover", "Percent_NonTree_Vegetation", "Percent_NonVegetated")$reduce('sum')$gt(50)$mask()
-ee_print(vegMask)
-Map$addLayer(vegMask)
+# ee_print(vegMask)
+# Map$addLayer(vegMask)
 
 maskGeom <- vegMask$geometry()$getInfo()
 maskBBox <- ee$Geometry$BBox(-180, -90, 180, 90)
@@ -184,6 +254,7 @@ saveVegMask$start()
 
 
 mod44bReproj <- mod44bReproj$map(function(IMG){IMG$updateMask(vegMask)})
+# Map$addLayer(mod44bReproj$select('Percent_Tree_Cover')$first(), vizTree, 'Percent Tree Cover')
 # ee_print(mod44bReproj)
 
 
@@ -194,12 +265,6 @@ modTree <- ee$ImageCollection$toBands(mod44bReproj$select("Percent_Tree_Cover"))
 modVeg <- ee$ImageCollection$toBands(mod44bReproj$select("Percent_NonTree_Vegetation"))$rename(yrString)
 modBare <- ee$ImageCollection$toBands(mod44bReproj$select("Percent_NonVegetated"))$rename(yrString)
 
-vizTree <- list(
-  # bands: ['Percent_Tree_Cover'],
-  min=0.0,
-  max=100.0,
-  palette=c('bbe029', '0a9501', '074b03')
-);
 # ee_print(modTree)
 Map$addLayer(modTree$select("YR2020"), vizTree, "TreeCover")
 
