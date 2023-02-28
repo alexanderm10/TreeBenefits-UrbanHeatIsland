@@ -11,7 +11,7 @@ if(!dir.exists(path.cities)) dir.create(path.cities, recursive=T, showWarnings =
 file.cityStatsRegion <- file.path(path.cities, "../city_stats_all.csv")
 
 # Path to where Earth Engine is saving the spatial extractions
-path.EEout <- "/Volumes/GoogleDrive/My Drive/UHI_Analysis_Output_Final/"
+path.EEout <- "/Volumes/GoogleDrive/My Drive/UHI_Analysis_Output_Final_v2"
 
 # Some color palettes for later
 grad.temp <- c("#2c7bb6", "#abd9e9", "#ffffbf", "#fdae61", "#d7191c")

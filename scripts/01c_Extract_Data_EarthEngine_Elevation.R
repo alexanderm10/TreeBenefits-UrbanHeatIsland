@@ -4,7 +4,7 @@ library(rgee); library(raster); library(terra)
 ee_check() # For some reason, it's important to run this before initializing right now
 rgee::ee_Initialize(user = 'crollinson@mortonarb.org', drive=T)
 path.google <- "/Volumes/GoogleDrive/My Drive"
-GoogleFolderSave <- "UHI_Analysis_Output_Final"
+GoogleFolderSave <- "UHI_Analysis_Output_Final_v2"
 
 
 ##################### 

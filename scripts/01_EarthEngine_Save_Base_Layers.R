@@ -4,7 +4,7 @@ library(rgee); library(raster); library(terra)
 ee_check() # For some reason, it's important to run this before initializing right now
 rgee::ee_Initialize(user = 'crollinson@mortonarb.org', drive=T)
 path.google <- "/Volumes/GoogleDrive/My Drive"
-GoogleFolderSave <- "UHI_Analysis_Output"
+GoogleFolderSave <- "UHI_Analysis_Output_Final_v2"
 assetHome <- ee_get_assethome()
 
 
@@ -185,6 +185,26 @@ mod44b <- mod44b$map(setYear)
 # ee_print(mod44b)
 # Map$addLayer(mod44b$select('Percent_Tree_Cover')$first(), vizTree, 'Percent Tree Cover')
 
+
+# Create a noVeg Mask -- do this without having taken out the QAQC first because that will end up doing really weird things!
+mod44bReprojOrig = mod44b$map(function(img){
+  return(img$reduceResolution(reducer=ee$Reducer$mean())$reproject(projLST))
+})$map(addTime); # add year here!
+# Map$addLayer(mod44bReprojOrig$select('Percent_Tree_Cover')$first(), vizTree, 'Percent Tree Cover')
+
+vegMask <- mod44bReprojOrig$first()$select("Percent_Tree_Cover", "Percent_NonTree_Vegetation", "Percent_NonVegetated")$reduce('sum')$gt(50)$mask()
+# ee_print(vegMask)
+# Map$addLayer(vegMask, vizBit)
+
+maskGeom <- vegMask$geometry()$getInfo()
+maskBBox <- ee$Geometry$BBox(-180, -90, 180, 90)
+
+# proj4string: "+proj=sinu +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs"
+saveVegMask <- ee_image_to_asset(vegMask, description="Save_VegetationMask", assetId=file.path(assetHome, "MOD44b_1km_Reproj_VegMask"), maxPixels = 10e9, scale=926.6, region = maskBBox, crs="SR-ORG:6974", crsTransform=c(926.625433056, 0, -20015109.354, 0, -926.625433055, 10007554.677), overwrite=T)
+saveVegMask$start()
+
+
+
 # // Cleaning Up and getting just Good MODIS VCF data
 # // Code adapted from https://gis.stackexchange.com/a/349401/5160
 # // Let's extract all pixels from the input image where
@@ -222,11 +242,11 @@ vegBitMask <- function(img){
   # Map$addLayer(bitmaskVeg, vizBit)
   
   # Could add the gte50 part here
-  VegMasked <- img$updateMask(bitmaskVeg)
+  VegBitMasked <- img$updateMask(bitmaskVeg)
   # ee_print(VegMasked)
   # Map$addLayer(img$select('Percent_Tree_Cover'), vizTree, 'Percent Tree Cover')
   # Map$addLayer(VegMasked$select('Percent_Tree_Cover'), vizTree, 'Percent Tree Cover')
-  return(VegMasked)
+  return(VegBitMasked)
 }
 
 mod44bGood <- mod44b$map(vegBitMask)
@@ -237,21 +257,6 @@ mod44bReproj = mod44bGood$map(function(img){
   return(img$reduceResolution(reducer=ee$Reducer$mean())$reproject(projLST))
 })$map(addTime); # add year here!
 # Map$addLayer(mod44bReproj$select('Percent_Tree_Cover')$first(), vizTree, 'Percent Tree Cover')
-
-
-
-# Create a noVeg Mask
-vegMask <- mod44bReproj$first()$select("Percent_Tree_Cover", "Percent_NonTree_Vegetation", "Percent_NonVegetated")$reduce('sum')$gt(50)$mask()
-# ee_print(vegMask)
-# Map$addLayer(vegMask)
-
-maskGeom <- vegMask$geometry()$getInfo()
-maskBBox <- ee$Geometry$BBox(-180, -90, 180, 90)
-
-# proj4string: "+proj=sinu +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs"
-saveVegMask <- ee_image_to_asset(vegMask, description="Save_VegetationMask", assetId=file.path(assetHome, "MOD44b_1km_Reproj_VegMask"), maxPixels = 10e9, scale=926.6, region = maskBBox, crs="SR-ORG:6974", crsTransform=c(926.625433056, 0, -20015109.354, 0, -926.625433055, 10007554.677), overwrite=T)
-saveVegMask$start()
-
 
 mod44bReproj <- mod44bReproj$map(function(IMG){IMG$updateMask(vegMask)})
 # Map$addLayer(mod44bReproj$select('Percent_Tree_Cover')$first(), vizTree, 'Percent Tree Cover')
@@ -300,7 +305,7 @@ for(i in 1:sizeNH-1){
   imgID <- img$id()$getInfo()
   # ee_print(img)
   # Map$addLayer(img, vizTempK, "Jul/Aug Temperature")
-  saveLSTNH <- ee_image_to_asset(img, description=paste0("Save_LST_JulAug_", imgID), assetId=file.path(assetHome, "LST_JulAug_Clean", imgID), maxPixels = 10e9, scale=926.6, region = maskBBox, crs="SR-ORG:6974", crsTransform=c(926.625433056, 0, -20015109.354, 0, -926.625433055, 10007554.677), overwrite=F)
+  saveLSTNH <- ee_image_to_asset(img, description=paste0("Save_LST_JulAug_", imgID), assetId=file.path(assetHome, "LST_JulAug_Clean", imgID), maxPixels = 10e9, scale=926.6, region = maskBBox, crs="SR-ORG:6974", crsTransform=c(926.625433056, 0, -20015109.354, 0, -926.625433055, 10007554.677), overwrite=T)
   saveLSTNH$start()
 }
 
@@ -309,7 +314,7 @@ for(i in 1:sizeSH-1){
   imgID <- img$id()$getInfo()
   # ee_print(img)
   # Map$addLayer(img, vizTempK, "JanFeb Temperature")
-  saveLSTSH <- ee_image_to_asset(img, description=paste0("Save_LST_JanFeb_", imgID), assetId=file.path(assetHome, "LST_JanFeb_Clean", imgID), maxPixels = 10e9, scale=926.6, region = maskBBox, crs="SR-ORG:6974", crsTransform=c(926.625433056, 0, -20015109.354, 0, -926.625433055, 10007554.677), overwrite=F)
+  saveLSTSH <- ee_image_to_asset(img, description=paste0("Save_LST_JanFeb_", imgID), assetId=file.path(assetHome, "LST_JanFeb_Clean", imgID), maxPixels = 10e9, scale=926.6, region = maskBBox, crs="SR-ORG:6974", crsTransform=c(926.625433056, 0, -20015109.354, 0, -926.625433055, 10007554.677), overwrite=T)
   saveLSTSH$start()
 }
 
