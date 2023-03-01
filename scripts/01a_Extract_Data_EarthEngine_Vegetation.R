@@ -3,7 +3,8 @@
 library(rgee); library(raster); library(terra)
 ee_check() # For some reason, it's important to run this before initializing right now
 rgee::ee_Initialize(user = 'crollinson@mortonarb.org', drive=T)
-path.google <- "/Volumes/GoogleDrive/My Drive"
+user.google <- dir("~/Library/CloudStorage/")
+path.google <- file.path("~/Library/CloudStorage", user.google)
 GoogleFolderSave <- "UHI_Analysis_Output_Final_v2"
 
 ##################### 
@@ -131,9 +132,9 @@ if(!overwrite){
 length(cityIdS); length(cityIdNW); length(cityIdNE1); length(cityIdNE2)
 
 
-# if(length(cityIdS)>0){
-#   extractVeg(CitySP=citiesUse, CityNames = cityIdS, TREE=modTree, VEG = modVeg, BARE=modBare, GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
-# }
+if(length(cityIdS)>0){
+  extractVeg(CitySP=citiesUse, CityNames = cityIdS, TREE=modTree, VEG = modVeg, BARE=modBare, GoogleFolderSave = GoogleFolderSave, overwrite=overwrite)
+}
 
 
 if(length(cityIdNW)>0){

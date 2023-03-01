@@ -6,12 +6,15 @@ overwrite=F
 
 # file paths for where to put the processed data
 # path.cities <- "../data_processed/data_cities_all"
-path.cities <- "/Volumes/GoogleDrive/Shared drives/Urban Ecological Drought/Trees-UHI Manuscript/Analysis/data_processed_final/data_cities_all"
+user.google <- dir("~/Library/CloudStorage/")
+path.google <- file.path("~/Library/CloudStorage", user.google)
+path.cities <- file.path(path.google, "Shared drives", "Urban Ecological Drought/Trees-UHI Manuscript/Analysis/data_processed_final")
+
 if(!dir.exists(path.cities)) dir.create(path.cities, recursive=T, showWarnings = F)
 file.cityStatsRegion <- file.path(path.cities, "../city_stats_all.csv")
 
 # Path to where Earth Engine is saving the spatial extractions
-path.EEout <- "/Volumes/GoogleDrive/My Drive/UHI_Analysis_Output_Final_v2"
+path.EEout <- file.path(path.google, "My Drive", "UHI_Analysis_Output_Final_v2")
 
 # Some color palettes for later
 grad.temp <- c("#2c7bb6", "#abd9e9", "#ffffbf", "#fdae61", "#d7191c")

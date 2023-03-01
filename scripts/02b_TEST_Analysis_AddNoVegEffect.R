@@ -5,7 +5,9 @@ library(ggplot2)
 library(mgcv)
 
 # Path to where Earth Engine is saving the spatial extractions
-path.EEout <- "/Volumes/GoogleDrive/My Drive/UHI_Analysis_Output_Final/"
+user.google <- dir("~/Library/CloudStorage/")
+path.google <- file.path("~/Library/CloudStorage", user.google)
+path.EEout <- file.path(path.google, "My Drive", "UHI_Analysis_Output_Final_v2")
 
 
 cityNow <- "USA31965" # Champaign -- has postive tree effect
