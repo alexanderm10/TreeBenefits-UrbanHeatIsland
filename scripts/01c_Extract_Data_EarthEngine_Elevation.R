@@ -120,7 +120,7 @@ if(!overwrite){
   cityRemove <- unlist(lapply(strsplit(elev.done, "_"), function(x){x[1]}))
   
   cityIdS <- cityIdS[!cityIdS %in% cityRemove]
-  cityIdsN <- cityIdN[!cityIdN %in% cityRemove]
+  cityIdN <- cityIdN[!cityIdN %in% cityRemove]
   
 } # End remove cities loop
 length(cityIdS); length(cityIdN)
