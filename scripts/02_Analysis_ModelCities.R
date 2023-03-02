@@ -2,13 +2,13 @@ library(raster); library(sp); library(terra); library(sf)
 library(ggplot2)
 library(mgcv)
 
-overwrite=F
+overwrite=T
 
 # file paths for where to put the processed data
 # path.cities <- "../data_processed/data_cities_all"
 user.google <- dir("~/Library/CloudStorage/")
 path.google <- file.path("~/Library/CloudStorage", user.google)
-path.cities <- file.path(path.google, "Shared drives", "Urban Ecological Drought/Trees-UHI Manuscript/Analysis/data_processed_final")
+path.cities <- file.path(path.google, "Shared drives", "Urban Ecological Drought/Trees-UHI Manuscript/Analysis_v2/data_processed_final")
 
 if(!dir.exists(path.cities)) dir.create(path.cities, recursive=T, showWarnings = F)
 file.cityStatsRegion <- file.path(path.cities, "../city_stats_all.csv")
@@ -70,7 +70,7 @@ if(!file.exists(file.cityStatsRegion) | overwrite){
   # Some summary stats about the inputs at the region scale 
   # ------------------
   # - number of pixels, mean LST, cover, elev --> for ranges, give range across entire dataset to indicate range of values used in full model
-  cityStatsRegion[,c("biome", "n.pixels", "LST.mean", "LST.sd", "LST.min", "LST.max", "tree.mean", "tree.sd", "tree.min", "tree.max", "veg.mean", "veg.sd", "veg.min", "veg.max", "elev.mean", "elev.sd", "elev.min", "elev.max")] <- NA
+  cityStatsRegion[,c("biome", "biome.prop", "n.pixels", "LST.mean", "LST.sd", "LST.min", "LST.max", "tree.mean", "tree.sd", "tree.min", "tree.max", "veg.mean", "veg.sd", "veg.min", "veg.max", "elev.mean", "elev.sd", "elev.min", "elev.max")] <- NA
   
   # Save the key info from the full model
   cityStatsRegion[,c("model.R2adj", "model.tree.slope", "model.veg.slope", "model.elev.slope", "model.tree.p", "model.veg.p", "model.elev.p")] <- NA
@@ -140,14 +140,20 @@ for(CITY in citiesAnalyze){
   if(nrow(biome)>0){ # Some aren't quite aligning-- we'll figure those out later
     if(nrow(biome)==1){
       cityStatsRegion$biome[row.city] <- biome$biome.name
+      cityStatsRegion$biome.prop[row.city] <- 1
     } else {
       biome$area <- st_area(biome)
-      biome.sum <- aggregate(area ~ biome.name, data=biome, FUN=sum)
+      biome.sum <- aggregate(area ~ biome.name, data=biome, FUN=sum, na.rm=T)
 
       if(nrow(biome.sum)>1){
-        cityStatsRegion$biome[row.city] <- biome.sum$biome.name[biome.sum$area==max(biome.sum$area)]
+        rowBiome <- which(biome.sum$area==max(biome.sum$area, na.rm=T))
+        cityStatsRegion$biome[row.city] <- biome.sum$biome.name[rowBiome]
+        cityStatsRegion$biome.prop[row.city] <- biome.sum$area[rowBiome]/sum(biome.sum$area, na.rm=T)
+        
       } else {
         cityStatsRegion$biome[row.city] <- biome.sum$biome.name
+        cityStatsRegion$biome.prop[row.city] <- 1
+
       }
 
       rm(biome.sum)

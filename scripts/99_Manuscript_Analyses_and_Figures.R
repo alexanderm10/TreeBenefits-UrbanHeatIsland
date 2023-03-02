@@ -64,11 +64,11 @@ library(ggplot2); library(RColorBrewer); library(cowplot)
 ###########################################
 # Establish file paths etc ----
 ###########################################
-google.user <- dir("~/Library/CloudStorage/")
+user.google <- dir("~/Library/CloudStorage/")
+path.google <- file.path("~/Library/CloudStorage", user.google, "Shared drives", "Urban Ecological Drought/Trees-UHI Manuscript/Analysis_v2")
+path.cities <- file.path(path.google, "data_processed_final")
 
-path.cities <- file.path("~/Library/CloudStorage/", google.user, "Shared drives/Urban Ecological Drought/Trees-UHI Manuscript/Analysis/data_processed_final")
-
-path.figs <- file.path(path.cities, "figures", "Manuscript Options")
+path.figs <- file.path(path.google, "figures_manuscript", "base")
 dir.create(path.figs, recursive=T, showWarnings=F)
 
 grad.lst <- c("#2c7bb6", "#abd9e9", "#f7f7f7", "#fdae61", "#d7191c") # ends with red
