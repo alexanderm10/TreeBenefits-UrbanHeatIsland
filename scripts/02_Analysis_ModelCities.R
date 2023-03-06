@@ -2,7 +2,7 @@ library(raster); library(sp); library(terra); library(sf)
 library(ggplot2)
 library(mgcv)
 
-overwrite=T
+overwrite=F
 
 # file paths for where to put the processed data
 # path.cities <- "../data_processed/data_cities_all"
@@ -112,11 +112,12 @@ cities.elev <- unlist(lapply(files.elev, FUN=function(x){strsplit(x, "_")[[1]][1
 cities.lst <- unlist(lapply(files.lst, FUN=function(x){strsplit(x, "_")[[1]][1]}))
 cities.tree <- unlist(lapply(files.tree, FUN=function(x){strsplit(x, "_")[[1]][1]}))
 cities.veg <- unlist(lapply(files.veg, FUN=function(x){strsplit(x, "_")[[1]][1]}))
+cities.mask <- unlist(lapply(files.mask, FUN=function(x){strsplit(x, "_")[[1]][1]}))
 
 
 # citiesDone <- unique(cities.lst)
 
-citiesDone <- unique(cities.lst[cities.lst %in% cities.elev & cities.lst %in% cities.tree & cities.lst %in% cities.veg])
+citiesDone <- unique(cities.lst[cities.lst %in% cities.elev & cities.lst %in% cities.tree & cities.lst %in% cities.veg & cities.lst %in% cities.mask])
 length(citiesDone)
 
 # Now compare the done list to what needs to be analyzed
@@ -179,6 +180,7 @@ for(CITY in citiesAnalyze){
   # par(mfrow=c(1,2))
   # plot(elevCity); plot(maskCity)
   # par(mfrow=c(1,1))
+  # plot(treeCity)
   
   # lst.mean <- mean(lstCity)
   # tree.mean <- mean(treeCity)
@@ -235,8 +237,7 @@ for(CITY in citiesAnalyze){
     # valsCity <- merge(valsCity, valsLST, all.x=T, all.y=T)
   } else if( any(coordsLST$location %in% valsCity$location)) {  
     valsCity <- merge(valsCity, valsLST, all.x=T, all.y=T)
-  } else 
-  {
+  } else {
     print(warning("LST coords do not match elev.  Doing nearest neighbor"))
     
     valsCity$LST_Day <- NA
@@ -281,40 +282,12 @@ for(CITY in citiesAnalyze){
     next
   }
   
-  # This will hopefully get fixed next time around
-  # if(nrow(coordsLST)!=nrow(coordsCity)){ 
-  #   print(warning("Mismatched cells.  Skip this city for now."))
-  #   next
-  # }
-  # names(lstCity)
-  # names(treeCity)
-  
-  # # Put everything into a single data frame 
-  # valsCity <- stack(data.frame(getValues(lstCity[[layers.use]])))
-  # names(valsCity) <- c("LST_Day", "year")
-  # 
-  # valsCity$cover.tree <- stack(data.frame(getValues(treeCity[[layers.use]])))[,1]
-  # valsCity$cover.veg <- stack(data.frame(getValues(vegCity[[layers.use]])))[,1]
-  # valsCity$elevation <- getValues(elevCity)
-  # valsCity$cityBounds <- getValues(maskCity)
-  # valsCity$cityBounds <- !is.na(valsCity$cityBounds) # NA = buffer = FALSE citybounds
-  # valsCity$year <- as.numeric(substr(valsCity$year, 3, 6))
-  # valsCity[,c("x", "y", "location")] <- coordsCity
-  # valsCity <- valsCity[complete.cases(valsCity),]
-  # dim(valsCity); summary(valsCity)
-  
-  # Recode the cityBounds variable to be T/F
-  # ggplot(data=valsCity[valsCity$year==2020,], aes(x=x, y=y)) +
-  #   coord_equal() +
-  #   geom_tile(aes(fill=cityBounds))
-  
-  # ggplot(data=valsCity, aes(x=x, y=y)) +
-  #   coord_equal() +
-  #   facet_wrap(~year) +
-  #   geom_tile(aes(fill=LST_Day))
   
   # Don't bother creating a folder for a city until we'll have at least something to save!
   dir.create(file.path(path.cities, CITY), recursive = T, showWarnings = F)
+  
+  # # Save the full output in case we want to share it for review or other uses
+  # write.csv(valsCity, file.path(path.cities, CITY, paste0(CITY, "_CityData_All.csv")), row.names=F)
   
   # Saving some summary stats of our inputs -- I know there's a more elegant way to do this, but hey, this works
   # cityStatsRegion[row.city,]
