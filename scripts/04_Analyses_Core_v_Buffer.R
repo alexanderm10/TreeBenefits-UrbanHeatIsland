@@ -16,7 +16,7 @@ dir.create(path.figs, recursive=T, showWarnings=F)
 ###########################################
 # Work with the cityAll.stats file to start re-building the core vs. buffer stats
 ###########################################
-cityAll.stats <- read.csv(file.path(path.cities, "city_stats_all.csv"))
+cityAll.stats <- read.csv(file.path(path.cities, "..", "city_stats_all.csv"))
 head(cityAll.stats)
 
 # Chicago: USA26687; Vancouver: CAN16375; Berlin: DEU10109; Atlanta: USA40447; Sydney: AUS66430; Santiago (Chile): CHL66311; Cairo (AlQahirah): EGY44702; Beijing: CHN31890; Johannesburg (South Africa): ZAF64524; Rio de Janeiro: BRA63739
@@ -57,7 +57,7 @@ for(i in 1:nrow(cityAll.stats)){
   row.veg <- which(CityBuff.stats$ISOURBID==URBID & CityBuff.stats$factor=="other veg")
   
   # Read in the data
-  datAll <- read.csv(file.path(path.cities, "data_cities_all", URBID, paste0(URBID, "_CityStats_Pixels.csv")))
+  datAll <- read.csv(file.path(path.cities, URBID, paste0(URBID, "_CityStats_Pixels.csv")))
   summary(datAll)
   
   # Calculate some summary stats

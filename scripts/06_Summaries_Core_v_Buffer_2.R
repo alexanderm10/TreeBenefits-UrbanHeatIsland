@@ -39,7 +39,7 @@ world <- map_data("world")
 # Read in base datasets ----
 # ##########################################
 # Regional Sumary Stuff ----
-cityAll.stats <- read.csv(file.path(path.cities, "city_stats_all.csv"))
+cityAll.stats <- read.csv(file.path(path.cities, "..", "city_stats_all.csv"))
 summary(cityAll.stats[!is.na(cityAll.stats$model.R2adj),])
 
 cityAll.stats$biome <- gsub("flodded", "flooded", cityAll.stats$biome) # Whoops, had a typo!  Not going to reprocess now.

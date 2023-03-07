@@ -8,7 +8,7 @@ library(ggplot2); library(RColorBrewer); library(cowplot)
 ###########################################
 user.google <- dir("~/Library/CloudStorage/")
 path.google <- file.path("~/Library/CloudStorage", user.google, "Shared drives", "Urban Ecological Drought/Trees-UHI Manuscript/Analysis_v2")
-path.cities <- file.path(path.google, "data_processed_final")
+path.cities <- file.path(path.google)
 
 file.cityAll.stats <- file.path(path.cities, "city_stats_all.csv")
 
@@ -97,10 +97,11 @@ biome.map <- ggplot(data=cityAll.stats[!is.na(cityAll.stats$biome),]) +
   geom_polygon(data=world, aes(x=long, y=lat, group=group), fill="gray50") +
   geom_point(aes(x=LONGITUDE, y=LATITUDE, color=biomeName), size=0.5) +
   scale_color_manual(name="biome", values=biome.pall.all) +
+  # scale_shape_manual(name="biome", values=1:length(biome.pall.all)) +
   guides(color="none") +
   theme_bw() +
   theme(legend.position="top",
-        legend.title=element_text(color="black", face="bold", size=rel(1.5)),
+        legend.title=element_blank(),
         legend.text=element_text(color="black"),
         legend.background=element_blank(),
         panel.background = element_rect(fill="NA"),
