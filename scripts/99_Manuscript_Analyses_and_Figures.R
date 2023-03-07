@@ -99,7 +99,7 @@ world <- map_data("world")
 # Read in base datasets ----
 # ##########################################
 # Regional Sumary Stuff ----
-cityAll.stats <- read.csv(file.path(path.cities, "city_stats_all.csv"))
+cityAll.stats <- read.csv(file.path(path.cities, "..", "city_stats_all.csv"))
 summary(cityAll.stats[!is.na(cityAll.stats$model.R2adj),])
 
 cityAll.stats$biome <- gsub("flodded", "flooded", cityAll.stats$biome) # Whoops, had a typo!  Not going to reprocess now.
@@ -547,7 +547,8 @@ length(citiesTreeHi)/length(which(CityBuffStats$factor=="tree" &  !is.na(CityBuf
 
 
 # Although the dominant pattern, reduced tree cover in cities is not universal, particularly in arid or semi-arid regions.  In temperate grassland biomes (mean buffer tree cover = 8%), 50% of cities had higher tree cover than the surrounding area and desert regions (mean buffer tree cover = 5%) had similar proportions of cities with lower (43%) versus higher (39%) tree cover (Table, Figure).  Many of the cities in temperate forest biomes where tree cover is higher in urban areas occur in regions that have heavily converted to agriculture, such as the midwestern U.S. and northeastern China (Figure-Map).
-                                                                                                                                                        citiesTreeHi <- which(CityBuffStats$factor=="tree" &  CityBuffStats$value.mean.diff>0 & CityBuffStats$value.mean.diff.p<0.01)
+                                                                                                                                                        
+citiesTreeHi <- which(CityBuffStats$factor=="tree" &  CityBuffStats$value.mean.diff>0 & CityBuffStats$value.mean.diff.p<0.01)
 length(citiesTreeHi)
 length(citiesTreeHi)/length(which(CityBuffStats$factor=="tree" &  !is.na(CityBuffStats$value.mean.diff)))
 
@@ -755,12 +756,11 @@ VegBiomeTrend.Sig$N.Tree.City.Neg <- aggregate(trend.mean.core ~ biomeName, data
 
 VegBiomeTrend.Sig2 <- aggregate(trend.mean.diff ~ biomeName, data=CityBuffStats[CityBuffStats$factor=="tree" &  CityBuffStats$trend.mean.diff>0 & CityBuffStats$trend.mean.diff.p<0.01,], FUN=length)
 names(VegBiomeTrend.Sig2) <- c("Biome", "N.Tree.sig.hi")
-VegBiomeTrend.Sig2$N.Tree.City.Pos <- aggregate(trend.mean.core ~ biomeName, data=CityBuffStats[CityBuffStats$factor=="tree" &  CityBuffStats$trend.mean.core>0 & CityBuffStats$trend.p.core<0.01,], FUN=length)[,2]
-
+VegBiomeTrend.Sig2$N.Other.sig.lo <- aggregate(trend.mean.diff ~ biomeName, data=CityBuffStats[CityBuffStats$factor=="other veg" &  CityBuffStats$trend.mean.diff<0 & CityBuffStats$trend.mean.diff.p<0.01,], FUN=length)[,2]
 # VegBiomeTrend.Sig <- merge(VegBiomeTrend.Sig, VegBiomeTrend.Sig2, all=T)
 
-VegBiomeTrend.Sig3 <- aggregate(trend.mean.diff ~ biomeName, data=CityBuffStats[CityBuffStats$factor=="other veg" &  CityBuffStats$trend.mean.diff<0 & CityBuffStats$trend.mean.diff.p<0.01,], FUN=length)
-names(VegBiomeTrend.Sig3) <- c("Biome", "N.Other.sig.lo")
+VegBiomeTrend.Sig3 <- aggregate(trend.mean.core ~ biomeName, data=CityBuffStats[CityBuffStats$factor=="tree" &  CityBuffStats$trend.mean.core>0 & CityBuffStats$trend.p.core<0.01,], FUN=length)
+names(VegBiomeTrend.Sig3) <- c("Biome", "N.Tree.City.Pos")
 
 VegBiomeTrend.Sig <- merge(merge(VegBiomeTrend.Sig, VegBiomeTrend.Sig2, all=T), VegBiomeTrend.Sig3, all=T)
 VegBiomeTrend.Sig[is.na(VegBiomeTrend.Sig)] <- 0
@@ -882,7 +882,7 @@ mean(cityAll.stats$model.tree.slope[NoOutliers]); sd(cityAll.stats$model.tree.sl
 length(cityAll.stats$model.tree.slope[NoOutliers])
 
 TreeCool <- which(cityAll.stats$model.tree.slope<0 & cityAll.stats$model.tree.p<0.01 & !cityAll.stats$Outlier.TreeSlope & !cityAll.stats$Outlier.OtherSlope)
-length(TreeCool)/nCityNoOutTree
+length(TreeCool)/nCityNoOutlier
 
 # For comparison, non-tree vegetation had a mean effect of -X ˚C per percent cover, with a significant effect in XX % of cities. 
 mean(cityAll.stats$model.veg.slope[NoOutliers]); sd(cityAll.stats$model.veg.slope[NoOutliers])
@@ -954,6 +954,7 @@ mean(cityAll.stats$model.tree.slope[cities.grassland]); sd(cityAll.stats$model.t
 summary(cityAll.stats[NoOutliers,])
 summary(CityBuffStats[NoOutliers,])
 cityAll.stats$Outlier <- cityAll.stats$Outlier.TreeSlope | cityAll.stats$Outlier.OtherSlope
+cityAll.stats$TreeSlope90 <- cityAll.stats$model.tree.slope>=quantile(cityAll.stats$model.tree.slope, 0.05) & cityAll.stats$model.tree.slope<=quantile(cityAll.stats$model.tree.slope, 0.95)
 summary(cityAll.stats)
 
 # # ** IMPORTANT ** Create a new data frame that merges some of the city-level stats with the key differences between cities & buffers
@@ -969,7 +970,7 @@ cityVeg <- merge(cityTree, cityOther, all=T)
 summary(cityVeg)
 
 summary(cityAll.stats[,c("ISOURBID", "ISO3", "NAME", "LATITUDE", "LONGITUDE", "biomeName", "model.R2adj", "model.tree.slope", "model.tree.p", "model.veg.slope", "model.veg.p")])
-StatsCombined <- merge(cityAll.stats[,c("ISOURBID", "ISO3", "NAME", "LATITUDE", "LONGITUDE", "biomeName", "model.R2adj", "model.tree.slope", "model.tree.p", "model.veg.slope", "model.veg.p","Outlier")],
+StatsCombined <- merge(cityAll.stats[,c("ISOURBID", "ISO3", "NAME", "LATITUDE", "LONGITUDE", "biomeName", "model.R2adj", "model.tree.slope", "model.tree.p", "model.veg.slope", "model.veg.p","Outlier", "TreeSlope90")],
                        cityVeg, all=T)
 summary(StatsCombined)
 
@@ -1145,7 +1146,7 @@ dev.off()
 
 StatsCombined$TempDeficit.Trees <- StatsCombined$value.LST.diff/StatsCombined$model.tree.slope
 StatsCombined$TempDeficit.Trees.Trim <- StatsCombined$TempDeficit.Trees
-StatsCombined$TempDeficit.Trees.Trim[StatsCombined$TempDeficit.Trees.Trim<quantile(StatsCombined$TempDeficit.Trees, 0.025) | StatsCombined$TempDeficit.Trees.Trim>quantile(StatsCombined$TempDeficit.Trees, 0.975) | StatsCombined$Outlier] <- NA
+StatsCombined$TempDeficit.Trees.Trim[!StatsCombined$TreeSlope90] <- NA
 summary(StatsCombined)
 length(which(!is.na(StatsCombined$TempDeficit.Trees.Trim)))
 mean(StatsCombined$TempDeficit.Trees.Trim, na.rm=T); sd(StatsCombined$TempDeficit.Trees.Trim, na.rm=T)
@@ -1153,16 +1154,24 @@ mean(StatsCombined$TempDeficit.Trees.Trim, na.rm=T); sd(StatsCombined$TempDefici
 # Setting a Tree-based UHI Offset Goal
 StatsCombined$TreeTempOffsetGoal <- StatsCombined$value.tree.core - StatsCombined$TempDeficit.Trees
 StatsCombined$TreeTempOffsetGoal.Trimmed <- StatsCombined$TreeTempOffsetGoal
-StatsCombined$TreeTempOffsetGoal.Trimmed[StatsCombined$TreeTempOffsetGoal.Trimmed<quantile(StatsCombined$TreeTempOffsetGoal, 0.025) | StatsCombined$TreeTempOffsetGoal.Trimmed>quantile(StatsCombined$TreeTempOffsetGoal, 0.975) | StatsCombined$Outlier] <- NA
+StatsCombined$TreeTempOffsetGoal.Trimmed[!StatsCombined$TreeSlope90] <- NA
 
 # StatsCombined$Ratio.TreeTempOffsetGoal <- StatsCombined$TreeTempOffsetGoal/StatsCombined$value.tree.core
 # StatsCombined$Ratio.TreeTempOffsetGoal[StatsCombined$Ratio.TreeTempOffsetGoal==Inf] <- NA
 # summary(StatsCombined)
 
-# For trees to be the sole nature-based solution for offsetting UHI effects, globally tree cover would need to be an average XX % higher (SD XX%), a near doubling of current average tree cover, when analyzing the middle 95% of cities.
+# For trees to be the sole nature-based solution for offsetting UHI effects, globally tree cover would need to be an average XX % higher (SD XX%), a near doubling of current average tree cover, when analyzing the middle 90% of cities.
 mean(StatsCombined$TreeTempOffsetGoal.Trimmed, na.rm=T); sd(StatsCombined$TreeTempOffsetGoal.Trimmed, na.rm=T)
 mean(StatsCombined$TreeTempOffsetGoal.Trimmed, na.rm=T)/mean(StatsCombined$value.tree.core, na.rm=T)
 median(StatsCombined$TreeTempOffsetGoal.Trimmed, na.rm=T)/median(StatsCombined$value.tree.core, na.rm=T)
+
+length(which(StatsCombined$value.tree.core>=mean(StatsCombined$TreeTempOffsetGoal.Trimmed, na.rm=T)))
+length(which(StatsCombined$value.tree.core>=mean(StatsCombined$TreeTempOffsetGoal.Trimmed, na.rm=T)))/nrow(StatsCombined)
+
+
+mean(StatsCombined$value.tree.core[!is.na(StatsCombined$TreeTempOffsetGoal.Trimmed)], na.rm=T); sd(StatsCombined$value.tree.core[!is.na(StatsCombined$TreeTempOffsetGoal.Trimmed)], na.rm=T)
+mean(StatsCombined$TreeTempOffsetGoal.Trimmed, na.rm=T); sd(StatsCombined$TreeTempOffsetGoal.Trimmed, na.rm=T)
+
 
 
 TreeDeficitBiome <- aggregate(cbind(TreeTempOffsetGoal.Trimmed, TempDeficit.Trees.Trim) ~ biomeName, data=StatsCombined[,], FUN=mean, na.rm=T)
@@ -1235,7 +1244,26 @@ ggplot(data=StatsCombined[,]) +
 dev.off()
 
 
+ggplot(data=StatsCombined[which(StatsCombined$value.tree.core>=mean(StatsCombined$TreeTempOffsetGoal.Trimmed, na.rm=T)),]) +
+  coord_equal(expand=0, ylim=c(-60,75)) +
+  geom_polygon(data=world, aes(x=long, y=lat, group=group), fill="gray50") +
+  geom_point(aes(x=LONGITUDE, y=LATITUDE, color="Above 32% Tree Cover"), size=0.5) +
+  scale_color_manual(values="green3") +
+  # scale_color_gradientn(name="Tree UHI\nOffset Deficit\n(%)", colors=grad.tree,  limits=c(-max(abs(StatsCombined$TempDeficit.Trees.Trim), na.rm=T), max(abs(StatsCombined$TempDeficit.Trees.Trim), na.rm=T))) +
+  theme_bw() +
+  theme(legend.position="top",
+        legend.title=element_blank(),
+        legend.text=element_text(color="black"),
+        legend.background=element_blank(),
+        panel.background = element_rect(fill="NA"),
+        panel.grid = element_blank())
 
+summary(StatsCombined[which(StatsCombined$value.tree.core>=mean(StatsCombined$TreeTempOffsetGoal.Trimmed, na.rm=T)),])
+
+StatsCombined[which(StatsCombined$value.tree.core>=mean(StatsCombined$TreeTempOffsetGoal.Trimmed, na.rm=T)),c("ISOURBID", "NAME", "biomeName", "value.tree.core")]
+StatsCombined[StatsCombined$model.R2adj<0.5, c("ISOURBID", "NAME", "biomeName", "value.tree.core", "model.R2adj", "model.tree.slope", "TreeSlope90")]
+
+summary(StatsCombined[StatsCombined$model.R2adj<0.5,])
 ## ----------
 #    3.3. Comparing cooling & tree trends to global warming and other urban warming processes
 ## ----------
