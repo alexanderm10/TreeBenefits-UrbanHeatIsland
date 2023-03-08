@@ -275,7 +275,7 @@ tableLSTBiome <- data.frame(Biome=LSTbiome$Biome, N.Cities=LSTbiome$N.Cities,
                             CityLST=paste0(round(LSTbiome$LST.CITY, 1), " (",round(LSTbiome$LST.CITY.SD, 1), ")"),
                             CityLSTDiff=paste0(round(LSTbiome$LST.Diff, 1), " (",round(LSTbiome$LST.Diff.SD, 1), ")"),
                             pCitiesSigUHI=paste0(round(LSTbiome$N.UHI.sig/LSTbiome$N.Cities*100), "%"))
-
+tableLSTBiome
 write.csv(tableLSTBiome, file.path(path.figs, "LST_Patterns_Biome.csv"), row.names=F)
 
 
@@ -1244,10 +1244,11 @@ ggplot(data=StatsCombined[,]) +
 dev.off()
 
 
+png(file.path(path.figs, "UHI-Offset_TreeDeficit_CitiesAboveGlobalTarget_map.png"), height=8, width=8, units="in", res=220)
 ggplot(data=StatsCombined[which(StatsCombined$value.tree.core>=mean(StatsCombined$TreeTempOffsetGoal.Trimmed, na.rm=T)),]) +
   coord_equal(expand=0, ylim=c(-60,75)) +
   geom_polygon(data=world, aes(x=long, y=lat, group=group), fill="gray50") +
-  geom_point(aes(x=LONGITUDE, y=LATITUDE, color="Above 32% Tree Cover"), size=0.5) +
+  geom_point(aes(x=LONGITUDE, y=LATITUDE, color="Above 33% Tree Cover"), size=0.5) +
   scale_color_manual(values="green3") +
   # scale_color_gradientn(name="Tree UHI\nOffset Deficit\n(%)", colors=grad.tree,  limits=c(-max(abs(StatsCombined$TempDeficit.Trees.Trim), na.rm=T), max(abs(StatsCombined$TempDeficit.Trees.Trim), na.rm=T))) +
   theme_bw() +
@@ -1257,6 +1258,7 @@ ggplot(data=StatsCombined[which(StatsCombined$value.tree.core>=mean(StatsCombine
         legend.background=element_blank(),
         panel.background = element_rect(fill="NA"),
         panel.grid = element_blank())
+dev.off()
 
 summary(StatsCombined[which(StatsCombined$value.tree.core>=mean(StatsCombined$TreeTempOffsetGoal.Trimmed, na.rm=T)),])
 
