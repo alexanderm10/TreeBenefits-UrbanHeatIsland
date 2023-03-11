@@ -753,10 +753,14 @@ VegBiomeTrend.Sig <- aggregate(trend.mean.diff ~ biomeName, data=CityBuffStats[C
 names(VegBiomeTrend.Sig) <- c("Biome", "N.Tree.sig.lo")
 VegBiomeTrend.Sig$N.Other.sig.hi <- aggregate(trend.mean.diff ~ biomeName, data=CityBuffStats[CityBuffStats$factor=="other veg" &  CityBuffStats$trend.mean.diff>0 & CityBuffStats$trend.mean.diff.p<0.01,], FUN=length)[,2]
 VegBiomeTrend.Sig$N.Tree.City.Neg <- aggregate(trend.mean.core ~ biomeName, data=CityBuffStats[CityBuffStats$factor=="tree" &  CityBuffStats$trend.mean.core<0 & CityBuffStats$trend.p.core<0.01,], FUN=length)[,2]
+VegBiomeTrend.Sig$N.Other.City.Pos <- aggregate(trend.mean.core ~ biomeName, data=CityBuffStats[CityBuffStats$factor=="other veg" &  CityBuffStats$trend.mean.core>0 & CityBuffStats$trend.p.core<0.01,], FUN=length)[,2]
+
+
 
 VegBiomeTrend.Sig2 <- aggregate(trend.mean.diff ~ biomeName, data=CityBuffStats[CityBuffStats$factor=="tree" &  CityBuffStats$trend.mean.diff>0 & CityBuffStats$trend.mean.diff.p<0.01,], FUN=length)
 names(VegBiomeTrend.Sig2) <- c("Biome", "N.Tree.sig.hi")
 VegBiomeTrend.Sig2$N.Other.sig.lo <- aggregate(trend.mean.diff ~ biomeName, data=CityBuffStats[CityBuffStats$factor=="other veg" &  CityBuffStats$trend.mean.diff<0 & CityBuffStats$trend.mean.diff.p<0.01,], FUN=length)[,2]
+VegBiomeTrend.Sig2$N.Other.City.Neg <- aggregate(trend.mean.core ~ biomeName, data=CityBuffStats[CityBuffStats$factor=="other veg" &  CityBuffStats$trend.mean.core<0 & CityBuffStats$trend.p.core<0.01,], FUN=length)[,2]
 # VegBiomeTrend.Sig <- merge(VegBiomeTrend.Sig, VegBiomeTrend.Sig2, all=T)
 
 VegBiomeTrend.Sig3 <- aggregate(trend.mean.core ~ biomeName, data=CityBuffStats[CityBuffStats$factor=="tree" &  CityBuffStats$trend.mean.core>0 & CityBuffStats$trend.p.core<0.01,], FUN=length)
@@ -780,6 +784,17 @@ tableTreeTrendBiome <- data.frame(Biome=VegBiomeTrend$Biome, N.Cities=VegBiomeTr
                                   pCityTreehi=paste0(round(VegBiomeTrend$N.Tree.sig.hi/VegBiomeTrend$N.Cities*100), "%"))
 tableTreeTrendBiome
 write.csv(tableTreeTrendBiome, file.path(path.figs, "Vegetation-Tree_Trend_Biome.csv"), row.names=F)
+
+tableOtherTrendBiome <- data.frame(Biome=VegBiomeTrend$Biome, N.Cities=VegBiomeTrend$N.Cities,
+                                  CityOther=paste0(round(VegBiomeTrend$Other.CITY, 2), " (",round(VegBiomeTrend$Other.CITY.SD, 2), ")"),
+                                  BufferOther=paste0(round(VegBiomeTrend$Other.BUFF, 2), " (",round(VegBiomeTrend$Other.BUFF.SD, 2), ")"),
+                                  OtherDiff=paste0(round(VegBiomeTrend$Other.Diff, 2), " (",round(VegBiomeTrend$Other.Diff.SD, 2), ")"),
+                                  pCityOtherPos=paste0(round(VegBiomeTrend$N.Other.City.Pos/VegBiomeTrend$N.Cities*100), "%"),
+                                  pCityOtherNeg=paste0(round(VegBiomeTrend$N.Other.City.Neg/VegBiomeTrend$N.Cities*100), "%"),
+                                  pCityOtherLo=paste0(round(VegBiomeTrend$N.Other.sig.lo/VegBiomeTrend$N.Cities*100), "%"),
+                                  pCityOtherhi=paste0(round(VegBiomeTrend$N.Other.sig.hi/VegBiomeTrend$N.Cities*100), "%"))
+tableOtherTrendBiome
+write.csv(tableOtherTrendBiome, file.path(path.figs, "Vegetation-OtherVeg_Trend_Biome.csv"), row.names=F)
 
 
 # Now backign up some text
@@ -1013,6 +1028,14 @@ mean(StatsCombined$UHIContrib.Other[cityUHI]); sd(StatsCombined$UHIContrib.Other
 
 # Now Getting the Biome Breakdown
 summary(StatsCombined)
+StatsCombined[StatsCombined$biomeName=="Tropical Conifer Forest", c("ISOURBID", "NAME")]
+
+mean(StatsCombined$TempContrib.Tree); sd(StatsCombined$TempContrib.Tree)
+mean(CityBuffStats$value.mean.core[CityBuffStats$factor=="tree"]); sd(CityBuffStats$value.mean.core[CityBuffStats$factor=="tree"])
+
+mean(StatsCombined$TempContrib.Other); sd(StatsCombined$TempContrib.Other)
+mean(CityBuffStats$value.mean.core[CityBuffStats$factor=="other veg"]); sd(CityBuffStats$value.mean.core[CityBuffStats$factor=="other veg"])
+
 
 VegEffectsBiome <- aggregate(cbind(value.LST.diff, model.R2adj, value.tree.core, value.other.core, model.tree.slope, model.veg.slope, TempContrib.Tree, TempContrib.Other, UHIContrib.Tree, UHIContrib.Other, pUHIContrib.Tree, pUHIContrib.Other) ~ biomeName, data=StatsCombined[!StatsCombined$Outlier,], FUN=mean)
 # names(VegSlopeBiome)[] <- c("Biome", "N.Cities")
