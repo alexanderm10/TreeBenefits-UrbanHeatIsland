@@ -203,8 +203,12 @@ mapLST <- ggplot(data=StatsCombined[,]) +
         legend.title=element_text(color="black", face="bold", size=rel(1.5)),
         legend.text=element_text(color="black"),
         legend.background=element_blank(),
+        axis.ticks.length = unit(-0.25, "lines"),
+        axis.text=element_text(color="black"),
+        axis.title=element_text(color="black", face="bold"),
         panel.background = element_rect(fill="NA"),
-        panel.grid = element_blank())
+        panel.grid = element_blank(), 
+        plot.margin=margin(0.5,0.5, 0.75, 0.5, "lines"))
 
 mapTree <- ggplot(data=StatsCombined[,]) +
   coord_equal(expand=0, ylim=c(-60,75)) +
@@ -217,8 +221,11 @@ mapTree <- ggplot(data=StatsCombined[,]) +
         legend.title=element_text(color="black", face="bold", size=rel(1.5)),
         legend.text=element_text(color="black"),
         legend.background=element_blank(),
+        axis.text=element_text(color="black"),
+        axis.title=element_text(color="black", face="bold"),
         panel.background = element_rect(fill="NA"),
-        panel.grid = element_blank())
+        panel.grid = element_blank(), 
+        plot.margin=margin(0.5,0.5, 0.75, 0.5, "lines"))
 
 mapOther <- ggplot(data=StatsCombined[,]) +
   coord_equal(expand=0, ylim=c(-60,75)) +
@@ -231,38 +238,47 @@ mapOther <- ggplot(data=StatsCombined[,]) +
         legend.title=element_text(color="black", face="bold", size=rel(1.5)),
         legend.text=element_text(color="black"),
         legend.background=element_blank(),
+        axis.text=element_text(color="black"),
+        axis.title=element_text(color="black", face="bold"),
         panel.background = element_rect(fill="NA"),
-        panel.grid = element_blank())
+        panel.grid = element_blank(), 
+        plot.margin=margin(0.5,0.5, 0.75, 0.5, "lines"))
 
 UHILat <- ggplot(data=StatsCombined[,],) +
-  coord_flip(xlim=c(-65,80)) +
+  coord_flip(xlim=c(-60,75), expand=F) +
   # coord_cartesian(, ylim=c(-65,80))
   # geom_point(aes(x=LATITUDE, y=exp(model.tree.slope), color=biomeName)) +
   geom_hline(yintercept=0, linetype="dashed") +
   # geom_vline(xintercept=0, linetype="dashed", size=0.5, color="red") +
   stat_smooth(aes(x=LATITUDE, y=value.LST.diff), color=rev(grad.lstHot)[1], fill=rev(grad.lstHot)[2], alpha=0.5) +
-  scale_color_manual(values=biome.pall.all[]) +
-  # scale_fill_manual(values=biome.pall.all[]) +
+  scale_y_continuous(limits=c(-2*0.08/0.065, 2)) +
+  # geom_bar(aes(x=LATITUDE, y=value.LST.diff), fill=rev(grad.lstHot)[2], stat="summary", fun.y="mean") +
+  # geom_errorbar(aes(x=LATITUDE, y=value.LST.diff), fill=rev(grad.lstHot)[2], stat="summary", fun.y="sd") +
+  # scale_x_binned(limits=c(-65, 80), breaks=seq(-65, 80, by=5)) +
   labs(y="UHI\n(deg C)", x="Latitude") +
   # guides(fill="none") +
   theme_bw()+
   theme(legend.title=element_blank(),
         panel.background = element_rect(fill=NA),
         panel.grid=element_blank(),
-        axis.text=element_text(color="black"),
-        axis.title=element_text(color="black", face="bold"),
+        axis.ticks.length = unit(-0.25, "lines"),
+        axis.title.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.text.x=element_text(color="black"),
+        axis.title.x=element_text(color="black", face="bold"),
         plot.margin=margin(4.5,2, 0.0, 0.5, "lines"))
 
-
-TreeSlopeLat <- ggplot(data=StatsCombined,) +
-  coord_flip(xlim=c(-65,80)) +
+TreeSlopeLat <-ggplot(data=StatsCombined,) +
+  coord_flip(xlim=c(-60,75), expand=F) +
   # coord_cartesian(, ylim=c(-65,80))
   # geom_point(aes(x=LATITUDE, y=exp(model.tree.slope), color=biomeName)) +
   geom_hline(yintercept=0, linetype="dashed") +
   # geom_vline(xintercept=0, linetype="dashed", size=0.5, color="red") +
   stat_smooth(aes(x=LATITUDE, y=model.tree.slope), color=rev(grad.tree)[1], fill=rev(grad.tree)[2], alpha=0.5) +
-  # scale_color_manual(values=biome.pall.all[]) +
-  # scale_fill_manual(values=biome.pall.all[]) +
+  # geom_bar(aes(x=LATITUDE, y=model.tree.slope), fill=rev(grad.tree)[2], stat="summary", fun.y="mean") +
+  # geom_errorbar(aes(x=LATITUDE, y=model.tree.slope), fill=rev(grad.tree)[2], stat="summary", fun.y="sd") +
+  # geom_boxplot(aes(x=LATITUDE, y=model.tree.slope), fill=rev(grad.tree)[2]) +
+  # scale_x_binned(limits=c(-65, 80), breaks=seq(-65, 80, by=10)) +
   scale_y_continuous(limits=c(-0.08, 0.065)) +
   labs(y="Cooling Potential\n(deg C / % cover)", x="Latitude") +
   # guides(fill="none") +
@@ -270,12 +286,40 @@ TreeSlopeLat <- ggplot(data=StatsCombined,) +
   theme(legend.title=element_blank(),
         panel.background = element_rect(fill=NA),
         panel.grid=element_blank(),
-        axis.text=element_text(color="black"),
-        axis.title=element_text(color="black", face="bold"),
+        axis.ticks.length = unit(-0.25, "lines"),
+        axis.title.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.text.x=element_text(color="black"),
+        axis.title.x=element_text(color="black", face="bold"),
+        plot.margin=margin(4.5,2, 0.0, 0.5, "lines"))
+
+TreeSlopeLat2 <- ggplot(data=StatsCombined,) +
+  coord_flip() +
+  # coord_cartesian(, ylim=c(-65,80))
+  # geom_point(aes(x=LATITUDE, y=exp(model.tree.slope), color=biomeName)) +
+  geom_hline(yintercept=0, linetype="dashed") +
+  # geom_vline(xintercept=0, linetype="dashed", size=0.5, color="red") +
+  # stat_smooth(aes(x=LATITUDE, y=model.tree.slope), color=rev(grad.tree)[1], fill=rev(grad.tree)[2], alpha=0.5) +
+  # geom_bar(aes(x=LATITUDE, y=model.tree.slope), fill=rev(grad.tree)[2], stat="summary", fun.y="mean") +
+  # geom_errorbar(aes(x=LATITUDE, y=model.tree.slope), fill=rev(grad.tree)[2], stat="summary", fun.y="sd") +
+  geom_boxplot(aes(x=cut(LATITUDE, breaks=seq(-65, 80, by=10)), y=model.tree.slope), fill=rev(grad.tree)[2]) +
+  scale_x_discrete(drop=F) +
+  # scale_y_continuous(limits=c(-0.08, 0.065)) +
+  labs(y="Cooling Potential\n(deg C / % cover)", x="Latitude") +
+  # guides(fill="none") +
+  theme_bw()+
+  theme(legend.title=element_blank(),
+        panel.background = element_rect(fill=NA),
+        panel.grid=element_blank(),
+        axis.ticks.length = unit(-0.25, "lines"),
+        axis.title.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.text.x=element_text(color="black"),
+        axis.title.x=element_text(color="black", face="bold"),
         plot.margin=margin(4.5,2, 0.0, 0.5, "lines"))
 
 OtherSlopeLat <- ggplot(data=StatsCombined,) +
-  coord_flip(xlim=c(-65,80)) +
+  coord_flip(xlim=c(-60,75), expand=F) +
   # coord_cartesian(, ylim=c(-65,80))
   # geom_point(aes(x=LATITUDE, y=exp(model.tree.slope), color=biomeName)) +
   geom_hline(yintercept=0, linetype="dashed") +
@@ -290,10 +334,38 @@ OtherSlopeLat <- ggplot(data=StatsCombined,) +
   theme(legend.title=element_blank(),
         panel.background = element_rect(fill=NA),
         panel.grid=element_blank(),
-        axis.text=element_text(color="black"),
-        axis.title=element_text(color="black", face="bold"),
+        axis.ticks.length = unit(-0.25, "lines"),
+        axis.title.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.text.x=element_text(color="black"),
+        axis.title.x=element_text(color="black", face="bold"),
         plot.margin=margin(4.5,2, 0.0, 0.5, "lines"))
 
+
+OtherSlopeLat2 <- ggplot(data=StatsCombined,) +
+  coord_flip() +
+  # coord_cartesian(, ylim=c(-65,80))
+  # geom_point(aes(x=LATITUDE, y=exp(model.tree.slope), color=biomeName)) +
+  geom_hline(yintercept=0, linetype="dashed") +
+  # geom_vline(xintercept=0, linetype="dashed", size=0.5, color="red") +
+  # stat_smooth(aes(x=LATITUDE, y=model.tree.slope), color=rev(grad.tree)[1], fill=rev(grad.tree)[2], alpha=0.5) +
+  # geom_bar(aes(x=LATITUDE, y=model.tree.slope), fill=rev(grad.tree)[2], stat="summary", fun.y="mean") +
+  # geom_errorbar(aes(x=LATITUDE, y=model.tree.slope), fill=rev(grad.tree)[2], stat="summary", fun.y="sd") +
+  geom_boxplot(aes(x=cut(LATITUDE, breaks=seq(-65, 80, by=10)), y=model.veg.slope), fill=rev(grad.other)[2]) +
+  scale_x_discrete(drop=F) +
+  # scale_y_continuous(limits=c(-0.08, 0.065)) +
+  labs(y="Cooling Potential\n(deg C / % cover)", x="Latitude") +
+  # guides(fill="none") +
+  theme_bw()+
+  theme(legend.title=element_blank(),
+        panel.background = element_rect(fill=NA),
+        panel.grid=element_blank(),
+        axis.ticks.length = unit(-0.25, "lines"),
+        axis.title.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.text.x=element_text(color="black"),
+        axis.title.x=element_text(color="black", face="bold"),
+        plot.margin=margin(4.5,2, 0.0, 0.5, "lines"))
 
 # mapLST
 # mapTree
@@ -303,7 +375,82 @@ OtherSlopeLat <- ggplot(data=StatsCombined,) +
 # OtherSlopeLat
 
 png(file.path(path.figs, "Figure1_UHI_Veg_SlopesLat.png"), height=8, width=6, units="in", res=320)
-plot_grid(mapLST, UHILat, mapTree, TreeSlopeLat, mapOther, OtherSlopeLat, nrow=3, rel_widths = c(0.75, 0.3))
+plot_grid(mapLST, UHILat, mapTree, TreeSlopeLat, mapOther, OtherSlopeLat, nrow=3, rel_widths = c(0.7, 0.3), labels=c("A","B", "C", "D", "E", "F"))
+dev.off()
+
+
+biomeCount <- ggplot(data=StatsCombined,) +
+  geom_bar(aes(x=biomeName, fill=biomeName)) +
+  scale_fill_manual(values=biome.pall.all[]) +
+  scale_y_continuous(expand=c(0,0)) +
+  labs(y="Count", x="Biome") +
+  guides(fill="none") +
+  theme_bw()+
+  theme(legend.title=element_blank(),
+        panel.background = element_rect(fill=NA),
+        panel.grid=element_blank(),
+        axis.ticks.length = unit(-0.25, "lines"),
+        axis.text.y=element_text(color="black"),
+        axis.title.y=element_text(color="black", face="bold"),
+        # axis.text.x=element_text(color="black", angle=-20, hjust=0),
+        axis.text.x=element_blank(),
+        axis.title.x=element_blank(),
+        plot.margin = unit(c(0.5, 6.5, 0.5, 0.5), "lines"))
+
+lstEffects <- stack(StatsCombined[,c("EffectLST.tree", "ContribUHI.tree")])
+names(lstEffects) <- c("Tree", "Type")
+lstEffects$Type <- factor(ifelse(grepl("UHI", lstEffects$Type), "Deficit", "Observed") )
+lstEffects$OtherVeg <- stack(StatsCombined[,c("EffectLST.other", "ContribUHI.other")])[,1]
+lstEffects[,c("ISOURBID", "biomeName")] <- StatsCombined[,c("ISOURBID", "biomeName")]
+summary(lstEffects)
+
+lstTree <- ggplot(data=lstEffects, aes(x=biomeName, y=Tree, fill=biomeName, group=rev(Type))) +
+  geom_bar(aes(alpha=Type), position="dodge", stat="summary", fun="mean") +
+  stat_summary(geom="errorbar", fun.data=function(x){c("ymin"=mean(x)-sd(x), "y"=mean(x), "ymax"=mean(x)+sd(x))}, position="dodge") +
+    # geom_errorbar(stat="summary", position="dodge") +
+  scale_fill_manual(values=biome.pall.all[]) +
+  scale_alpha_manual(values=c("Deficit"=0.5, "Observed"=1)) +
+  geom_hline(yintercept=0, linetype="dashed") +
+  labs(x="Biome", y="LST Effect (deg. C)") +
+  scale_y_continuous(limits=c(-6,1.5)) +
+  guides(fill="none") +
+  geom_text(x=rev(levels(StatsCombined$biomeName))[1], y=-5.5, hjust=1, label="cooling due to cover") +
+  geom_text(x=rev(levels(StatsCombined$biomeName))[1], y=1.4, hjust=1, label="warming due to cover defficit") +
+  theme_bw()+
+  theme(legend.title=element_blank(),
+        panel.background = element_rect(fill=NA),
+        panel.grid=element_blank(),
+        axis.ticks.length = unit(-0.25, "lines"),
+        axis.text.y=element_text(color="black"),
+        axis.title.y=element_text(color="black", face="bold"),
+        # axis.text.x=element_text(color="black", angle=-20, hjust=0),
+        axis.text.x=element_blank(),
+        axis.title.x=element_blank(),
+        plot.margin = unit(c(0.5, 0.5, 0.5, 0.75), "lines"))
+
+lstOther <- ggplot(data=lstEffects, aes(x=biomeName, y=OtherVeg, fill=biomeName, group=rev(Type))) +
+  geom_bar(aes(alpha=Type), position="dodge", stat="summary", fun="mean") +
+  stat_summary(geom="errorbar", fun.data=function(x){c("ymin"=mean(x)-sd(x), "y"=mean(x), "ymax"=mean(x)+sd(x))}, position="dodge") +
+  # geom_errorbar(stat="summary", position="dodge") +
+  scale_fill_manual(values=biome.pall.all[]) +
+  scale_alpha_manual(values=c("Deficit"=0.5, "Observed"=1)) +
+  geom_hline(yintercept=0, linetype="dashed") +
+  scale_y_continuous(limits=c(-6,1.5)) +
+  labs(x="Biome", y="LST Effect (deg. C)") +
+  guides(fill="none") +
+  theme_bw()+
+  theme(legend.title=element_blank(),
+        panel.background = element_rect(fill=NA),
+        panel.grid=element_blank(),
+        axis.ticks.length = unit(-0.25, "lines"),
+        axis.text.y=element_text(color="black"),
+        axis.text.x=element_text(color="black", angle=-20, hjust=0),
+        axis.title=element_text(color="black", face="bold"),
+        plot.margin = unit(c(0.5, 0.5, 0.5, 0.75), "lines"))
+
+
+png(file.path(path.figs, "Figure2_VegEffects_LST.png"), height=8, width=6, units="in", res=320)
+plot_grid(biomeCount, lstTree, lstOther, nrow=3, rel_heights = c(2, 2, 3), labels=c("A","B", "C"))
 dev.off()
 
 # Trees have a clear, consistent cooling potential on global urban surface temperatures, with a global median effect of XXX˚C per percent tree cover (SD XXX˚C/%), and a significant cooling effect in XX% of those cities (Fig. 1)
@@ -336,14 +483,78 @@ round(mean(StatsCombined$ContribUHI.tree/StatsCombined$value.LST.diff),2); round
 # If tree cover in metropolitan cores matched that of the reference region, the observed UHI effect would be reduced by a [mean/median] 0.43˚C (SD 0.53˚C), with the greatest reductions in UHI occurring in biomes with the greatest tree cover deficits.
 round(mean(StatsCombined$ContribUHI.tree),2); round(sd(StatsCombined$ContribUHI.tree), 2)
 
+# Globally, trees cool cities an average of XXX˚C (SD XXX˚C) with a only mean cover of XXX% (SD XXX%).  In contrast, non-tree vegetation contributes a mean XXXX˚C (SD XXX˚C) cooling with XX% (SD XX%) cover
+round(mean(StatsCombined$EffectLST.tree),2); round(sd(StatsCombined$EffectLST.tree), 2)
+round(mean(StatsCombined$value.tree.core),0); round(sd(StatsCombined$value.tree.core), 0)
+
+round(mean(StatsCombined$EffectLST.other),2); round(sd(StatsCombined$EffectLST.other), 2)
+round(mean(StatsCombined$value.other.core),0); round(sd(StatsCombined$value.other.core), 0)
+
+
+
 
 # BIOME BREAKDOWNS ----
 # On a per-percent cover basis, the cooling potential of trees is greatest in arid and semi-arid biomes where the natural landscape is dominated by grasses and shrubby vegetation (SUPPLEMENT FIG/TABLE)
 # SUPPELEMENTAL TABLE 2 BY BIOME---
 #  - Cities in analysis; Mean Core [LST/Tree/Veg]; Mean Diff [LST/Tree/Veg]; 
+ncitiesAll <- aggregate(ISOURBID ~ biomeName, data=cityAll.stats, FUN = length)
+names(ncitiesAll) <- c("Biome", "N.Total")
+
+ncitiesAnaly <- aggregate(ISOURBID ~ biomeName, data=StatsCombined, FUN = length)
+ncitiesAnaly[,c("LST.mean", "Tree.mean", "Other.mean")] <- round(aggregate(cbind(value.LST.core, value.tree.core, value.other.core) ~ biomeName, data=StatsCombined, FUN = mean)[,c(2:4)], 2)
+ncitiesAnaly[,c("LST.sd", "Tree.sd", "Other.sd")] <- round(aggregate(cbind(value.LST.core, value.tree.core, value.other.core) ~ biomeName, data=StatsCombined, FUN = sd)[,c(2:4)], 2)
+ncitiesAnaly[,c("LSTDiff.mean", "TreeDiff.mean", "OtherDiff.mean")] <- round(aggregate(cbind(value.LST.diff, value.tree.diff, value.other.diff) ~ biomeName, data=StatsCombined, FUN = mean)[,c(2:4)], 2)
+ncitiesAnaly[,c("LSTDiff.sd", "TreeDiff.sd", "OtherDiff.sd")] <- round(aggregate(cbind(value.LST.diff, value.tree.diff, value.other.diff) ~ biomeName, data=StatsCombined, FUN = sd)[,c(2:4)], 2)
+# ncitiesAnaly[,c("LST.sd", "Tree.sd", "Other.sd")] <- round(aggregate(cbind(value.LST.core, value.tree.core, value.other.core) ~ biomeName, data=StatsCombined, FUN = sd)[,c(2:4)], 2)
+
+ncitiesAnaly
+
+TableCitySummary <- data.frame(Biome = ncitiesAnaly$biomeName,
+                               N.Analyzed = ncitiesAnaly$ISOURBID, 
+                               LST.mean = paste0(ncitiesAnaly$LST.mean, " (", ncitiesAnaly$LST.sd, ")"),
+                               Tree.mean = paste0(round(ncitiesAnaly$Tree.mean, 0), " (", round(ncitiesAnaly$Tree.sd, 0), ")"),
+                               OtherVeg.mean = paste0(round(ncitiesAnaly$Other.mean, 0), " (", round(ncitiesAnaly$Other.sd, 0), ")"),
+                               LST.diff = paste0(ncitiesAnaly$LSTDiff.mean, " (", ncitiesAnaly$LSTDiff.sd, ")"),
+                               Tree.diff = paste0(round(ncitiesAnaly$TreeDiff.mean, 0), " (", round(ncitiesAnaly$TreeDiff.sd, 0), ")"),
+                               OtherVeg.diff = paste0(round(ncitiesAnaly$OtherDiff.mean, 0), " (", round(ncitiesAnaly$OtherDiff.sd, 0), ")"))
+
+TableCitySummary <- merge(ncitiesAll, TableCitySummary, all=T)
+TableCitySummary$N.Analyzed[is.na(TableCitySummary$N.Analyzed)] <- 0
+TableCitySummary
+
+write.csv(TableCitySummary, file.path(path.figs, "SuppTable1_Biome_CitySummaryStats.csv"), row.names=F)
 
 # SUPPELEMENTAL TABLE 3 BY BIOME---
 # - Tree/Veg Stats: slope, pSig, Cooling Contrib, UHI due to diff
+CoolStats <- aggregate(ISOURBID ~ biomeName, data=StatsCombined, FUN = length)
+CoolStats[,c("TreeSlope.mean", "OtherSlope.mean")] <- round(aggregate(cbind(model.tree.slope, model.veg.slope) ~ biomeName, data=StatsCombined, FUN = mean)[,c(2:3)], 2)
+CoolStats[,c("TreeSlope.sd", "OtherSlope.sd")] <- round(aggregate(cbind(model.tree.slope, model.veg.slope) ~ biomeName, data=StatsCombined, FUN = sd)[,c(2:3)], 2)
+
+CoolStats[,c("EffectLST.Tree.mean", "EffectLST.Other.mean")] <- round(aggregate(cbind(EffectLST.tree, EffectLST.other) ~ biomeName, data=StatsCombined, FUN = mean)[,c(2:3)], 2)
+CoolStats[,c("EffectLST.Tree.sd", "EffectLST.Other.sd")] <- round(aggregate(cbind(EffectLST.tree, EffectLST.other) ~ biomeName, data=StatsCombined, FUN = sd)[,c(2:3)], 2)
+CoolStats[,c("EffectUHI.Tree.mean", "EffectUHI.Other.mean")] <- round(aggregate(cbind(ContribUHI.tree, ContribUHI.other) ~ biomeName, data=StatsCombined, FUN = mean)[,c(2:3)], 2)
+CoolStats[,c("EffectUHI.Tree.sd", "EffectUHI.Other.sd")] <- round(aggregate(cbind(ContribUHI.tree, ContribUHI.other) ~ biomeName, data=StatsCombined, FUN = sd)[,c(2:3)], 2)
+
+CoolStats$TreeCool.sig <- round(aggregate(model.tree.slope ~ biomeName, data=StatsCombined[StatsCombined$model.tree.slope<0 & StatsCombined$model.tree.p<0.01,], FUN = length)[,2], 2)
+CoolStats$OtherCool.sig <- round(aggregate(model.veg.slope ~ biomeName, data=StatsCombined[StatsCombined$model.veg.slope<0 & StatsCombined$model.veg.p<0.01,], FUN = length)[,2], 2)
+CoolStats$TreeCool.sig.Percent <- round(CoolStats$TreeCool.sig/CoolStats$ISOURBID*100,0)
+CoolStats$OtherCool.sig.Percent <- round(CoolStats$OtherCool.sig/CoolStats$ISOURBID*100,0)
+CoolStats
+
+CoolStatsSummary <- data.frame(Biome = CoolStats$biomeName,
+                               N.Analyzed = CoolStats$ISOURBID, 
+                               TreeSlope = paste0(CoolStats$TreeSlope.mean, " (", CoolStats$TreeSlope.sd,")"),
+                               PercentTreeCool = paste0(CoolStats$TreeCool.sig.Percent, "%"),
+                               OtherSlope = paste0(CoolStats$OtherSlope.mean, " (", CoolStats$OtherSlope.sd,")"),
+                               PercentOtherCool = paste0(CoolStats$OtherCool.sig.Percent, "%"),
+                               LST.Effect.TreeCover = paste0(CoolStats$EffectLST.Tree.mean, " (", CoolStats$EffectLST.Tree.sd,")"),
+                               LST.Effect.OtherCover = paste0(CoolStats$EffectLST.Other.mean, " (", CoolStats$EffectLST.Other.sd,")"),
+                               LST.Effect.TreeDiff = paste0(CoolStats$EffectUHI.Tree.mean, " (", CoolStats$EffectUHI.Tree.sd,")"),
+                               LST.Effect.OtherDiff = paste0(CoolStats$EffectUHI.Other.mean, " (", CoolStats$EffectUHI.Other.sd,")"))
+
+CoolStatsSummary
+
+write.csv(CoolStatsSummary, file.path(path.figs, "SuppTable2_Biome_CoolingEffects.csv"), row.names=F)
 
 # ##########################################
 
