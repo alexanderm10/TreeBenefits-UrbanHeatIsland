@@ -802,6 +802,11 @@ median(StatsCombined$trend.LST.core)
 median(StatsCombined$trend.other.core)
 round(median(StatsCombined$trend.other.core)*20, 0)
 
+# Our analysis of 2047 cities synthesizes 20-year trends from over XXXX million pixels, representing a vastly larger scope than previous studies.  
+dim(cityStatsAnaly); dim(StatsCombined)
+sum(cityStatsAnaly$n.pixels)
+
+
 # Calculating the temperature contributions of changes in 
 StatsCombined$LSTTrend.Tree <- StatsCombined$trend.tree.core*StatsCombined$model.tree.slope 
 StatsCombined$LSTTrend.Other <- StatsCombined$trend.other.core*StatsCombined$model.veg.slope 
@@ -828,3 +833,115 @@ round(median(StatsCombined$TargetOffsetWarming[citiesWarm])*20, 1)
 round(median((StatsCombined$TargetOffsetWarming[citiesWarm]*20 + StatsCombined$value.tree.core[citiesWarm])/StatsCombined$value.tree.core[citiesWarm]), 1)
 
 round(median(StatsCombined$trend.tree.core[citiesWarm]), 1)
+
+
+# # # Making the table to go with the slopes (Fig. 3) ----
+# Want to show:  n cities; ;
+#                median tree cover trend (all cities); 
+#                n cities w/ intensifying UHI; 
+#                median tree cover trend (UHI Cities); 
+#                tree cover trend to hold UHI constant; 
+#                n cities w/ warming 
+#                median tree cover trend (warming Cities); 
+#                tree cover trend to offset warming
+StatsCombined$EstTree2001 <- StatsCombined$value.tree.core - StatsCombined$trend.tree.core*10
+StatsCombined$EstTree2020 <- StatsCombined$value.tree.core + StatsCombined$trend.tree.core*10
+StatsCombined$TargetTree2020UHI <- StatsCombined$EstTree2001 + StatsCombined$TargetConstantUHI*20
+StatsCombined$TargetTree2020Warming <- StatsCombined$EstTree2001 + StatsCombined$TargetOffsetWarming*20
+summary(StatsCombined)
+
+
+TrendTreesObs <- aggregate(ISOURBID ~ biomeName + biomeCode, data=StatsCombined, FUN=length)
+names(TrendTreesObs)[3] <- "N.Analyzed"
+TrendTreesObs$EstTree2001 <- aggregate(EstTree2001 ~ biomeName, data=StatsCombined, FUN=median, na.rm=T)[,2]
+TrendTreesObs$EstTree2020 <- aggregate(EstTree2020 ~ biomeName, data=StatsCombined, FUN=median, na.rm=T)[,2]
+TrendTreesObs$TrendObsTreeMed <- aggregate(trend.tree.core ~ biomeName, data=StatsCombined, FUN=median, na.rm=T)[,2]
+TrendTreesObs$TrendObsTreelo <- aggregate(trend.tree.core ~ biomeName, data=StatsCombined, FUN=quantile, 0.25)[,2]
+TrendTreesObs$TrendObsTreehi <- aggregate(trend.tree.core ~ biomeName, data=StatsCombined, FUN=quantile, 0.75)[,2]
+TrendTreesObs
+
+TrendTreesUHI <- aggregate(ISOURBID ~ biomeName, data=StatsCombined[intensifyUHI,], FUN=length)
+names(TrendTreesUHI)[2] <- "N.UHI"
+TrendTreesUHI$TrendUHIMed <- aggregate(trend.LST.diff ~ biomeName, data=StatsCombined[intensifyUHI,], FUN=median, na.rm=T)[,2]
+TrendTreesUHI$TrendUHIlo <- aggregate(trend.LST.diff ~ biomeName, data=StatsCombined[intensifyUHI,], FUN=quantile, 0.25)[,2]
+TrendTreesUHI$TrendUHIhi <- aggregate(trend.LST.diff ~ biomeName, data=StatsCombined[intensifyUHI,], FUN=quantile, 0.75)[,2]
+TrendTreesUHI$TrendUHITreeMed <- aggregate(trend.tree.core ~ biomeName, data=StatsCombined[intensifyUHI,], FUN=median, na.rm=T)[,2]
+TrendTreesUHI$TrendUHITreelo <- aggregate(trend.tree.core ~ biomeName, data=StatsCombined[intensifyUHI,], FUN=quantile, 0.25)[,2]
+TrendTreesUHI$TrendUHITreehi <- aggregate(trend.tree.core ~ biomeName, data=StatsCombined[intensifyUHI,], FUN=quantile, 0.75)[,2]
+TrendTreesUHI$TargetUHITreeMed <- aggregate(TargetConstantUHI ~ biomeName, data=StatsCombined[intensifyUHI,], FUN=median, na.rm=T)[,2]
+TrendTreesUHI$TargetUHITreelo <- aggregate(TargetConstantUHI ~ biomeName, data=StatsCombined[intensifyUHI,], FUN=quantile, 0.25)[,2]
+TrendTreesUHI$TargetUHITreehi <- aggregate(TargetConstantUHI ~ biomeName, data=StatsCombined[intensifyUHI,], FUN=quantile, 0.75)[,2]
+TrendTreesUHI <- merge(TrendTreesObs, TrendTreesUHI, all=T)
+TrendTreesUHI
+
+TableTrendsUHI <- data.frame(Biome=TrendTreesUHI$biomeName,
+                          N.Analyzed = TrendTreesUHI$N.Analyzed,
+                          N.IntensifyUHI = TrendTreesUHI$N.UHI,
+                          UHITrend = paste0(round(TrendTreesUHI$TrendUHIMed, 2), " (", round(TrendTreesUHI$TrendUHIlo, 2), " - ", round(TrendTreesUHI$TrendUHIhi, 2),")"),
+                          UHITreeTrend = paste0(round(TrendTreesUHI$TrendUHITreeMed, 2), " (", round(TrendTreesUHI$TrendUHITreelo, 2), " - ", round(TrendTreesUHI$TrendUHITreehi, 2),")"),
+                          UHITreeTarget = paste0(round(TrendTreesUHI$TargetUHITreeMed, 2), " (", round(TrendTreesUHI$TargetUHITreelo, 2), " - ", round(TrendTreesUHI$TargetUHITreehi, 2),")"))
+TableTrendsUHI <- TableTrendsUHI[order(TableTrendsUHI$Biome),]
+TableTrendsUHI
+
+write.csv(TableTrendsUHI, file.path(path.figs, "SuppTable4_Biome_TreeTrendTargets-UHI.csv"), row.names=F)
+
+
+
+TrendTreesWarm <- aggregate(ISOURBID ~ biomeName, data=StatsCombined[citiesWarm,], FUN=length)
+names(TrendTreesWarm)[2] <- "N.Warm"
+TrendTreesWarm$TrendWarmMed <- aggregate(trend.LST.core ~ biomeName, data=StatsCombined[citiesWarm,], FUN=median, na.rm=T)[,2]
+TrendTreesWarm$TrendWarmlo <- aggregate(trend.LST.core ~ biomeName, data=StatsCombined[citiesWarm,], FUN=quantile, 0.25)[,2]
+TrendTreesWarm$TrendWarmhi <- aggregate(trend.LST.core ~ biomeName, data=StatsCombined[citiesWarm,], FUN=quantile, 0.75)[,2]
+TrendTreesWarm$TrendWarmTreeMed <- aggregate(trend.tree.core ~ biomeName, data=StatsCombined[citiesWarm,], FUN=median, na.rm=T)[,2]
+TrendTreesWarm$TrendWarmTreelo <- aggregate(trend.tree.core ~ biomeName, data=StatsCombined[citiesWarm,], FUN=quantile, 0.25)[,2]
+TrendTreesWarm$TrendWarmTreehi <- aggregate(trend.tree.core ~ biomeName, data=StatsCombined[citiesWarm,], FUN=quantile, 0.75)[,2]
+TrendTreesWarm$TargetWarmTreeMed <- aggregate(TargetOffsetWarming ~ biomeName, data=StatsCombined[citiesWarm,], FUN=median, na.rm=T)[,2]
+TrendTreesWarm$TargetWarmTreelo <- aggregate(TargetOffsetWarming ~ biomeName, data=StatsCombined[citiesWarm,], FUN=quantile, 0.25)[,2]
+TrendTreesWarm$TargetWarmTreehi <- aggregate(TargetOffsetWarming ~ biomeName, data=StatsCombined[citiesWarm,], FUN=quantile, 0.75)[,2]
+TrendTreesWarm <- merge(TrendTreesObs, TrendTreesWarm, all=T)
+TrendTreesWarm
+
+
+TableTrendsWarm <- data.frame(Biome=TrendTreesWarm$biomeName,
+                             N.Analyzed = TrendTreesWarm$N.Analyzed,
+                             N.IntensifyWarm = TrendTreesWarm$N.Warm,
+                             WarmTrend = paste0(round(TrendTreesWarm$TrendWarmMed, 2), " (", round(TrendTreesWarm$TrendWarmlo, 2), " - ", round(TrendTreesWarm$TrendWarmhi, 2),")"),
+                             WarmTreeTrend = paste0(round(TrendTreesWarm$TrendWarmTreeMed, 2), " (", round(TrendTreesWarm$TrendWarmTreelo, 2), " - ", round(TrendTreesWarm$TrendWarmTreehi, 2),")"),
+                             WarmTreeTarget = paste0(round(TrendTreesWarm$TargetWarmTreeMed, 2), " (", round(TrendTreesWarm$TargetWarmTreelo, 2), " - ", round(TrendTreesWarm$TargetWarmTreehi, 2),")"))
+TableTrendsWarm <- TableTrendsWarm[order(TableTrendsWarm$Biome),]
+TableTrendsWarm
+
+write.csv(TableTrendsWarm, file.path(path.figs, "SuppTable5_Biome_TreeTrendTargets-Warm.csv"), row.names=F)
+
+
+
+# # # Making the slope figure (Fig. 3) ----
+TrendsTreeAll <- merge(TrendTreesUHI, TrendTreesWarm, all=T)
+TrendsTreeAll
+summary(StatsCombined)
+
+png(file.path(path.figs, "Figure3_TreeCover_ObservedTargets.png"), height=6, width=6, units="in", res=320)
+ggplot(data=TrendsTreeAll[TrendsTreeAll$N.Analyzed>=50,]) +
+  facet_wrap(~biomeCode) +
+  geom_segment(data=StatsCombined[StatsCombined$biomeName %in% TrendsTreeAll$biomeName[TrendsTreeAll$N.Analyzed>=50],], aes(x=2001, xend=2020, y=EstTree2001, yend=EstTree2020), size=0.1, alpha=0.7, color="gray80") +
+  geom_segment(aes(x=2001, xend=2020, y=EstTree2001, yend=EstTree2020, color="Observed"), size=2) +
+  geom_segment(aes(x=2001, xend=2020, y=EstTree2001, yend=EstTree2001+20*TargetUHITreeMed, color="Constant UHI"), size=2) +
+  geom_segment(aes(x=2001, xend=2020, y=EstTree2001, yend=EstTree2001+20*TargetWarmTreeMed, color="No Warming"), size=2) +
+  scale_color_manual(name="Tree Scenario", values=c("Observed" = "#1b9e77", "Constant UHI"="#7570b3", "No Warming"="#d95f02"))+
+  scale_x_continuous(name="Year", breaks=c(2001, 2020), limits=c(1998, 2023)) +
+  scale_y_continuous(name="Tree Cover (%)") +
+  # theme_bw() +
+  theme(legend.position=c(0.67, 0.15),
+        legend.title=element_text(face='bold'),
+        legend.key = element_rect(fill=NA),
+        panel.background = element_rect(fill=NA, color="black"),
+        panel.grid=element_blank(),
+        axis.ticks.length = unit(-0.25, "lines"),
+        axis.text=element_text(color="black"),
+        axis.title=element_text(color="black", face="bold"),
+        # axis.text.x=element_blank(),
+        # axis.title.x=element_blank(),
+        plot.margin = unit(c(0.5, 0.5, 0.5, 0.5), "lines"))
+dev.off()
+
+
