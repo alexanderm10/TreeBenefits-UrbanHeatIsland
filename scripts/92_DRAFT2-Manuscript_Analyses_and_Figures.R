@@ -314,6 +314,28 @@ summary(StatsCombined)
 # -- Cities exlcuded for each criteria
 # ##########################################
 
+png(file.path(path.figs, "FigureS1_ModelR2adj.png"), height=6, width=8, units="in", res=320)
+ggplot(data=StatsCombined[,]) +
+  geom_sf(data=worldBBoxRobin, fill="gray90", size=0.1) +
+  geom_map(data=worldRobin, map=worldRobin, aes(x=long, y=lat, map_id=id), fill="gray30") +
+  geom_point(aes(x=xRobin, y=yRobin, color=model.R2adj), size=0.25, alpha=0.8) +
+  scale_x_continuous(expand=c(0,0)) +
+  scale_y_continuous(expand=c(0,0)) +
+  scale_color_stepsn(name="R2-adjusted", colors=grad.modfit) +
+  theme(legend.position="top",
+        legend.title=element_text(color="black", face="bold"),
+        legend.text=element_text(color="black"),
+        legend.background=element_blank(),
+        legend.key.width = unit(2, "lines"),
+        # legend.key.height = unit(1.5, "lines"),
+        axis.ticks=element_blank(),
+        axis.text=element_blank(),
+        axis.title=element_blank(),
+        panel.background = element_rect(fill="NA"),
+        panel.grid = element_blank(), 
+        plot.margin=margin(0.5,0.5, 0.5, 0.5, "lines"))
+dev.off()
+
 # ##########################################
 # 1. Cooling contribution of trees and non-tree vegetation to cities (4-5 paragraphs)
 # Key Result/Messages: 
