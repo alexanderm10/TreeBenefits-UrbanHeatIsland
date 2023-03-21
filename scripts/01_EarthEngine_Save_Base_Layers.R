@@ -81,7 +81,7 @@ lstConvert <- function(img){
 # // Bits 0-1 <= 1 (LST produced of both good and other quality)
 # // Bits 2-3 = 0 (Good data quality)
 # // Bits 4-5 Ignore, any value is ok
-# // Bits 6-7 = 0 (Average LST error ≤ 1K)
+# // Bits 6-7 = 2 (Average LST error ≤ 2K)
 # // var lstMask = function(qcDay, lstDay){
 # //   var qaMask = bitwiseExtract(qcDay, 0, 1).lte(1)
 # //   var dataQualityMask = bitwiseExtract(qcDay, 2, 3).eq(0)

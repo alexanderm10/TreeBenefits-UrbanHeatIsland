@@ -17,7 +17,7 @@
 ###########################################
 
 library(ggplot2); library(RColorBrewer); library(cowplot)
-library(ggalt)
+library(ggalt); library(sf)
 
 ###########################################
 # Establish file paths etc ----
@@ -413,14 +413,18 @@ mapOther <- ggplot(data=StatsCombined[,]) +
 UHIBiome <- ggplot(data=StatsCombined[,],) +
   coord_flip() +
   geom_violin(aes(x=biomeCodeRev, y=value.LST.diff, fill=biomeCode), scale="width") +
+  geom_point(data=StatsCombined[StatsCombined$biomeCodeRev=="Tun",], aes(x=biomeCodeRev, y=value.LST.diff, color=biomeCode)) +
   geom_hline(yintercept=0, linetype="dashed") +
   scale_fill_manual(values=biomeCode.pall.all) +
+  scale_color_manual(values=biomeCode.pall.all) +
   labs(y="LST Difference (deg C)", x="Biome") +
-  guides(fill="none") +
+  guides(fill="none", color="none") +
   theme(legend.title=element_blank(),
         legend.key = element_rect(fill=NA),
         panel.background = element_rect(fill=NA, color="black"),
-        panel.grid=element_blank(),
+        panel.grid.major.x=element_blank(),
+        panel.grid.minor.x=element_blank(),
+        panel.grid.major.y=element_line(color="black", size=0.1),
         axis.ticks.length = unit(-0.25, "lines"),
         axis.text.y=element_text(color="black", size=unit(8, "pt")),
         axis.text.x=element_text(color="black", size=unit(8, "pt")),
@@ -432,15 +436,19 @@ UHIBiome <- ggplot(data=StatsCombined[,],) +
 treeSlopeBiome <- ggplot(data=StatsCombined[,],) +
   coord_flip() +
   geom_violin(aes(x=biomeCodeRev, y=model.tree.slope, fill=biomeCode), scale="width") +
+  geom_point(data=StatsCombined[StatsCombined$biomeCodeRev=="Tun",], aes(x=biomeCodeRev, y=model.tree.slope, color=biomeCode)) +
   geom_hline(yintercept=0, linetype="dashed") +
   scale_fill_manual(values=biomeCode.pall.all) +
+  scale_color_manual(values=biomeCode.pall.all) +
   scale_y_continuous(limits=range(c(StatsCombined$model.tree.slope, StatsCombined$model.veg.slope))) +
   labs(y="Tree Slope (deg. C/%)", x="Biome") +
-  guides(fill="none") +
+  guides(fill="none", color="none") +
   theme(legend.title=element_blank(),
         legend.key = element_rect(fill=NA),
         panel.background = element_rect(fill=NA, color="black"),
-        panel.grid=element_blank(),
+        panel.grid.major.x=element_blank(),
+        panel.grid.minor.x=element_blank(),
+        panel.grid.major.y=element_line(color="black", size=0.1),
         axis.ticks.length = unit(-0.25, "lines"),
         axis.text.y=element_text(color="black", size=unit(8, "pt")),
         axis.text.x=element_text(color="black", size=unit(8, "pt")),
@@ -450,15 +458,19 @@ treeSlopeBiome <- ggplot(data=StatsCombined[,],) +
 otherSlopeBiome <- ggplot(data=StatsCombined[,],) +
   coord_flip() +
   geom_violin(aes(x=biomeCodeRev, y=model.veg.slope, fill=biomeCode), scale="width") +
+  geom_point(data=StatsCombined[StatsCombined$biomeCodeRev=="Tun",], aes(x=biomeCodeRev, y=model.veg.slope, color=biomeCode)) +
   geom_hline(yintercept=0, linetype="dashed") +
   scale_fill_manual(values=biomeCode.pall.all) +
+  scale_color_manual(values=biomeCode.pall.all) +
   scale_y_continuous(limits=range(c(StatsCombined$model.tree.slope, StatsCombined$model.veg.slope))) +
   labs(y="Non-Tree Slope (deg. C/%)", x="Biome") +
-  guides(fill="none") +
+  guides(fill="none", color="none") +
   theme(legend.title=element_blank(),
         legend.key = element_rect(fill=NA),
         panel.background = element_rect(fill=NA, color="black"),
-        panel.grid=element_blank(),
+        panel.grid.major.x=element_blank(),
+        panel.grid.minor.x=element_blank(),
+        panel.grid.major.y=element_line(color="black", size=0.1),
         axis.ticks.length = unit(-0.25, "lines"),
         axis.text.y=element_text(color="black", size=unit(8, "pt")),
         axis.text.x=element_text(color="black", size=unit(8, "pt")),
@@ -807,11 +819,11 @@ dim(cityStatsAnaly); dim(StatsCombined)
 sum(cityStatsAnaly$n.pixels)
 
 
-# Calculating the temperature contributions of changes in 
+# Calculating the temperature contributions of changes in vegetation cover
 StatsCombined$LSTTrend.Tree <- StatsCombined$trend.tree.core*StatsCombined$model.tree.slope 
 StatsCombined$LSTTrend.Other <- StatsCombined$trend.other.core*StatsCombined$model.veg.slope 
-StatsCombined$TargetConstantUHI <- -StatsCombined$trend.LST.diff/StatsCombined$model.tree.slope 
-StatsCombined$TargetOffsetWarming <- -StatsCombined$trend.LST.core/StatsCombined$model.tree.slope 
+StatsCombined$TargetConstantUHI <- -StatsCombined$trend.LST.diff/StatsCombined$model.tree.slope + StatsCombined$trend.tree.core
+StatsCombined$TargetOffsetWarming <- -StatsCombined$trend.LST.core/StatsCombined$model.tree.slope + StatsCombined$trend.tree.core
 
 round(median(StatsCombined$LSTTrend.Tree[treesGrow])*20, 1)
 round(median(StatsCombined$LSTTrend.Tree[treesGrow]/(StatsCombined$LSTTrend.Tree[treesGrow] + StatsCombined$trend.LST.core[treesGrow])), 2)
