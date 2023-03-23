@@ -83,7 +83,7 @@ biomeCode.pall.all = c("Tai"= "#2c5c74",
                        "TrMBF"= "#266240",
                        "Man" = "#9c8c94")
 
-library(sp)
+library(sp); library(sf)
 library(rworldmap)
 
 world <- map_data("world")
