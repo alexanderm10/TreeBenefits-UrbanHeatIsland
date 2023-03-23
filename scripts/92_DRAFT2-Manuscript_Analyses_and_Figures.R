@@ -317,7 +317,7 @@ summary(StatsCombined)
 png(file.path(path.figs, "FigureS1_ModelR2adj.png"), height=6, width=8, units="in", res=320)
 ggplot(data=StatsCombined[,]) +
   geom_sf(data=worldBBoxRobin, fill="gray90", size=0.1) +
-  geom_map(data=worldRobin, map=worldRobin, aes(x=long, y=lat, map_id=id), fill="gray30") +
+  geom_map(data=worldRobin, map=worldRobin, aes(x=long, y=lat, map_id=id), fill="gray50") +
   geom_point(aes(x=xRobin, y=yRobin, color=model.R2adj), size=0.25, alpha=0.8) +
   scale_x_continuous(expand=c(0,0)) +
   scale_y_continuous(expand=c(0,0)) +
@@ -377,7 +377,11 @@ mapLST <- ggplot(data=StatsCombined[,]) +
   geom_point(aes(x=xRobin, y=yRobin, color=value.LST.diff), size=0.25, alpha=0.8) +
   scale_x_continuous(expand=c(0,0)) +
   scale_y_continuous(expand=c(0,0)) +
-  scale_color_stepsn(name="LST Diff.\n(deg. C)", colors=grad.lst, breaks=breaksLST) +
+  scale_color_stepsn(colors=grad.lst, breaks=breaksLST) +
+  labs(color="LST Diff.\n(˚C)") +
+  # labs(color=expression(paste("LST Diff\n("*degree*C*"")"))) +
+  # labs(color=c(paste("LST Diff\n"),expression(""*degree*"C)"))) +
+  # scale_color_stepsn(name="LST Diff.\n(deg. C)", colors=grad.lst, breaks=breaksLST) +
   theme(legend.position="top",
         legend.title=element_text(color="black", face="bold"),
         legend.text=element_text(color="black"),
@@ -395,7 +399,7 @@ mapTree <- ggplot(data=StatsCombined[,]) +
   geom_sf(data=worldBBoxRobin, fill="gray90", size=0.1) +
   geom_map(data=worldRobin, map=worldRobin, aes(x=long, y=lat, map_id=id), fill="gray30") +
   geom_point(aes(x=xRobin, y=yRobin, color=value.tree.core), size=0.25) +
-  scale_color_stepsn(name="Tree Cover\n(%)", colors=grad.tree, breaks=seq(0, 90, by=10)) +
+  scale_color_stepsn(name="Tree\nCover (%)", colors=grad.tree, breaks=seq(0, 90, by=10)) +
   scale_x_continuous(expand=c(0,0)) +
   scale_y_continuous(expand=c(0,0)) +
   theme(legend.position="top",
@@ -416,7 +420,7 @@ mapOther <- ggplot(data=StatsCombined[,]) +
   geom_sf(data=worldBBoxRobin, fill="gray90", size=0.1) +
   geom_map(data=worldRobin, map=worldRobin, aes(x=long, y=lat, map_id=id), fill="gray30") +
   geom_point(aes(x=xRobin, y=yRobin, color=value.other.core), size=0.25) +
-  scale_color_stepsn(name="Non-Tree\nCover(%)", colors=grad.other, breaks=seq(0, 90, by=10)) +
+  scale_color_stepsn(name="Non-Tree\nCover (%)", colors=grad.other, breaks=seq(0, 90, by=10)) +
   scale_x_continuous(expand=c(0,0)) +
   scale_y_continuous(expand=c(0,0)) +
   theme(legend.position="top",
@@ -439,7 +443,7 @@ UHIBiome <- ggplot(data=StatsCombined[,],) +
   geom_hline(yintercept=0, linetype="dashed") +
   scale_fill_manual(values=biomeCode.pall.all) +
   scale_color_manual(values=biomeCode.pall.all) +
-  labs(y="LST Difference (deg C)", x="Biome") +
+  labs(y="LST Difference (˚C)", x="Biome") +
   guides(fill="none", color="none") +
   theme(legend.title=element_blank(),
         legend.key = element_rect(fill=NA),
@@ -463,7 +467,7 @@ treeSlopeBiome <- ggplot(data=StatsCombined[,],) +
   scale_fill_manual(values=biomeCode.pall.all) +
   scale_color_manual(values=biomeCode.pall.all) +
   scale_y_continuous(limits=range(c(StatsCombined$model.tree.slope, StatsCombined$model.veg.slope))) +
-  labs(y="Tree Slope (deg. C/%)", x="Biome") +
+  labs(y="Tree Slope (˚C/% cover)", x="Biome") +
   guides(fill="none", color="none") +
   theme(legend.title=element_blank(),
         legend.key = element_rect(fill=NA),
@@ -485,7 +489,7 @@ otherSlopeBiome <- ggplot(data=StatsCombined[,],) +
   scale_fill_manual(values=biomeCode.pall.all) +
   scale_color_manual(values=biomeCode.pall.all) +
   scale_y_continuous(limits=range(c(StatsCombined$model.tree.slope, StatsCombined$model.veg.slope))) +
-  labs(y="Non-Tree Slope (deg. C/%)", x="Biome") +
+  labs(y="Non-Tree Slope (˚C/% cover)", x="Biome") +
   guides(fill="none", color="none") +
   theme(legend.title=element_blank(),
         legend.key = element_rect(fill=NA),
@@ -493,33 +497,6 @@ otherSlopeBiome <- ggplot(data=StatsCombined[,],) +
         panel.grid.major.x=element_blank(),
         panel.grid.minor.x=element_blank(),
         panel.grid.major.y=element_line(color="black", size=0.1),
-        axis.ticks.length = unit(-0.25, "lines"),
-        axis.text.y=element_text(color="black", size=unit(8, "pt")),
-        axis.text.x=element_text(color="black", size=unit(8, "pt")),
-        axis.title=element_text(color="black", face="bold", size=unit(10, "pt")),
-        plot.margin=margin(0.5,0.5, 0.5, 0.5, "lines"))
-
-
-slopesComp <- stack(StatsCombined[,c("model.tree.slope", "model.veg.slope")])
-slopesComp$ind <- factor(ifelse(grepl("tree", slopesComp$ind), "Tree", "Non-Tree Veg."), levels=c("Tree", "Non-Tree Veg.") )
-slopesComp[,c("biomeCode", "biomeCodeRev", "ISOURBID")] <- StatsCombined[,c("biomeCode", "biomeCodeRev", "ISOURBID")]
-summary(slopesComp)
-
-
-plotSlopeComp <- ggplot(data=slopesComp[,],) +
-  coord_flip() +
-  geom_violin(aes(x=biomeCodeRev, y=values, fill=ind),scale="width") +
-  geom_hline(yintercept=0, linetype="dashed") +
-  scale_y_continuous(limits=range(c(StatsCombined$model.tree.slope, StatsCombined$model.veg.slope))) +
-  # scale_fill_manual(values=biomeCode.pall.all) +
-  scale_fill_manual(name="Veg. Type", values=c("Tree"=rev(grad.tree)[3], "Non-Tree Veg."=rev(grad.other)[5])) +
-  labs(y="Slope (deg C/%)", x="Biome") +
-  # guides(fill="none") +
-  theme(legend.position="top",
-        # legend.title=element_blank(),
-        legend.key = element_rect(fill=NA),
-        panel.background = element_rect(fill=NA, color="black"),
-        panel.grid=element_blank(),
         axis.ticks.length = unit(-0.25, "lines"),
         axis.text.y=element_text(color="black", size=unit(8, "pt")),
         axis.text.x=element_text(color="black", size=unit(8, "pt")),
@@ -536,13 +513,6 @@ plotSlopeComp <- ggplot(data=slopesComp[,],) +
 png(file.path(path.figs, "Figure1_UHI_Veg_SlopesBiome.png"), height=8, width=8, units="in", res=320)
 plot_grid(mapLST, UHIBiome, mapTree, treeSlopeBiome, mapOther, otherSlopeBiome, nrow=3, rel_widths = c(0.6, 0.6), labels=c("A","B", "C", "D", "E", "F"))
 dev.off() 
-
-
-png(file.path(path.figs, "Figure1_UHI_Veg_SlopesBiome_v2.png"), height=8, width=8, units="in", res=320)
-plot1 <- plot_grid(mapLST, mapTree, mapOther, ncol=1, labels=c("A", "B", "C"))
-plot2 <- plot_grid(UHIBiome, plotSlopeComp, ncol=1, labels=c("D", "E"), rel_heights = c(.4, .6))
-plot_grid(plot1, plot2, ncol=2)
-dev.off()
 
 
 # Trees have a clear, consistent cooling potential on global urban surface temperatures, with a global median effect of XXX˚C per percent tree cover (SD XXX˚C/%), and a significant cooling effect in XX% of those cities (Fig. 1)
@@ -585,8 +555,9 @@ plotTempEffects <- ggplot(data=effectsUHI, aes(x=biomeCode, y=values, fill=ind))
   geom_hline(yintercept=0, size=0.5, color="black") +
   scale_fill_manual(name="Temp. Source", values=c("Tree"=rev(grad.tree)[3], "Non-Tree Veg"=rev(grad.other)[5], "Remaining UHI"=rev(grad.lst)[3])) +
   geom_text(x="Des", y=-7, hjust=1, label="Cooling Effect") +
-  geom_text(x="Des", y=2, hjust=1, label="Warming Effect") +
-  labs(x="Biome", y="Temperature Effect (deg. C)") +
+  geom_text(x="Des", y=2.5, hjust=1, label="Warming Effect") +
+  coord_cartesian(ylim=c(-7.5, 2.5)) +
+  labs(x="Biome", y="Temperature Effect (˚C)") +
   theme_bw()+
   theme(legend.position="top",
         legend.title=element_text(face="bold"),
@@ -958,10 +929,10 @@ png(file.path(path.figs, "Figure3_TreeCover_ObservedTargets.png"), height=6, wid
 ggplot(data=TrendsTreeAll[TrendsTreeAll$N.Analyzed>=50,]) +
   facet_wrap(~biomeCode) +
   geom_segment(data=StatsCombined[StatsCombined$biomeName %in% TrendsTreeAll$biomeName[TrendsTreeAll$N.Analyzed>=50],], aes(x=2001, xend=2020, y=EstTree2001, yend=EstTree2020), size=0.1, alpha=0.7, color="gray80") +
-  geom_segment(aes(x=2001, xend=2020, y=EstTree2001, yend=EstTree2020, color="Observed"), size=2) +
-  geom_segment(aes(x=2001, xend=2020, y=EstTree2001, yend=EstTree2001+20*TargetUHITreeMed, color="Constant UHI"), size=2) +
-  geom_segment(aes(x=2001, xend=2020, y=EstTree2001, yend=EstTree2001+20*TargetWarmTreeMed, color="No Warming"), size=2) +
-  scale_color_manual(name="Tree Scenario", values=c("Observed" = "#1b9e77", "Constant UHI"="#7570b3", "No Warming"="#d95f02"))+
+  geom_segment(aes(x=2001, xend=2020, y=EstTree2001, yend=EstTree2020, color="Observed Trend"), size=2) +
+  geom_segment(aes(x=2001, xend=2020, y=EstTree2001, yend=EstTree2001+20*TargetUHITreeMed, color="Mitigate Intensifying UHI"), size=2) +
+  geom_segment(aes(x=2001, xend=2020, y=EstTree2001, yend=EstTree2001+20*TargetWarmTreeMed, color="Mitigate Warming Trend"), size=2) +
+  scale_color_manual(name="Tree Cover Trends", values=c("Observed Trend" = "#1b9e77", "Mitigate Intensifying UHI"="#7570b3", "Mitigate Warming Trend"="#d95f02"))+
   scale_x_continuous(name="Year", breaks=c(2001, 2020), limits=c(1998, 2023)) +
   scale_y_continuous(name="Tree Cover (%)") +
   # theme_bw() +
@@ -973,6 +944,7 @@ ggplot(data=TrendsTreeAll[TrendsTreeAll$N.Analyzed>=50,]) +
         axis.ticks.length = unit(-0.25, "lines"),
         axis.text=element_text(color="black"),
         axis.title=element_text(color="black", face="bold"),
+        strip.text = element_text(color="black", face="bold"),
         # axis.text.x=element_blank(),
         # axis.title.x=element_blank(),
         plot.margin = unit(c(0.5, 0.5, 0.5, 0.5), "lines"))
