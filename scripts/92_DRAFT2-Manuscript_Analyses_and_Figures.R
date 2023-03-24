@@ -35,6 +35,7 @@ grad.lst <- c("#053061", "#2166ac", "#4393c3", "#92c5de", "#d1e5f0", "#fbbdc7", 
 # grad.lstHot <- c("#ffffb2", "#fed976", "#feb24c", "#fd8d3c", "#f03b20", "#bd0026") # ends with red
 grad.lstHot <- c("#ffffcc", "#ffeda0", "#fed976", "#feb24c", "#fd8d3c", "#fc4e2a", "#e31a1c", "#bd0026", "#800026") # ends with red
 
+
 # grad.tree <- c("#a6611a", "#dfc27d", "#f5f5f5", "#80cdc1", "#018571") # ends with teal
 # grad.treeDiff <- c("#8c510a", "#d8b365", "#f6e8c3", "#f5f5f5", "#c7eae5", "#5ab4ac", "#01665e") # ends with teal
 grad.treeDiff <- c("#543005", "#8c510a", "#bf812d", "#dfc27d", "#f6e8c3", "#c7eae5", "#80cdc1", "#35978f", "#01665e", "#003c30") # ends with teal
@@ -550,10 +551,14 @@ effectsUHI$ind <- factor(effectsUHI$ind, levels=c("Tree", "Non-Tree Veg", "Remai
 effectsUHI[,c("ISOURBID", "biomeName", "biomeCode", "biomeCodeRev", "value.LST.diff.p")] <- StatsCombined[citiesUHI,c("ISOURBID", "biomeName", "biomeCode", "biomeCodeRev", "value.LST.diff.p")]
 summary(effectsUHI)
 
+# "#67001f" "#b2182b" "#d6604d" "#f4a582" "#fbbdc7" "#d1e5f0" "#92c5de" "#4393c3" "#2166ac" "#053061"
+# "#f03b20"    "#ef3b2c"
 plotTempEffects <- ggplot(data=effectsUHI, aes(x=biomeCode, y=values, fill=ind)) + 
   geom_bar(stat="summary", fun="median") +
   geom_hline(yintercept=0, size=0.5, color="black") +
-  scale_fill_manual(name="Temp. Source", values=c("Tree"=rev(grad.tree)[3], "Non-Tree Veg"=rev(grad.other)[5], "Remaining UHI"=rev(grad.lst)[3])) +
+  # scale_fill_manual(name="Temp. Source", values=c("Tree"="#005a32", "Non-Tree Veg"=rev(grad.other)[4], "Remaining UHI"="#fb6a4a")) +
+  scale_fill_manual(name="Temp. Source", values=c("Tree"="#005a32", "Non-Tree Veg"=rev(grad.other)[3], "Remaining UHI"=rev(grad.lst)[3])) +
+  
   geom_text(x="Des", y=-7, hjust=1, label="Cooling Effect") +
   geom_text(x="Des", y=2.5, hjust=1, label="Warming Effect") +
   coord_cartesian(ylim=c(-7.5, 2.5)) +
@@ -712,7 +717,7 @@ TreeCoverTarget <- ggplot(data=StatsCombined[citiesUHI,], aes(x=biomeCode, y=Tre
   geom_bar(stat="summary", fun="median") +
   # geom_hline(yintercept=median(StatsCombined$TreeCoverTargetUHI[citiesUHI], na.rm=T), size=1, color=rev(grad.tree)[1]) +
   geom_violin(aes(x=biomeCode, y=value.tree.core, fill="Current"), scale="width") +
-  scale_fill_manual(name="Tree Cover", values=c("Current"=rev(grad.tree)[2], "Biome Target"=grad.tree[4])) +
+  scale_fill_manual(name="Tree Cover", values=c("Current"="#005a32", "Biome Target"=grad.tree[4])) +
   labs(x="Biome", y="Tree Cover (%)") +
   scale_y_continuous(limits=c(0,70), expand=c(0,0)) +
   theme_bw()+
@@ -925,6 +930,7 @@ TrendsTreeAll <- merge(TrendTreesUHI, TrendTreesWarm, all=T)
 TrendsTreeAll
 summary(StatsCombined)
 
+
 png(file.path(path.figs, "Figure3_TreeCover_ObservedTargets.png"), height=6, width=6, units="in", res=320)
 ggplot(data=TrendsTreeAll[TrendsTreeAll$N.Analyzed>=50,]) +
   facet_wrap(~biomeCode) +
@@ -932,7 +938,9 @@ ggplot(data=TrendsTreeAll[TrendsTreeAll$N.Analyzed>=50,]) +
   geom_segment(aes(x=2001, xend=2020, y=EstTree2001, yend=EstTree2020, color="Observed Trend"), size=2) +
   geom_segment(aes(x=2001, xend=2020, y=EstTree2001, yend=EstTree2001+20*TargetUHITreeMed, color="Mitigate Intensifying UHI"), size=2) +
   geom_segment(aes(x=2001, xend=2020, y=EstTree2001, yend=EstTree2001+20*TargetWarmTreeMed, color="Mitigate Warming Trend"), size=2) +
-  scale_color_manual(name="Tree Cover Trends", values=c("Observed Trend" = "#1b9e77", "Mitigate Intensifying UHI"="#7570b3", "Mitigate Warming Trend"="#d95f02"))+
+  scale_color_manual(name="Tree Cover Trends", values=c("Observed Trend" = "#005a32", "Mitigate Intensifying UHI"="#238443", "Mitigate Warming Trend"="#41ab5d"))+
+  # scale_color_manual(name="Tree Cover Trends", values=c("Observed Trend" = rev(grad.tree)[2], "Mitigate Intensifying UHI"=rev(grad.tree)[3], "Mitigate Warming Trend"=rev(grad.tree)[4]))+
+  # scale_color_manual(name="Tree Cover Trends", values=c("Observed Trend" = "#1b9e77", "Mitigate Intensifying UHI"="#7570b3", "Mitigate Warming Trend"="#d95f02"))+
   scale_x_continuous(name="Year", breaks=c(2001, 2020), limits=c(1998, 2023)) +
   scale_y_continuous(name="Tree Cover (%)") +
   # theme_bw() +
