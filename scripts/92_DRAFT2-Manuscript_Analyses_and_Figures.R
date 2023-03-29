@@ -936,9 +936,10 @@ ggplot(data=TrendsTreeAll[TrendsTreeAll$N.Analyzed>=50,]) +
   facet_wrap(~biomeCode) +
   geom_segment(data=StatsCombined[StatsCombined$biomeName %in% TrendsTreeAll$biomeName[TrendsTreeAll$N.Analyzed>=50],], aes(x=2001, xend=2020, y=EstTree2001, yend=EstTree2020), size=0.1, alpha=0.7, color="gray80") +
   geom_segment(aes(x=2001, xend=2020, y=EstTree2001, yend=EstTree2020, color="Observed Trend"), size=2) +
-  geom_segment(aes(x=2001, xend=2020, y=EstTree2001, yend=EstTree2001+20*TargetUHITreeMed, color="Mitigate Intensifying UHI"), size=2) +
-  geom_segment(aes(x=2001, xend=2020, y=EstTree2001, yend=EstTree2001+20*TargetWarmTreeMed, color="Mitigate Warming Trend"), size=2) +
-  scale_color_manual(name="Tree Cover Trends", values=c("Observed Trend" = "#005a32", "Mitigate Intensifying UHI"="#238443", "Mitigate Warming Trend"="#41ab5d"))+
+  geom_segment(aes(x=2001, xend=2020, y=EstTree2001, yend=EstTree2001+20*TargetUHITreeMed, color="Mitigate Intensifying UHI"), size=2, linetype="dashed") +
+  geom_segment(aes(x=2001, xend=2020, y=EstTree2001, yend=EstTree2001+20*TargetWarmTreeMed, color="Mitigate Warming Trend"), size=2, linetype="dashed") +
+  scale_color_manual(name="Tree Cover Trends", values=c("Observed Trend" = "#005a32", "Mitigate Intensifying UHI"="#3FA242", "Mitigate Warming Trend"="#A3D16B"))+
+  # scale_color_manual(name="Tree Cover Trends", values=c("Observed Trend" = "#005a32", "Mitigate Intensifying UHI"="#238443", "Mitigate Warming Trend"="#41ab5d"))+
   # scale_color_manual(name="Tree Cover Trends", values=c("Observed Trend" = rev(grad.tree)[2], "Mitigate Intensifying UHI"=rev(grad.tree)[3], "Mitigate Warming Trend"=rev(grad.tree)[4]))+
   # scale_color_manual(name="Tree Cover Trends", values=c("Observed Trend" = "#1b9e77", "Mitigate Intensifying UHI"="#7570b3", "Mitigate Warming Trend"="#d95f02"))+
   scale_x_continuous(name="Year", breaks=c(2001, 2020), limits=c(1998, 2023)) +
