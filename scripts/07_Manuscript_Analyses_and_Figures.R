@@ -8,7 +8,7 @@
 # 1. Cooling Contribution of trees & non-tree vegetation
 # ---------
 # ---------
-# 2. Vegetation cover targets to fully offset UHIs and warming trends
+# 2. Vegetation cover targets to fully mitigate UHIs and warming trends
 # ---------
 # ---------
 
@@ -309,6 +309,8 @@ StatsCombined <- merge(StatsCombined, cityLST, all=T)
 summary(StatsCombined)
 
 
+# Saving this combined & formatted dataset for collaborators or other sharing
+write.csv(StatsCombined, file.path(path.cities, "..", "UHIs-FinalCityDataForAnalysis.csv"), row.names=F)
 # SUPPLEMENTAL TABLE ----
 # Global + Biome:
 # -- Cities Considered
@@ -317,8 +319,7 @@ summary(StatsCombined)
 
 mean(StatsCombined$model.R2adj); median(StatsCombined$model.R2adj)
 
-png(file.path(path.figs, "FigureS1_ModelR2adj.png"), height=6, width=8, units="in", res=320)
-ggplot(data=StatsCombined[,]) +
+MapModFits <- ggplot(data=StatsCombined[,]) +
   geom_sf(data=worldBBoxRobin, fill="gray90", size=0.1) +
   geom_map(data=worldRobin, map=worldRobin, aes(x=long, y=lat, map_id=id), fill="gray50") +
   geom_point(aes(x=xRobin, y=yRobin, color=model.R2adj), size=0.25, alpha=0.8) +
@@ -337,6 +338,14 @@ ggplot(data=StatsCombined[,]) +
         panel.background = element_rect(fill="NA"),
         panel.grid = element_blank(), 
         plot.margin=margin(0.5,0.5, 0.5, 0.5, "lines"))
+
+
+png(file.path(path.figs, "FigureS1_ModelR2adj.png"), height=6, width=8, units="in", res=320)
+MapModFits
+dev.off()
+
+tiff(file.path(path.figs, "FigureS1_ModelR2adj.tiff"), height=6, width=8, units="in", res=320)
+MapModFits
 dev.off()
 
 # ##########################################
@@ -517,6 +526,10 @@ png(file.path(path.figs, "Figure1_UHI_Veg_SlopesBiome.png"), height=8, width=8, 
 plot_grid(mapLST, UHIBiome, mapTree, treeSlopeBiome, mapOther, otherSlopeBiome, nrow=3, rel_widths = c(0.6, 0.6), labels=c("A","B", "C", "D", "E", "F"))
 dev.off() 
 
+tiff(file.path(path.figs, "Figure1_UHI_Veg_SlopesBiome.tiff"), height=8, width=8, units="in", res=320)
+plot_grid(mapLST, UHIBiome, mapTree, treeSlopeBiome, mapOther, otherSlopeBiome, nrow=3, rel_widths = c(0.6, 0.6), labels=c("A","B", "C", "D", "E", "F"))
+dev.off() 
+
 
 # Trees have a clear, consistent cooling potential on global urban surface temperatures, with a global median effect of XXX˚C per percent tree cover (SD XXX˚C/%), and a significant cooling effect in XX% of those cities (Fig. 1)
 # hist(cityStatsAnaly$model.tree.slope)
@@ -579,9 +592,9 @@ plotTempEffects <- ggplot(data=effectsUHI, aes(x=biomeCode, y=values, fill=ind))
         plot.margin = unit(c(0.5, 0.5, 0.5, 0.5), "lines"))
 
 
-png(file.path(path.figs, "base", "Figure2_TempEffects.png"), height=8, width=6, units="in", res=320)
-plotTempEffects
-dev.off()
+# png(file.path(path.figs, "base", "Figure2_TempEffects.png"), height=8, width=6, units="in", res=320)
+# plotTempEffects
+# dev.off()
 
 
 # Lower tree canopy in the metropolitan core than the surrounding  region accounts for nearly one-third (31% SD 39%) of the observed warming in the XXXX% of cities showing significant (p<0.01) UHI effects
@@ -683,7 +696,7 @@ write.csv(CoolStatsSummary, file.path(path.figs, "SuppTable2_Biome_CoolingEffect
 
 
 # ##########################################
-# 2. Vegetation cover targets to fully offset UHIs and warming trends
+# 2. Vegetation cover targets to fully offset UHIs and warming trends ----
 #    Key Result/Messages: 
 #       - On average, urban tree cover would need to be double current levels to fully offset the UHI with tree cover alone.  (Presumably the number for non-tree vegetation will be ridiculously high)
 #       - In order to have offset the increased warming in cities relative to the reference region, tree cover would need to have increased at more than 6 times the observed median (this would have the UHI rate constant instead of growing)
@@ -704,22 +717,24 @@ StatsCombined$OtherCoverTargetUHI <- StatsCombined$OtherCoverUHINeed + StatsComb
 summary(StatsCombined)
 
 # For trees to be the sole solution for offsetting UHI effects globally, mean tree cover would need to more than double (2.25x), increasing from the current mean of 15.4% (SD 10.9%) to 32% (SD 27%)
-round(median(StatsCombined$TreeCoverTargetUHI, na.rm=T)/mean(StatsCombined$value.tree.core), 1)
+round(median(StatsCombined$TreeCoverTargetUHI, na.rm=T)/median(StatsCombined$value.tree.core), 1)
 
-round(mean(StatsCombined$value.tree.core, na.rm=T), 0); round(sd(StatsCombined$value.tree.core, na.rm=T), 0)
+round(median(StatsCombined$value.tree.core, na.rm=T), 0)
 round(median(StatsCombined$TreeCoverTargetUHI, na.rm=T), 0)
 
 length(which(StatsCombined$value.tree.core>median(StatsCombined$TreeCoverTargetUHI, na.rm=T)))
 nrow(StatsCombined)
 length(which(StatsCombined$value.tree.core>median(StatsCombined$TreeCoverTargetUHI, na.rm=T)))/nrow(StatsCombined)
 
+install.pacages("ungeviz")
 
-
-TreeCoverTarget <- ggplot(data=StatsCombined[citiesUHI,], aes(x=biomeCode, y=TreeCoverTargetUHI, fill="Biome Target")) +  
+TreeCoverTarget <- ggplot(data=StatsCombined[citiesUHI,], aes(x=biomeCode, y=TreeCoverTargetUHI, fill="Biome Target", color="Biome Target")) +  
   geom_bar(stat="summary", fun="median") +
-  # geom_hline(yintercept=median(StatsCombined$TreeCoverTargetUHI[citiesUHI], na.rm=T), size=1, color=rev(grad.tree)[1]) +
-  geom_violin(aes(x=biomeCode, y=value.tree.core, fill="Current"), scale="width") +
+  # geom_segment(yend=0, aes(xend=biomeCode), stat="summary", fun="median", size=2) +
+  geom_violin(aes(x=biomeCode, y=value.tree.core, fill="Current", color="Current"), scale="width") +
+  # geom_point(stat="summary", fun="median", size=5) +
   scale_fill_manual(name="Tree Cover", values=c("Current"="#005a32", "Biome Target"=grad.tree[4])) +
+  scale_color_manual(name="Tree Cover", values=c("Current"="#005a32", "Biome Target"=grad.tree[4])) +
   labs(x="Biome", y="Tree Cover (%)") +
   scale_y_continuous(limits=c(0,70), expand=c(0,0)) +
   theme_bw()+
@@ -736,6 +751,10 @@ TreeCoverTarget <- ggplot(data=StatsCombined[citiesUHI,], aes(x=biomeCode, y=Tre
         plot.margin = unit(c(0.5, 0.5, 0.5, 0.5), "lines"))
 
 png(file.path(path.figs, "Figure2_TempEffects_CoverTargets.png"), height=8, width=6, units="in", res=320)
+plot_grid(plotTempEffects, TreeCoverTarget, ncol=1, labels=c("A", "B"))
+dev.off()
+
+tiff(file.path(path.figs, "Figure2_TempEffects_CoverTargets.tiff"), height=8, width=6, units="in", res=320)
 plot_grid(plotTempEffects, TreeCoverTarget, ncol=1, labels=c("A", "B"))
 dev.off()
 
@@ -929,24 +948,28 @@ write.csv(TableTrendsWarm, file.path(path.figs, "SuppTable5_Biome_TreeTrendTarge
 
 # # # Making the slope figure (Fig. 3) ----
 TrendsTreeAll <- merge(TrendTreesUHI, TrendTreesWarm, all=T)
+TrendsTreeAll$YendUHI <- TrendsTreeAll$EstTree2001+20*TrendsTreeAll$TargetUHITreeMed
+TrendsTreeAll$YendWarm <- TrendsTreeAll$EstTree2001+20*TrendsTreeAll$TargetWarmTreeMed
+
+# Creating a vector to help annotate
+TrendsTreeAll$YlabUHI <-TrendsTreeAll$YendUHI
+TrendsTreeAll$YlabWarm <-TrendsTreeAll$YendWarm
 TrendsTreeAll
 summary(StatsCombined)
 
-
-png(file.path(path.figs, "Figure3_TreeCover_ObservedTargets.png"), height=6, width=6, units="in", res=320)
-ggplot(data=TrendsTreeAll[TrendsTreeAll$N.Analyzed>=50,]) +
+figTrends <- ggplot(data=TrendsTreeAll[TrendsTreeAll$N.Analyzed>=50,]) +
   facet_wrap(~biomeCode) +
   geom_segment(data=StatsCombined[StatsCombined$biomeName %in% TrendsTreeAll$biomeName[TrendsTreeAll$N.Analyzed>=50],], aes(x=2001, xend=2020, y=EstTree2001, yend=EstTree2020), size=0.1, alpha=0.7, color="gray80") +
   geom_segment(aes(x=2001, xend=2020, y=EstTree2001, yend=EstTree2020, color="Observed Trend"), size=2) +
-  geom_segment(aes(x=2001, xend=2020, y=EstTree2001, yend=EstTree2001+20*TargetUHITreeMed, color="Mitigate Intensifying UHI"), size=2, linetype="longdash") +
-  geom_segment(aes(x=2001, xend=2020, y=EstTree2001, yend=EstTree2001+20*TargetWarmTreeMed, color="Mitigate Warming Trend"), size=2, linetype="longdash") +
+  geom_segment(aes(x=2001, xend=2020, y=EstTree2001, yend=YendUHI, color="Mitigate Intensifying UHI"), size=2, linetype="dashed") +
+  geom_segment(aes(x=2001, xend=2020, y=EstTree2001, yend=YendWarm, color="Mitigate Warming Trend"), size=2, linetype="dashed") +
+  geom_text(aes(x=2020, y=EstTree2020-1, label=paste0("+",round(20*TrendObsTreeMed, 1), "%"), color="Observed Trend"), hjust=0, show.legend=F, size=3 ) +
+  geom_text(aes(x=2020, y=YendUHI+1, label=paste0("+", round(20*TargetUHITreeMed, 1), "%"), color="Mitigate Intensifying UHI"), hjust=0, show.legend=F, size=3) +
+  geom_text(aes(x=2020, y=YendWarm+3, label=paste0("+", round(20*TargetWarmTreeMed, 1), "%"), color="Mitigate Warming Trend"), hjust=0, show.legend=F, size=3) +
   scale_color_manual(name="Tree Cover Trends", values=c("Observed Trend" = "#005a32", "Mitigate Intensifying UHI"="#3FA242", "Mitigate Warming Trend"="#A3D16B"))+
-  # scale_color_manual(name="Tree Cover Trends", values=c("Observed Trend" = "#005a32", "Mitigate Intensifying UHI"="#238443", "Mitigate Warming Trend"="#41ab5d"))+
-  # scale_color_manual(name="Tree Cover Trends", values=c("Observed Trend" = rev(grad.tree)[2], "Mitigate Intensifying UHI"=rev(grad.tree)[3], "Mitigate Warming Trend"=rev(grad.tree)[4]))+
-  # scale_color_manual(name="Tree Cover Trends", values=c("Observed Trend" = "#1b9e77", "Mitigate Intensifying UHI"="#7570b3", "Mitigate Warming Trend"="#d95f02"))+
-  scale_x_continuous(name="Year", breaks=c(2001, 2020), limits=c(1998, 2023)) +
+  scale_x_continuous(name="Year", breaks=c(2001, 2020), limits=c(1999, 2025)) +
   scale_y_continuous(name="Tree Cover (%)") +
-  # theme_bw() +
+  guides(label=NA) +
   theme(legend.position=c(0.67, 0.15),
         legend.title=element_text(face='bold'),
         legend.key = element_rect(fill=NA),
@@ -959,6 +982,14 @@ ggplot(data=TrendsTreeAll[TrendsTreeAll$N.Analyzed>=50,]) +
         # axis.text.x=element_blank(),
         # axis.title.x=element_blank(),
         plot.margin = unit(c(0.5, 0.5, 0.5, 0.5), "lines"))
+figTrends
+
+
+png(file.path(path.figs, "Figure3_TreeCover_ObservedTargets.png"), height=6, width=6, units="in", res=320)
+figTrends
 dev.off()
 
+tiff(file.path(path.figs, "Figure3_TreeCover_ObservedTargets.tiff"), height=6, width=6, units="in", res=320)
+figTrends
+dev.off()
 
