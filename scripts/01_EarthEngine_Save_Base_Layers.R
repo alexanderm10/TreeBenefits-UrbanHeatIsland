@@ -19,13 +19,88 @@ setYear <- function(img){
   return(img$set("year", img$date()$get("year")))
 }
 
+addYear = function(img) {
+  d= ee$Date(ee$Number(img$get('system:time_start')));
+  y= ee$Number(d$get('year'));
+  return(img$set('year', y));
+}
+
 bitwiseExtract <- function(input, fromBit, toBit) {
   maskSize <- ee$Number(1)$add(toBit)$subtract(fromBit)
   mask <- ee$Number(1)$leftShift(maskSize)$subtract(1)
   return(input$rightShift(fromBit)$bitwiseAnd(mask))
 }
-##################### 
 
+addNDVI <- function(img){
+  return( img$addBands(img$normalizedDifference(c('nir','red'))$rename('NDVI')));
+}
+
+
+applyLandsatBitMask = function(img){
+  qaPix <- img$select('QA_PIXEL');
+  qaRad <- img$select('QA_RADSAT');
+  terrMask <- qaRad$bitwiseAnd(11)$eq(0); ## get rid of any terrain occlusion
+  # satMask <- qaRad$bitwiseAnd(3 << 4)$eq(0); ## get rid of any saturated bands we use to calculate NDVI
+  satMask <- bitwiseExtract(qaRad, 3, 4)$eq(0) ## get rid of any saturated bands we use to calculate NDVI 
+  # clearMask <- qaPix$bitwiseAnd(1<<7)$eq(0)
+  clearMask <- bitwiseExtract(qaPix, 1, 7)$eq(0) 
+  cloudConf = bitwiseExtract(qaPix, 8, 9)$lte(1) ## we can only go with low confidence; doing finer leads to NOTHING making the cut
+  shadowConf <- bitwiseExtract(qaPix, 10, 11)$lte(1) ## we can only go with low confidence; doing finer leads to NOTHING making the cut
+  snowConf <- bitwiseExtract(qaPix, 12, 13)$lte(1) ## we can only go with low confidence; doing finer leads to NOTHING making the cut
+  
+  
+  img <- img$updateMask(clearMask$And(cloudConf)$And(shadowConf)$And(snowConf)$And(terrMask)$And(satMask));
+  
+  return(img)
+  
+}
+
+# Function for combining images with the same date
+# 2nd response from here: https:#gis.stackexchange.com/questions/280156/mosaicking-image-collection-by-date-day-in-google-earth-engine 
+mosaicByDate <- function(imcol, yrWindow){
+  # imcol: An image collection
+  # returns: An image collection
+  imlist = imcol$toList(imcol$size())
+  
+  # Note: needed to specify the ee_utils_pyfunc since it's not an image collection
+  unique_dates <- imlist$map(ee_utils_pyfunc(function(img){
+    return(ee$Image(img)$date()$format("YYYY-MM-dd"))
+  }))$distinct()
+  
+  # Same as above: what we're mapping through is a List, so need to call python
+  mosaic_imlist = unique_dates$map(ee_utils_pyfunc(function(d){
+    d = ee$Date(d)
+    dy= d$get('day');    
+    m= d$get('month');
+    y= d$get('year');
+    
+    im = imcol$filterDate(d$advance(-yrWindow, "year"), d$advance(yrWindow, "year"))$reduce(ee$Reducer$median()) # should influence the window for image aggregation
+    
+    return(im$set("system:time_start", d$millis(), 
+                  "system:id", d$format("YYYY-MM-dd"),
+                  'date', d, 'day', dy, 'month', m, 'year', y))
+  }))
+  
+  # testOUT <- ee$ImageCollection(mosaic_imlist)
+  # ee_print(testOUT)
+  return (ee$ImageCollection(mosaic_imlist))
+}
+##################### 
+##################### 
+# Color Palette etc. ----
+##################### 
+# Setting the center point for the Arb because I think we'll have more variation
+# Map$setCenter(-88.04526, 41.81513, 11);
+
+ndviVis = list(
+  min= 0.0,
+  max= 1,
+  palette= c(
+    '#FFFFFF', '#CE7E45', '#DF923D', '#F1B555', '#FCD163', '#99B718', '#74A901',
+    '#66A000', '#529400', '#3E8601', '#207401', '#056201', '#004C00', '#023B01',
+    '#012E01', '#011D01', '#011301'
+  )
+)
 ##################### 
 # 2. Load in data layers 
 ####################
@@ -45,13 +120,20 @@ vizBit <- list(
   max=1,
   palette=c('bbe029', '074b03')
 );
+
+tempColors <- c(
+  '040274', '040281', '0502a3', '0502b8', '0502ce', '0502e6',
+  '0602ff', '235cb1', '307ef3', '269db1', '30c8e2', '32d3ef',
+  '3be285', '3ff38f', '86e26f', '3ae237', 'b5e22e', 'd6e21f',
+  'fff705', 'ffd611', 'ffb613', 'ff8b13', 'ff6e08', 'ff500d',
+  'ff0000', 'de0101', 'c21301', 'a71001', '911003'
+);
+
 vizBit2 <- list(
   min=0,
   max=8,
   palette=tempColors
 );
-
-
 
 mod44b <- ee$ImageCollection('MODIS/006/MOD44B')$filter(ee$Filter$date("2013-04-01", "2020-12-31")) #MODIS doesn't have 2022 data yet. Subsetting to a shared time period
 mod44b <- mod44b$map(setYear)$map(addTime)
@@ -226,6 +308,51 @@ vizTempK <- list(
 );
 
 # 2.a.1 - Northern Hemisphere: July/August
+##################### 
+# Read in & Format Landsat 8 ----
+##################### 
+# "LANDSAT/LC08/C02/T1_RT"
+# Load MODIS NDVI data; attach month & year
+# https:#developers.google.com/earth-engine/datasets/catalog/LANDSAT_LC08_C02_T1_L2
+# Modifying Christy's code to pull just the July-AUG days
+landsat8 <- ee$ImageCollection("LANDSAT/LC08/C02/T1_L2")$filter(ee$Filter$dayOfYear(182, 243))$filter(ee$Filter$date("2013-04-01", "2020-12-31"))$map(function(image){
+  return(image)
+})$map(function(img){
+  d= ee$Date(img$get('system:time_start'));
+  dy= d$get('day');    
+  m= d$get('month');
+  y= d$get('year');
+  
+  # # Add masks 
+  img <- applyLandsatBitMask(img)
+  
+  # #scale correction; doing here & separating form NDVI so it gets saved on the image
+  lAdj = img$select(c('SR_B1', 'SR_B2', 'SR_B3', 'SR_B4', 'SR_B5', 'SR_B6', 'SR_B7'))$multiply(0.0000275)$add(-0.2);
+  lst_k = img$select('ST_B10')$multiply(0.00341802)$add(149);
+  
+  # img3 = img2$addBands(srcImg=lAdj, overwrite=T)$addBands(srcImg=lst_k, overwrite=T)$set('date',d, 'day',dy, 'month',m, 'year',y)
+  return(img$addBands(srcImg=lAdj, overwrite=T)$addBands(srcImg=lst_k, overwrite=T)$set('date',d, 'day',dy, 'month',m, 'year',y))
+})$select(c('SR_B2', 'SR_B3', 'SR_B4', 'SR_B5', 'SR_B6', 'SR_B7', 'ST_B10'),c('blue', 'green', 'red', 'nir', 'swir1', 'swir2', 'LST_K'))$map(addNDVI)
+
+# ee_print(landsat8, "landsat8")
+
+l8Mosaic = mosaicByDate(landsat8, 1)$select(c('blue_median', 'green_median', 'red_median', 'nir_median', 'swir1_median', 'swir2_median', 'LST_K_median', "NDVI_median"),c('blue', 'green', 'red', 'nir', 'swir1', 'swir2', 'LST_K', "NDVI"))$sort("date")
+# ee_print(l8Mosaic, "landsat8-Mosaic")
+
+lstDayGoodNH <- l8Mosaic$map(lstMask)
+
+landsatReproj = lstDayGoodNH$map(function(img){
+  return(img$reproject(projveg)$reduceResolution(reducer=ee$Reducer$mean())) # flipping teh order here to specify the reproject first seems to have helped.
+})$map(addTime);
+ee_print(landsatReproj)
+
+Map$addLayer(landsatReproj$first()$select('LST_K'), vizTempK, "LST_K - First")
+ee_print(landsatReproj$first())
+
+landsatReproj
+
+
+
 tempJulAug <- ee$ImageCollection('LANDSAT/LC08/C02/T1_L2')$filter(ee$Filter$dayOfYear(182, 243))$filter(ee$Filter$date("2013-04-01", "2020-12-31"))$map(addTime);
 tempJulAug <- tempJulAug$map(Landsat.lstConvert) 
 tempJulAug <- tempJulAug$map(setYear)
