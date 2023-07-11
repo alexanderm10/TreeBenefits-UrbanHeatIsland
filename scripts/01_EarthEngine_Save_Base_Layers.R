@@ -55,36 +55,7 @@ applyLandsatBitMask = function(img){
   
 }
 
-# Function for combining images with the same date
-# 2nd response from here: https:#gis.stackexchange.com/questions/280156/mosaicking-image-collection-by-date-day-in-google-earth-engine 
-mosaicByDate <- function(imcol, yrWindow){
-  # imcol: An image collection
-  # returns: An image collection
-  imlist = imcol$toList(imcol$size())
-  
-  # Note: needed to specify the ee_utils_pyfunc since it's not an image collection
-  unique_dates <- imlist$map(ee_utils_pyfunc(function(img){
-    return(ee$Image(img)$date()$format("YYYY-MM-dd"))
-  }))$distinct()
-  
-  # Same as above: what we're mapping through is a List, so need to call python
-  mosaic_imlist = unique_dates$map(ee_utils_pyfunc(function(d){
-    d = ee$Date(d)
-    dy= d$get('day');    
-    m= d$get('month');
-    y= d$get('year');
-    
-    im = imcol$filterDate(d$advance(-yrWindow, "year"), d$advance(yrWindow, "year"))$reduce(ee$Reducer$median()) # should influence the window for image aggregation
-    
-    return(im$set("system:time_start", d$millis(), 
-                  "system:id", d$format("YYYY-MM-dd"),
-                  'date', d, 'day', dy, 'month', m, 'year', y))
-  }))
-  
-  # testOUT <- ee$ImageCollection(mosaic_imlist)
-  # ee_print(testOUT)
-  return (ee$ImageCollection(mosaic_imlist))
-}
+
 ##################### 
 ##################### 
 # Color Palette etc. ----
@@ -239,13 +210,13 @@ modBare <- ee$ImageCollection$toBands(mod44bGood$select("Percent_NonVegetated"))
 # ee_print(modTree)
 Map$addLayer(modTree$select("YR2020"), vizTree, "TreeCover")
 
-saveTree <- ee_image_to_asset(modTree, description="Save_Mod44b_TreeCover", assetId=file.path(assetHome, "MOD44b_native_Percent_Tree_Cover"), maxPixels = 10e9, scale=926.6, region = maskBBox, crs="SR-ORG:6974", crsTransform=projTransform, overwrite=T)
+saveTree <- ee_image_to_asset(modTree, description="Save_Mod44b_TreeCover", assetId=file.path(assetHome, "MOD44b_native_Percent_Tree_Cover"), maxPixels = 10e12, scale=231.656, region = maskBBox, crs="SR-ORG:6974", crsTransform=projTransform, overwrite=T)
 saveTree$start()
 
-saveVeg <- ee_image_to_asset(modVeg, description="Save_Mod44b_OtherVegCover", assetId=file.path(assetHome, "MOD44b_native_Percent_NonTree_Vegetation"), maxPixels = 10e9, scale=926.6, region = maskBBox, crs="SR-ORG:6974", crsTransform=projTransform, overwrite=T)
+saveVeg <- ee_image_to_asset(modVeg, description="Save_Mod44b_OtherVegCover", assetId=file.path(assetHome, "MOD44b_native_Percent_NonTree_Vegetation"), maxPixels = 10e12, scale=231.656, region = maskBBox, crs="SR-ORG:6974", crsTransform=projTransform, overwrite=T)
 saveVeg$start()
 
-saveBare <- ee_image_to_asset(modBare, description="Save_Mod44b_NonVeg", assetId=file.path(assetHome, "MOD44b_native_Percent_NonVegetated"), maxPixels = 10e9, scale=926.6, region = maskBBox, crs="SR-ORG:6974", crsTransform=projTransform, overwrite=T)
+saveBare <- ee_image_to_asset(modBare, description="Save_Mod44b_NonVeg", assetId=file.path(assetHome, "MOD44b_native_Percent_NonVegetated"), maxPixels = 10e12, scale=231.656, region = maskBBox, crs="SR-ORG:6974", crsTransform=projTransform, overwrite=T)
 saveBare$start()
 # ----------
 
@@ -311,53 +282,59 @@ vizTempK <- list(
 ##################### 
 # Read in & Format Landsat 8 ----
 ##################### 
-# "LANDSAT/LC08/C02/T1_RT"
-# Load MODIS NDVI data; attach month & year
-# https:#developers.google.com/earth-engine/datasets/catalog/LANDSAT_LC08_C02_T1_L2
-# Modifying Christy's code to pull just the July-AUG days
-landsat8 <- ee$ImageCollection("LANDSAT/LC08/C02/T1_L2")$filter(ee$Filter$dayOfYear(182, 243))$filter(ee$Filter$date("2013-04-01", "2020-12-31"))$map(function(image){
-  return(image)
-})$map(function(img){
-  d= ee$Date(img$get('system:time_start'));
-  dy= d$get('day');    
-  m= d$get('month');
-  y= d$get('year');
-  
-  # # Add masks 
-  img <- applyLandsatBitMask(img)
-  
-  # #scale correction; doing here & separating form NDVI so it gets saved on the image
-  lAdj = img$select(c('SR_B1', 'SR_B2', 'SR_B3', 'SR_B4', 'SR_B5', 'SR_B6', 'SR_B7'))$multiply(0.0000275)$add(-0.2);
-  lst_k = img$select('ST_B10')$multiply(0.00341802)$add(149);
-  
-  # img3 = img2$addBands(srcImg=lAdj, overwrite=T)$addBands(srcImg=lst_k, overwrite=T)$set('date',d, 'day',dy, 'month',m, 'year',y)
-  return(img$addBands(srcImg=lAdj, overwrite=T)$addBands(srcImg=lst_k, overwrite=T)$set('date',d, 'day',dy, 'month',m, 'year',y))
-})$select(c('SR_B2', 'SR_B3', 'SR_B4', 'SR_B5', 'SR_B6', 'SR_B7', 'ST_B10'),c('blue', 'green', 'red', 'nir', 'swir1', 'swir2', 'LST_K'))$map(addNDVI)
-
-# ee_print(landsat8, "landsat8")
-
-l8Mosaic = mosaicByDate(landsat8, 1)$select(c('blue_median', 'green_median', 'red_median', 'nir_median', 'swir1_median', 'swir2_median', 'LST_K_median', "NDVI_median"),c('blue', 'green', 'red', 'nir', 'swir1', 'swir2', 'LST_K', "NDVI"))$sort("date")
-# ee_print(l8Mosaic, "landsat8-Mosaic")
-
-lstDayGoodNH <- l8Mosaic$map(lstMask)
-
-landsatReproj = lstDayGoodNH$map(function(img){
-  return(img$reproject(projveg)$reduceResolution(reducer=ee$Reducer$mean())) # flipping teh order here to specify the reproject first seems to have helped.
-})$map(addTime);
-ee_print(landsatReproj)
-
-Map$addLayer(landsatReproj$first()$select('LST_K'), vizTempK, "LST_K - First")
-ee_print(landsatReproj$first())
-
-landsatReproj
-
-
-
+# filtering to just days from July and August
 tempJulAug <- ee$ImageCollection('LANDSAT/LC08/C02/T1_L2')$filter(ee$Filter$dayOfYear(182, 243))$filter(ee$Filter$date("2013-04-01", "2020-12-31"))$map(addTime);
 tempJulAug <- tempJulAug$map(Landsat.lstConvert) 
 tempJulAug <- tempJulAug$map(setYear)
 
+lstDayGoodNH <- tempJulAug$map(lstMask)
+# ee_print(lstDayGoodNH)
 
+yrList <- ee$List(lstDayGoodNH$aggregate_array("year"))$distinct()$sort()
+yrString <- yrList$map(ee_utils_pyfunc(function(j){
+  return(ee$String("YR")$cat(ee$String(ee$Number(j)$format())))
+}))
+
+landsatReproj = lstDayGoodNH$map(function(img){
+  return(img$reproject(projveg)$reduceResolution(reducer=ee$Reducer$mean()))
+         })$map(addYear) # flipping teh order here to specify the reproject first seems to have helped.
+ee_print(landsatReproj)
+
+tempYrMedian <- yrList$map(ee_utils_pyfunc(function(j){
+  YR <- ee$Number(j);
+  START <- ee$Date$fromYMD(YR,1,1);
+  END <- ee$Date$fromYMD(YR,12,31);
+  lstYR <- landsatReproj$filter(ee$Filter$date(START, END))
+ 
+  tempMedian <- lstYR$select('ST_B10')$reduce(ee$Reducer$median())
+  
+  tempAgg <- ee$Image(tempMedian)
+  
+  ## ADD YEAR AS A PROPERTY!!
+  tempAgg <- tempAgg$set(ee$Dictionary(list(year=YR)))
+  tempAgg <- tempAgg$set(ee$Dictionary(list(`system:index`=YR$format("%03d"))))
+  # ee_print(tempAgg)
+  # Map$addLayer(tempAgg$select('LST_Day_1km_mean'), vizTempK, 'Mean Surface Temperature (K)');
+  # Map$addLayer(tempAgg$select('LST_Day_Dev_mean'), vizTempAnom, 'Median Surface Temperature - Anomaly');
+  
+  return (tempAgg); # update to standardized once read
+}))
+
+tempYrMedian <- ee$ImageCollection$fromImages(tempYrMedian) # go ahead and overwrite it since we're just changing form
+tempYrMedian <- ee$ImageCollection$toBands(tempYrMedian)$rename(yrString)
+
+
+
+# landsatReproj < landsatReproj$map(function(img){
+#   return(img$reduceResolution(reducer=ee$Reducer$mean()))
+# })  
+
+Map$addLayer(tempYrMedian$select("YR2020"), vizTempK)
+
+
+
+savetempYrMedian <- ee_image_to_asset(tempYrMedian, description="save_250km_median_LST", assetId=file.path(assetHome, "landsat8_medianLST_250km"), maxPixels = 10e12, scale=231.656, region = maskBBox, crs="SR-ORG:6974", crsTransform=projTransform, overwrite=T)
+savetempYrMedian$start()
 #---------------------
 # Trying to mosaic tiles from a single date into one layer
 

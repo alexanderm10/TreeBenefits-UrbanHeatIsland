@@ -233,32 +233,32 @@ extractTempEE <- function(CitySP, CityNames, TEMPERATURE, GoogleFolderSave, over
     ## ----------------
     # Only iterate through years with some data! 
     # tempCityAll$aggregate_array("year")$getInfo()
-    yrList <- ee$List(tempCityAll$aggregate_array("year"))$distinct()
-    yrString <- yrList$map(ee_utils_pyfunc(function(j){
-      return(ee$String("YR")$cat(ee$String(ee$Number(j)$format())))
-    }))
-
-    tempYrMean <- yrList$map(ee_utils_pyfunc(function(j){
-      YR <- ee$Number(j);
-      START <- ee$Date$fromYMD(YR,1,1);
-      END <- ee$Date$fromYMD(YR,12,31);
-      lstYR <- tempCityAll$filter(ee$Filter$date(START, END))
-      # // var lstDev =  // make each layer an anomaly map
-      tempMean <- lstYR$select('LST_Day_1km')$reduce(ee$Reducer$mean())
-      # tempDev <- lstYR$select('LST_Day_Dev')$reduce(ee$Reducer$mean())
-      tempAgg <- ee$Image(tempMean)
-      
-      ## ADD YEAR AS A PROPERTY!!
-      tempAgg <- tempAgg$set(ee$Dictionary(list(year=YR)))
-      tempAgg <- tempAgg$set(ee$Dictionary(list(`system:index`=YR$format("%03d"))))
-      # ee_print(tempAgg)
-      # Map$addLayer(tempAgg$select('LST_Day_1km_mean'), vizTempK, 'Mean Surface Temperature (K)');
-      # Map$addLayer(tempAgg$select('LST_Day_Dev_mean'), vizTempAnom, 'Mean Surface Temperature - Anomaly');
-      
-      return (tempAgg); # update to standardized once read
-    }))
-    tempYrMean <- ee$ImageCollection$fromImages(tempYrMean) # go ahead and overwrite it since we're just changing form
-    tempYrMean <- ee$ImageCollection$toBands(tempYrMean)$rename(yrString)
+    # yrList <- ee$List(tempCityAll$aggregate_array("year"))$distinct()
+    # yrString <- yrList$map(ee_utils_pyfunc(function(j){
+    #   return(ee$String("YR")$cat(ee$String(ee$Number(j)$format())))
+    # }))
+    # 
+    # tempYrMean <- yrList$map(ee_utils_pyfunc(function(j){
+    #   YR <- ee$Number(j);
+    #   START <- ee$Date$fromYMD(YR,1,1);
+    #   END <- ee$Date$fromYMD(YR,12,31);
+    #   lstYR <- tempCityAll$filter(ee$Filter$date(START, END))
+    #   # // var lstDev =  // make each layer an anomaly map
+    #   tempMean <- lstYR$select('LST_Day_1km')$reduce(ee$Reducer$mean())
+    #   # tempDev <- lstYR$select('LST_Day_Dev')$reduce(ee$Reducer$mean())
+    #   tempAgg <- ee$Image(tempMean)
+    #   
+    #   ## ADD YEAR AS A PROPERTY!!
+    #   tempAgg <- tempAgg$set(ee$Dictionary(list(year=YR)))
+    #   tempAgg <- tempAgg$set(ee$Dictionary(list(`system:index`=YR$format("%03d"))))
+    #   # ee_print(tempAgg)
+    #   # Map$addLayer(tempAgg$select('LST_Day_1km_mean'), vizTempK, 'Mean Surface Temperature (K)');
+    #   # Map$addLayer(tempAgg$select('LST_Day_Dev_mean'), vizTempAnom, 'Mean Surface Temperature - Anomaly');
+    #   
+    #   return (tempAgg); # update to standardized once read
+    # }))
+    # tempYrMean <- ee$ImageCollection$fromImages(tempYrMean) # go ahead and overwrite it since we're just changing form
+    # tempYrMean <- ee$ImageCollection$toBands(tempYrMean)$rename(yrString)
     # tempYrMean <- tempYrMean$setDefaultProjection(projLST)
     # ee_print(tempYrMean)
     # Map$addLayer(tempYrMean$select('YR2020'), vizTempK, 'Mean Surface Temperature (K)');
