@@ -25,14 +25,14 @@ sdei.df <- data.frame(vect("input_data/sdei-global-uhi-2013-shp/shp/sdei-global-
 # Subsetting the data to be just the US cities
 sdei.df2 <- sdei.df[sdei.df$ISO3=="USA",]
 
-sdei.df <- sdei.df2[sdei.df2$ES00POP>=100e3 & sdei.df2$SQKM_FINAL>=1e2,]
+sdei.df <- sdei.df2[sdei.df2$ES00POP>=50e3 & sdei.df2$SQKM_FINAL>=1e2,]
 cityIdAll <- sdei.df$ISOURBID
 
 sdei <- ee$FeatureCollection('users/crollinson/sdei-global-uhi-2013'); # crollinson shared this GEE asset.
 # print(sdei.first())
 
 # Right now, just set all cities with >100k people in the metro area and at least 100 sq km in size
-citiesUse <- sdei$filter(ee$Filter$gte('ES00POP', 100e3))$filter(ee$Filter$gte('SQKM_FINAL', 1e2)) 
+citiesUse <- sdei$filter(ee$Filter$gte('ES00POP', 50e3))$filter(ee$Filter$gte('SQKM_FINAL', 1e2)) 
 
 
 # Making the buffer file a separate thing!

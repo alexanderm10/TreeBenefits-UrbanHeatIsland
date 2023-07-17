@@ -245,16 +245,20 @@ Landsat.lstConvert <- function(img) {
 
 # building the bit mask to separate good vs. bad values based on QA layer that is written in binary
 lstMask <- function(img){
-  qaPix <- img$select('QA_PIXEL')
-  qaRad <- img$select('QA_RADSAT')
-  terrMask <- bitwiseExtract(qaRad,11,11)$eq(0) # get rid of any terrain occlusion  
-  satMask <- bitwiseExtract(qaRad,3, 4)$eq(0) # get rid of any saturated bands we use to calculate NDVI
-  clearMask <- bitwiseExtract(qaPix,1, 7)$eq(0)
-  cloudConf <- bitwiseExtract(qaPix, 8, 9)$lt(2)
-  shadowConf <- bitwiseExtract(qaPix, 10, 11)$lt(2)
-  snowConf <- bitwiseExtract(qaPix, 12, 13)$lt(2)
+  qaPix <- img$select('QA_PIXEL');
+  qaRad <- img$select('QA_RADSAT');
+  terrMask <- qaRad$bitwiseAnd(11)$eq(0); ## get rid of any terrain occlusion
+  # satMask <- qaRad$bitwiseAnd(3 << 4)$eq(0); ## get rid of any saturated bands we use to calculate NDVI
+  satMask <- bitwiseExtract(qaRad, 3, 4)$eq(0) ## get rid of any saturated bands we use to calculate NDVI 
+  # clearMask <- qaPix$bitwiseAnd(1<<7)$eq(0)
+  clearMask <- bitwiseExtract(qaPix, 1, 5)$eq(0)
+  waterMask <- bitwiseExtract(qaPix, 7, 7)$eq(0)
+  cloudConf = bitwiseExtract(qaPix, 8, 9)$lte(1) ## we can only go with low confidence; doing finer leads to NOTHING making the cut
+  shadowConf <- bitwiseExtract(qaPix, 10, 11)$lte(1) ## we can only go with low confidence; doing finer leads to NOTHING making the cut
+  snowConf <- bitwiseExtract(qaPix, 12, 13)$lte(1) ## we can only go with low confidence; doing finer leads to NOTHING making the cut
   
- img = img$updateMask(clearMask$And(cloudConf)$And(shadowConf)$And(snowConf)$And(terrMask)$And(satMask));
+  
+  img <- img$updateMask(clearMask$And(waterMask)$And(cloudConf)$And(shadowConf)$And(snowConf)$And(terrMask)$And(satMask));
   
   return(img)
 }
@@ -435,17 +439,21 @@ lstNHList <- NHlstonly$toList(sizeNH)
 
 ### --------------------------
 ### TESTING ONLY
-sizeNH=10
-lstNHList <- NHlstonly$toList(sizeNH) # making the list with just 10 images
-
-# ee_print(ee$Image(lstNHList$get(1)))
-TEST <- ee$Image(lstNHList$get(1))
-ee_print(TEST)
-testID <- TEST$id()$getInfo()
-testID
+# sizeNH=10
+# lstNHList <- NHlstonly$toList(sizeNH) # making the list with just 10 images
+# 
+# # ee_print(ee$Image(lstNHList$get(1)))
+# TEST <- ee$Image(lstNHList$get(1))
+# ee_print(TEST)
+# testID <- TEST$id()$getInfo()
+# testID
 
 
 # # # What Christy thinks is happening:----
+
+# 07/17::Still having memory issues
+# created script 01b_cityExtract_Extract_Data_EarthEngine_LST.R to extract city temperaturesfor every city individually.
+
 # We have a TON of images because each image is a single point in time for a single tile -- not the whole world like MODIS
 # What we need to do is to either: 
 # 1. combine/*FLATTEN* tiles into single images for each time point (will hopefully work now that we've reduced the resolution, but TBD) and then save each time point
@@ -467,7 +475,7 @@ for(i in 1:sizeNH-1){
   print(imgID)
   # ee_print(img)
   # Map$addLayer(img, vizTempK, "Jul/Aug Temperature")
-  saveLSTNH <- ee_image_to_asset(img, description=paste0("Save_Repoj_LST_JulAug_", imgID), assetId=file.path(assetHome, "Reporj_LST_JulAug_Clean", imgID), maxPixels = 10e10, scale=926.6, region = maskBBox, crs="SR-ORG:6974", crsTransform=projTransform, overwrite=T)
+  saveLSTNH <- ee_image_to_asset(img, description=paste0("Save_Repoj_LST_JulAug_", imgID), assetId=file.path(assetHome, "Reporj_LST_JulAug_Clean", imgID), maxPixels = 10e12, scale=926.6, region = maskBBox, crs="SR-ORG:6974", crsTransform=projTransform, overwrite=T)
   saveLSTNH$start()
 }
 
