@@ -2,11 +2,12 @@
 
 library(rgee); library(raster); library(terra)
 ee_check() # For some reason, it's important to run this before initializing right now
-rgee::ee_Initialize(user = 'crollinson@mortonarb.org', drive=T)
-user.google <- dir("~/Library/CloudStorage/")
-path.google <- file.path("~/Library/CloudStorage", user.google, "My Drive")
-GoogleFolderSave <- "UHI_Analysis_Output_Final_v2"
-
+rgee::ee_Initialize(user = 'malexander@anl.gov', drive=T, project="nbs2023-malexander")
+# user.google <- dir("~/Library/CloudStorage/")
+path.google <- file.path("G:/My Drive/northstar2023/")
+GoogleFolderSave <- "city_bounds"
+assetHome <- ee_get_assethome() # checking to see where in GEE things are saving for this project.
+assetHome
 ##################### 
 # 0. Set up some choices for data quality thresholds
 ##################### 
@@ -20,15 +21,18 @@ overwrite=F
 ##################### 
 # 1. Load and select cities
 #####################
-sdei.df <- data.frame(vect("../data_raw/sdei-global-uhi-2013-shp/shp/sdei-global-uhi-2013.shp"))
-sdei.df <- sdei.df[sdei.df$ES00POP>=100e3 & sdei.df$SQKM_FINAL>=1e2,]
-cityIDsAll <- sdei.df$ISOURBID
+sdei.df <- data.frame(vect("input_data/sdei-global-uhi-2013-shp/shp/sdei-global-uhi-2013.shp"))
+# Subsetting the data to be just the US cities
+sdei.df2 <- sdei.df[sdei.df$ISO3=="USA",]
 
-sdei <- ee$FeatureCollection('users/crollinson/sdei-global-uhi-2013');
+sdei.df <- sdei.df2[sdei.df2$ES00POP>=50e3 & sdei.df2$SQKM_FINAL>=1e2,]
+cityIdAll <- sdei.df$ISOURBID
+
+sdei <- ee$FeatureCollection('users/crollinson/sdei-global-uhi-2013'); # crollinson shared this GEE asset.
 # print(sdei.first())
 
 # Right now, just set all cities with >100k people in the metro area and at least 100 sq km in size
-citiesUse <- sdei$filter(ee$Filter$gte('ES00POP', 100e3))$filter(ee$Filter$gte('SQKM_FINAL', 1e2)) 
+citiesUse <- sdei$filter(ee$Filter$gte('ES00POP', 50e3))$filter(ee$Filter$gte('SQKM_FINAL', 1e2)) 
 
 
 # Making the buffer file a separate thing!
@@ -39,7 +43,7 @@ citiesBuff <- citiesUse$map(function(f){f$buffer(10e3)})
 ##################### 
 # 2. Load in data layers  -- formatting in script 1!
 ####################
-vegMask <- ee$Image("users/crollinson/MOD44b_1km_Reproj_VegMask")
+vegMask <- ee$Image(file.path(assetHome,"MOD44b_1km_Reproj_VegMask"))
 # Map$addLayer(vegMask)
 
 projMask = vegMask$projection()
