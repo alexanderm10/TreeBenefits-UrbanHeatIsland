@@ -190,6 +190,9 @@ extractTempEE <- function(CitySP, CityNames,  GoogleFolderSave, overwrite=F, ...
     cityID <- CityNames[i]
     # cityNow <- citiesUse$filter('NAME=="Chicago"')
     cityNow <- CitySP$filter(ee$Filter$eq('ISOURBID', cityID))
+    
+    # Figure out if we need N or S hemisphere; 
+    # NOTE: if this is slow, then just have it as a specified thing from the function since we have fed N/S separately anyways
     cityCent <- cityNow$geometry()$centroid()
     lat <- cityCent$coordinates()$get(1)
     if( lat$getInfo() >= 0){
@@ -289,9 +292,7 @@ extractTempEE <- function(CitySP, CityNames,  GoogleFolderSave, overwrite=F, ...
       NDVIAgg <- NDVIAgg$set(ee$Dictionary(list(year=YR)))
       NDVIAgg <- NDVIAgg$set(ee$Dictionary(list(`system:index`=YR$format("%03d"))))
       # ee_print(NDVIAgg)
-      # Map$addLayer(NDVIAgg$select('LST_Day_1km_mean'), vizNDVIK, 'Mean Surface NDVIerature (K)');
-      # Map$addLayer(NDVIAgg$select('LST_Day_Dev_mean'), vizNDVIAnom, 'Median Surface NDVIerature - Anomaly');
-      
+
       return (NDVIAgg); # update to standardized once read
     }))
     
@@ -327,7 +328,7 @@ length(cityIdS); length(cityIdN)
 
 if(!overwrite){
   ### Filter out sites that have been done!
-  tmean.done <- dir(file.path(path.google, GoogleFolderSave), "LST_Day_Tmean")
+  tmean.done <- dir(file.path(path.google, GoogleFolderSave), "LST")
 
   # Check to make sure a city has all three layers; if it doesn't do it again
   cityRemove <- unlist(lapply(strsplit(tmean.done, "_"), function(x){x[1]}))
@@ -349,12 +350,12 @@ length(cityIdN)
 
 # 
 if(length(cityIdS)>0){
-  extractTempEE(CitySP=citiesUse, CityNames = cityIdS, TEMPERATURE=tempJanFeb$select("LST_Day_1km"), GoogleFolderSave = GoogleFolderSave)
+  extractTempEE(CitySP=citiesUse, CityNames = cityIdS, GoogleFolderSave = GoogleFolderSave)
 }
 
 # 
 if(length(cityIdN)>0){
-  extractTempEE(CitySP=citiesUse, CityNames = cityIdN, TEMPERATURE=tempJulAug$select("LST_Day_1km"), GoogleFolderSave = GoogleFolderSave)
+  extractTempEE(CitySP=citiesUse, CityNames = cityIdN, GoogleFolderSave = GoogleFolderSave)
 }
 
 # # All except 3 were run successfully
