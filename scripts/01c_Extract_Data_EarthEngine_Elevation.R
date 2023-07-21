@@ -2,12 +2,10 @@
 
 library(rgee); library(raster); library(terra)
 ee_check() # For some reason, it's important to run this before initializing right now
-rgee::ee_Initialize(user = 'malexander@anl.gov', drive=T, project="nbs2023-malexander")
-# user.google <- dir("~/Library/CloudStorage/")
-path.google <- file.path("G:/My Drive/northstar2023/")
-GoogleFolderSave <- "elevation"
-assetHome <- ee_get_assethome() # checking to see where in GEE things are saving for this project.
-assetHome
+rgee::ee_Initialize(user = 'crollinson@mortonarb.org', drive=T)
+path.google <- "~/Google Drive/My Drive/"
+GoogleFolderSave <- "UHI_Analysis_Output_v3"
+assetHome <- ee_get_assethome()
 
 ##################### 
 # 0. Set up some choices for data quality thresholds
