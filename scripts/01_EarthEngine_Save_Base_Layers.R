@@ -135,7 +135,7 @@ projTransform #should produce NUMBERS!
 
 
 # proj4string: "+proj=sinu +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs"
-saveVegMask <- ee_image_to_asset(vegMask, description="Save_VegetationMask", assetId=file.path(assetHome, "MOD44b_250m_Reproj_VegMask"), maxPixels = 10e9, scale=926.6, region = maskBBox, crs="SR-ORG:6974", crsTransform=projTransform, overwrite=T)
+saveVegMask <- ee_image_to_asset(vegMask, description="Save_VegetationMask", assetId=file.path(assetHome, "MOD44b_250m_Reproj_VegMask"), maxPixels = 10e12, scale=231.6564, region = maskBBox, crs="SR-ORG:6974", crsTransform=projTransform, overwrite=T)
 saveVegMask$start()
 
 
@@ -210,13 +210,13 @@ modBare <- ee$ImageCollection$toBands(mod44bGood$select("Percent_NonVegetated"))
 # ee_print(modTree)
 Map$addLayer(modTree$select("YR2020"), vizTree, "TreeCover")
 
-saveTree <- ee_image_to_asset(modTree, description="Save_Mod44b_TreeCover", assetId=file.path(assetHome, "MOD44b_native_250m_Percent_Tree_Cover"), maxPixels = 10e12, scale=231.656, region = maskBBox, crs="SR-ORG:6974", crsTransform=projTransform, overwrite=T)
+saveTree <- ee_image_to_asset(modTree, description="Save_Mod44b_TreeCover", assetId=file.path(assetHome, "MOD44b_250m_native_Percent_Tree_Cover"), maxPixels = 10e12, scale=231.6564, region = maskBBox, crs="SR-ORG:6974", crsTransform=projTransform, overwrite=T)
 saveTree$start()
 
-saveVeg <- ee_image_to_asset(modVeg, description="Save_Mod44b_OtherVegCover", assetId=file.path(assetHome, "MOD44b_native_250m_Percent_NonTree_Vegetation"), maxPixels = 10e12, scale=231.656, region = maskBBox, crs="SR-ORG:6974", crsTransform=projTransform, overwrite=T)
+saveVeg <- ee_image_to_asset(modVeg, description="Save_Mod44b_OtherVegCover", assetId=file.path(assetHome, "MOD44b_250m_native_Percent_NonTree_Vegetation"), maxPixels = 10e12, scale=231.6564, region = maskBBox, crs="SR-ORG:6974", crsTransform=projTransform, overwrite=T)
 saveVeg$start()
 
-saveBare <- ee_image_to_asset(modBare, description="Save_Mod44b_NonVeg", assetId=file.path(assetHome, "MOD44b_native_250m_Percent_NonVegetated"), maxPixels = 10e12, scale=231.656, region = maskBBox, crs="SR-ORG:6974", crsTransform=projTransform, overwrite=T)
+saveBare <- ee_image_to_asset(modBare, description="Save_Mod44b_NonVeg", assetId=file.path(assetHome, "MOD44b_250m_native_Percent_NonVegetated"), maxPixels = 10e12, scale=231.6564, region = maskBBox, crs="SR-ORG:6974", crsTransform=projTransform, overwrite=T)
 saveBare$start()
 # ----------
 
