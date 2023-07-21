@@ -135,7 +135,7 @@ projTransform #should produce NUMBERS!
 
 
 # proj4string: "+proj=sinu +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs"
-saveVegMask <- ee_image_to_asset(vegMask, description="Save_VegetationMask", assetId=file.path(assetHome, "MOD44b_1km_Reproj_VegMask"), maxPixels = 10e9, scale=926.6, region = maskBBox, crs="SR-ORG:6974", crsTransform=projTransform, overwrite=T)
+saveVegMask <- ee_image_to_asset(vegMask, description="Save_VegetationMask", assetId=file.path(assetHome, "MOD44b_1km_Reproj_VegMask"), maxPixels = 10e9, scale=231.656, region = maskBBox, crs="SR-ORG:6974", crsTransform=projTransform, overwrite=T)
 saveVegMask$start()
 
 
@@ -153,6 +153,8 @@ saveVegMask$start()
 # 6   DOY 353 – 017   0 Clear; 1 Cloudy
 # 7   DOY 033 – 045   0 Clear; 1 Cloudy
 # img <- mod44b$first()
+
+
 vegBitMask <- function(img){
   qcVeg <- img$select('Quality')
   # test <- ee$Image
@@ -527,7 +529,7 @@ elevVis = list(
 Map$addLayer(elevReproj, elevVis, "Elevation - Masked, reproj")
 
 
-saveElev <- ee_image_to_asset(elevReproj, description="Save_MERIT_Elevation_Reproj", assetId=file.path(assetHome, "MERIT-DEM-v1_250m_Reproj"), maxPixels = 10e9, scale=926.6, region = maskBBox, crs="SR-ORG:6974", crsTransform=projTransform, overwrite=T)
+saveElev <- ee_image_to_asset(elevReproj, description="Save_MERIT_Elevation_Reproj", assetId=file.path(assetHome, "MERIT-DEM-v1_250m_Reproj"), maxPixels = 10e12, scale=231.656, region = maskBBox, crs="SR-ORG:6974", crsTransform=projTransform, overwrite=T)
 saveElev$start()
 
 
