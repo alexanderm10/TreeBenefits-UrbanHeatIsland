@@ -135,7 +135,7 @@ projTransform #should produce NUMBERS!
 
 
 # proj4string: "+proj=sinu +lon_0=0 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs"
-saveVegMask <- ee_image_to_asset(vegMask, description="Save_VegetationMask", assetId=file.path(assetHome, "MOD44b_1km_Reproj_VegMask"), maxPixels = 10e9, scale=231.656, region = maskBBox, crs="SR-ORG:6974", crsTransform=projTransform, overwrite=T)
+saveVegMask <- ee_image_to_asset(vegMask, description="Save_VegetationMask", assetId=file.path(assetHome, "MOD44b_1km_Reproj_VegMask"), maxPixels = 10e12, scale=231.656, region = maskBBox, crs="SR-ORG:6974", crsTransform=projTransform, overwrite=T)
 saveVegMask$start()
 
 
