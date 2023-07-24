@@ -30,6 +30,70 @@ addTime <- function(image){
 setYear <- function(img){
   return(img$set("year", img$date()$get("year")))
 }
+
+bitwiseExtract <- function(input, fromBit, toBit) {
+  maskSize <- ee$Number(1)$add(toBit)$subtract(fromBit)
+  mask <- ee$Number(1)$leftShift(maskSize)$subtract(1)
+  return(input$rightShift(fromBit)$bitwiseAnd(mask))
+}
+
+
+applyLandsatBitMask = function(img){
+  qaPix <- img$select('QA_PIXEL');
+  qaRad <- img$select('QA_RADSAT');
+  terrMask <- qaRad$bitwiseAnd(11)$eq(0); ## get rid of any terrain occlusion
+  # satMask <- qaRad$bitwiseAnd(3 << 4)$eq(0); ## get rid of any saturated bands we use to calculate NDVI
+  satMask <- bitwiseExtract(qaRad, 3, 4)$eq(0) ## get rid of any saturated bands we use to calculate NDVI 
+  # clearMask <- qaPix$bitwiseAnd(1<<7)$eq(0)
+  clearMask <- bitwiseExtract(qaPix, 1, 5)$eq(0)
+  waterMask <- bitwiseExtract(qaPix, 7, 7)$eq(0)
+  cloudConf = bitwiseExtract(qaPix, 8, 9)$lte(1) ## we can only go with low confidence; doing finer leads to NOTHING making the cut
+  shadowConf <- bitwiseExtract(qaPix, 10, 11)$lte(1) ## we can only go with low confidence; doing finer leads to NOTHING making the cut
+  snowConf <- bitwiseExtract(qaPix, 12, 13)$lte(1) ## we can only go with low confidence; doing finer leads to NOTHING making the cut
+  
+  
+  img <- img$updateMask(clearMask$And(waterMask)$And(cloudConf)$And(shadowConf)$And(snowConf)$And(terrMask)$And(satMask));
+  
+  return(img)
+  
+}
+
+# Function for combining images with the same date
+# 2nd response from here: https:#gis.stackexchange.com/questions/280156/mosaicking-image-collection-by-date-day-in-google-earth-engine 
+mosaicByDate <- function(imcol, dayWindow){
+  # imcol: An image collection
+  # returns: An image collection
+  imlist = imcol$toList(imcol$size())
+  
+  # Note: needed to specify the ee_utils_pyfunc since it's not an image collection
+  unique_dates <- imlist$map(ee_utils_pyfunc(function(img){
+    return(ee$Image(img)$date()$format("YYYY-MM-dd"))
+  }))$distinct()
+  
+  # Same as above: what we're mappign through is a List, so need to call python
+  mosaic_imlist = unique_dates$map(ee_utils_pyfunc(function(d){
+    d = ee$Date(d)
+    dy= d$get('day');    
+    m= d$get('month');
+    y= d$get('year');
+    
+    im = imcol$filterDate(d$advance(-dayWindow, "day"), d$advance(dayWindow, "day"))$reduce(ee$Reducer$median()) # shoudl influence the window for image aggregation
+    
+    return(im$set("system:time_start", d$millis(), 
+                  "system:id", d$format("YYYY-MM-dd"),
+                  'date', d, 'day', dy, 'month', m, 'year', y))
+  }))
+  
+  # testOUT <- ee$ImageCollection(mosaic_imlist)
+  # ee_print(testOUT)
+  return (ee$ImageCollection(mosaic_imlist))
+}
+
+addNDVI <- function(img){
+  return( img$addBands(img$normalizedDifference(c('nir','red'))$rename('NDVI')));
+}
+
+
 ##################### 
 
 
@@ -80,30 +144,35 @@ vizTempK <- list(
   max=47.0+273.15,
   palette=tempColors
 );
+
+ndviVis = list(
+  min= 0.0,
+  max= 1,
+  palette= c(
+    '#FFFFFF', '#CE7E45', '#DF923D', '#F1B555', '#FCD163', '#99B718', '#74A901',
+    '#66A000', '#529400', '#3E8601', '#207401', '#056201', '#004C00', '#023B01',
+    '#012E01', '#011D01', '#011301'
+  )
+)
+
+
 # -----------
-# 2.a - Land Surface Temperature
+# Vegetation mask for projection info
 # -----------
-# 2.a.1 - Northern Hemisphere: July/August
-JulAugList <- ee_manage_assetlist(path_asset = "users/crollinson/LST_JulAug_Clean/")
-tempJulAug <- ee$ImageCollection(JulAugList$ID)
-tempJulAug <- tempJulAug$map(setYear) # Note: This is needed here otherwise the format is weird and code doesn't work!
-# ee_print(tempJulAug)
-# tempJulAug$first()$propertyNames()$getInfo()
-# tempJulAug$first()$get("system:id")$getInfo()
-# ee_print(tempJulAug$first())
-# Map$addLayer(tempJulAug$first(), vizTempK, "Jul/Aug Temperature")
+vegMask <- ee$Image('users/crollinson/MOD44b_250m_native_Percent_Tree_Cover')
+# vegMask <- ee$Image('users/crollinson/MERIT-DEM-v1_250m_Reproj')
+ee_print(vegMask)
 
-# 2.a.2 - Southern Hemisphere: Jan/Feb
-JanFebList <- ee_manage_assetlist(path_asset = "users/crollinson/LST_JanFeb_Clean/")
-tempJanFeb <- ee$ImageCollection(JanFebList$ID);
-tempJanFeb <- tempJanFeb$map(setYear) # Note: This is needed here otherwise the format is weird and code doesn't work!
+maskGeom <- vegMask$geometry()$getInfo()
+maskBBox <- ee$Geometry$BBox(-180, -90, 180, 90) # The world
 
-# ee_print(tempJanFeb)
-# Map$addLayer(tempJanFeb$first(), vizTempK, "Jan/Feb Temperature")
+# getting the projection details for MODIS
+projveg = vegMask$projection() # Gettign the projection for the Landsat LST layer
+projCRS = projveg$crs()
+projTransform <- unlist(projveg$getInfo()$transform)
 
-projLST = tempJulAug$first()$projection()
-projCRS = projLST$crs()
-projTransform <- unlist(projLST$getInfo()$transform)
+# ee_print(projveg)
+projTransform #should produce NUMBERS!
 
 # -----------
 
@@ -113,14 +182,24 @@ projTransform <- unlist(projLST$getInfo()$transform)
 
 ## Making the workflow a function that we can then feed N/S data to
 # Cities needs to be an EarthEngine Feature List
-extractTempEE <- function(CitySP, CityNames, TEMPERATURE, GoogleFolderSave, overwrite=F, ...){
+extractTempEE <- function(CitySP, CityNames,  GoogleFolderSave, overwrite=F, ...){
   # cityseq <- seq_len(CITIES$length()$getInfo())
   pb <- txtProgressBar(min=0, max=length(CityNames), style=3)
   for(i in 1:length(CityNames)){
     setTxtProgressBar(pb, i)
     cityID <- CityNames[i]
-    # cityNow <- citiesUse$filter('NAME=="Chicago"')$first()
+    # cityNow <- citiesUse$filter('NAME=="Chicago"')
     cityNow <- CitySP$filter(ee$Filter$eq('ISOURBID', cityID))
+    
+    # Figure out if we need N or S hemisphere; 
+    # NOTE: if this is slow, then just have it as a specified thing from the function since we have fed N/S separately anyways
+    cityCent <- cityNow$geometry()$centroid()
+    lat <- cityCent$coordinates()$get(1)
+    if( lat$getInfo() >= 0){
+      dayStart = 181; dayEnd=240
+    } else {
+      dayStart = 1; dayEnd=60
+    }
     # cityNow <- CitySP$filter('ISOURBID'=="NZL96")
     # Map$centerObject(cityNow) 
     # Map$addLayer(cityNow)
@@ -128,175 +207,106 @@ extractTempEE <- function(CitySP, CityNames, TEMPERATURE, GoogleFolderSave, over
     #-------
     # Now doing Land Surface Temperature
     #-------
-    # Map$addLayer(tempHemi$first()$select('LST_Day_1km'), vizTempK, "Raw Surface Temperature")
+    # Read in the appropriate landsat data using the filter bounds function & appropriate time for N/S hemisphere
+    # # # NOTE: Working with just 1 year to try and get this working!!
+    landsat8 <- ee$ImageCollection('LANDSAT/LC08/C02/T1_L2')$filterBounds(cityNow)$filter(ee$Filter$dayOfYear(dayStart, dayEnd))$filter(ee$Filter$date("2014-01-01", "2020-12-31"))$map(addTime)$map(function(img){
+      # Add date info
+      d= ee$Date(img$get('system:time_start'));
+      dy= d$get('day');    
+      m= d$get('month');
+      y= d$get('year');
+      
+      # # Add masks 
+      img <- applyLandsatBitMask(img)
+      
+      # #scale correction; doing here & separating form NDVI so it gets saved on the image
+      lAdj = img$select(c('SR_B1', 'SR_B2', 'SR_B3', 'SR_B4', 'SR_B5', 'SR_B6', 'SR_B7'))$multiply(0.0000275)$add(-0.2);
+      lst_k = img$select('ST_B10')$multiply(0.00341802)$add(149);
+      
+      # img3 = img2$addBands(srcImg=lAdj, overwrite=T)$addBands(srcImg=lst_k, overwrite=T)$set('date',d, 'day',dy, 'month',m, 'year',y)
+      return(img$addBands(srcImg=lAdj, overwrite=T)$addBands(srcImg=lst_k, overwrite=T)$set('date',d, 'day',dy, 'month',m, 'year',y))
+    })$select(c('SR_B2', 'SR_B3', 'SR_B4', 'SR_B5', 'SR_B6', 'SR_B7', 'ST_B10'),c('blue', 'green', 'red', 'nir', 'swir1', 'swir2', 'LST_K'))$map(addNDVI);
+    # ee_print(landsat8)
+    # Map$addLayer(landsat8$first()$select('LST_K'), vizTempK, "Raw Surface Temperature")
     
-    # JUST GET AN MASK THE RAW DATA FIRST
-    tempCityAll <- TEMPERATURE$map(function(img){
-      tempNow <- img$clip(cityNow)
-      # dat <- tempNow$gt(0)
-      # tempNow <- tempNow$updateMask(dat)
-      return(tempNow)
-    })
-    # ee_print(tempCityAll)
-    # tempCityAll$first()$get("year")$getInfo()
-    # Map$addLayer(tempCityAll$first()$select('LST_Day_1km'), vizTempK, "Raw Surface Temperature")
-    
- 
-    # ---------------
-    # Need to run this first so that layers without data are removed up front
-    # ---------------
-    setNPts <- function(img){
-      npts.now <- img$select("LST_Day_1km")$reduceRegion(reducer=ee$Reducer$count(), geometry=cityNow$geometry(), scale=1e3)
-      return(img$set("n_Pts", npts.now$get("LST_Day_1km")))#$set("p_Pts", p.now$get
-    }
-    
-    tempCityAll <- tempCityAll$map(setNPts)
-    # ee_print(tempCityAll)
-    
-    # Making sure we have at least 50% of the points present
-    # tempCityAll$select("2016_02_18")
-    # tempCityAll$first()$get("n_Pts")$getInfo()
-    # tempCityAll$first()$get("year")$getInfo()
-    ptsString <- tempCityAll$aggregate_array("n_Pts")$sort()
-    ptsMax <- ptsString$get(-1)
-    ptsThresh <- ee$Number(ptsMax)$multiply(ee$Number(thresh.prop))
-    
-    tempCityAll <- tempCityAll$filter(ee$Filter$gte("n_Pts", ptsThresh)) # have at least 5    
-    # ee_print(tempCityAll)
-    # ---------------
+    yrList <- ee$List(landsat8$aggregate_array("year"))$distinct()$sort()
+    yrString <- yrList$map(ee_utils_pyfunc(function(j){
+      return(ee$String("YR")$cat(ee$String(ee$Number(j)$format())))
+    }))
 
-    ## ----------------
-    # Now remove outliers
-    # Once it DOES work, we can re-run the the setNPts
-    ## ----------------
-    lstOutliers <- function(img){
-      # Calculate the means & sds for the region
-      tempStats <- img$select("LST_Day_1km")$reduceRegion(reducer=ee$Reducer$mean()$combine(
-        reducer2=ee$Reducer$stdDev(), sharedInputs=T),
-        geometry=cityNow$geometry(), scale=1e3)
-      
-      # Cacluate the key numbers for our sanity
-      tmean <- ee$Number(tempStats$get("LST_Day_1km_mean"))
-      tsd <- ee$Number(tempStats$get("LST_Day_1km_stdDev"))
-      thresh <- tsd$multiply(thresh.sigma)
-      
-      # Do the filtering
-      dat.low <- img$gte(tmean$subtract(thresh))
-      dat.hi <- img$lte(tmean$add(thresh))
-      img <- img$updateMask(dat.low)
-      img <- img$updateMask(dat.hi)
-      
-      # Map$addLayer(tempNow$select('LST_Day_1km'), vizTempK, "Raw Surface Temperature")
-      return(img)
-    }
-    
-    tempCityAll <- tempCityAll$map(lstOutliers)
-    # ee_print(tempCityAll)
-    # Map$addLayer(tempCityAll$first()$select('LST_Day_1km'), vizTempK, "Raw Surface Temperature")
-    
-    # ---------------
-    # Remove poor data layers
-    # ---------------
-    setNPts <- function(img){
-      npts.now <- img$select("LST_Day_1km")$reduceRegion(reducer=ee$Reducer$count(), geometry=cityNow$geometry(), scale=1e3)
-      # p.now <- list(p_Pts=ee$Number(npts.now$get("LST_Day_1km"))$divide(npts.elev))
-      # p.now <- ee$Dictionary(p.now)
-      
-      # test <- img$set("n_Pts", npts.now$get("LST_Day_1km"))$set("p_Pts", p.now$get("p_Pts"))
-      # test$get("p_Pts")$getInfo()
-      return(img$set("n_Pts", npts.now$get("LST_Day_1km")))#$set("p_Pts", p.now$get("p_Pts")))
-    }
-    
-    tempCityAll <- tempCityAll$map(setNPts)
-    # ee_print(tempCityAll)
+    l8Reproj = landsat8$map(function(img){
+      return(img$reproject(projveg)$reduceResolution(reducer=ee$Reducer$mean()))
+             })$map(addYear) # flipping teh order here to specify the reproject first seems to have helped.
+    # ee_print(l8Reproj)
+    # Map$addLayer(l8Reproj$first()$select('LST_K'), vizTempK, "Raw Surface Temperature")
 
-    tempCityAll <- tempCityAll$filter(ee$Filter$gte("n_Pts", ptsThresh)) # have at least 50% of the data points (see top of script)
-    ## ----------------
-    
-    ## ----------------
-    # Now calculate Temperature Deviations
-    ## ----------------
-    # tempCityAll <- tempCityAll$map(function(img){
-    #   tempMed <- img$select('LST_Day_1km')$reduceRegion(reducer=ee$Reducer$median(), geometry=cityNow$geometry(), scale=1e3)
-    #   tempDev <- img$select('LST_Day_1km')$subtract(ee$Number(tempMed$get('LST_Day_1km')))$rename('LST_Day_Dev')$toFloat()
-    #   return(img$addBands(tempDev))
-    # })
-    # # print("Temperature Deviation (Raw)", tempCityAll);
-    # # Map$addLayer(tempCityAll$first()$select('LST_Day_Dev'), vizTempAnom, 'Surface Temperature - Anomaly');
-    # # devList = tempCityAll.toList(tempCityAll.size())
-    # # Map.addLayer(ee.Image(devList.get(12)).select('LST_Day_Dev'), vizTempAnom, 'Surface Temperature - Anomaly');
-    ## ----------------
+    # Now that we've re-projected, lets clip to the region
+    l8Here <- l8Reproj$map(function(img){ return(img$clip(cityNow))})
+    # Map$addLayer(l8Here$first()$select('LST_K'), vizTempK, "Raw Surface Temperature")
     
     
-    ## ----------------
-    # Now lets do our annual means
-    ## ----------------
-    # Only iterate through years with some data! 
-    # tempCityAll$aggregate_array("year")$getInfo()
-    # yrList <- ee$List(tempCityAll$aggregate_array("year"))$distinct()
-    # yrString <- yrList$map(ee_utils_pyfunc(function(j){
-    #   return(ee$String("YR")$cat(ee$String(ee$Number(j)$format())))
-    # }))
-    # 
-    # tempYrMean <- yrList$map(ee_utils_pyfunc(function(j){
-    #   YR <- ee$Number(j);
-    #   START <- ee$Date$fromYMD(YR,1,1);
-    #   END <- ee$Date$fromYMD(YR,12,31);
-    #   lstYR <- tempCityAll$filter(ee$Filter$date(START, END))
-    #   # // var lstDev =  // make each layer an anomaly map
-    #   tempMean <- lstYR$select('LST_Day_1km')$reduce(ee$Reducer$mean())
-    #   # tempDev <- lstYR$select('LST_Day_Dev')$reduce(ee$Reducer$mean())
-    #   tempAgg <- ee$Image(tempMean)
-    #   
-    #   ## ADD YEAR AS A PROPERTY!!
-    #   tempAgg <- tempAgg$set(ee$Dictionary(list(year=YR)))
-    #   tempAgg <- tempAgg$set(ee$Dictionary(list(`system:index`=YR$format("%03d"))))
-    #   # ee_print(tempAgg)
-    #   # Map$addLayer(tempAgg$select('LST_Day_1km_mean'), vizTempK, 'Mean Surface Temperature (K)');
-    #   # Map$addLayer(tempAgg$select('LST_Day_Dev_mean'), vizTempAnom, 'Mean Surface Temperature - Anomaly');
-    #   
-    #   return (tempAgg); # update to standardized once read
-    # }))
-    # tempYrMean <- ee$ImageCollection$fromImages(tempYrMean) # go ahead and overwrite it since we're just changing form
-    # tempYrMean <- ee$ImageCollection$toBands(tempYrMean)$rename(yrString)
-    # tempYrMean <- tempYrMean$setDefaultProjection(projLST)
-    # ee_print(tempYrMean)
-    # Map$addLayer(tempYrMean$select('YR2020'), vizTempK, 'Mean Surface Temperature (K)');
+    l8TempYrAvg <- yrList$map(ee_utils_pyfunc(function(j){
+      YR <- ee$Number(j);
+      START <- ee$Date$fromYMD(YR,1,1);
+      END <- ee$Date$fromYMD(YR,12,31);
+      lstYR <- l8Here$filter(ee$Filter$date(START, END))
+
+      # tempMedian <- lstYR$select('LST_K')$reduce(ee$Reducer$median())
+      tempMedian <- lstYR$select('LST_K')$reduce(ee$Reducer$mean())
+      
+      tempAgg <- ee$Image(tempMedian)
+
+      ## ADD YEAR AS A PROPERTY!!
+      tempAgg <- tempAgg$set(ee$Dictionary(list(year=YR)))
+      tempAgg <- tempAgg$set(ee$Dictionary(list(`system:index`=YR$format("%03d"))))
+      # ee_print(tempAgg)
+      # Map$addLayer(tempAgg$select('LST_Day_1km_mean'), vizTempK, 'Mean Surface Temperature (K)');
+      # Map$addLayer(tempAgg$select('LST_Day_Dev_mean'), vizTempAnom, 'Median Surface Temperature - Anomaly');
+
+      return (tempAgg); # update to standardized once read
+    }))
+
+    l8TempYrAvg <- ee$ImageCollection$fromImages(l8TempYrAvg) # go ahead and overwrite it since we're just changing form
+    # ee_print(l8TempYrAvg)
+    # Map$addLayer(l8TempYrAvg$first()$select('LST_K_mean'), vizTempK, "Mean Surface Temperature")
     
-    export.TempMean <- ee_image_to_drive(image=tempYrMean, description=paste0(cityID, "_LST_Day_Tmean"), fileNamePrefix=paste0(cityID, "_LST_Day_Tmean"), folder=GoogleFolderSave, timePrefix=F, region=cityNow$geometry(), maxPixels=5e7, crs=projCRS, crsTransform=projTransform)
+    l8tempYrAvg <- ee$ImageCollection$toBands(l8TempYrAvg)$rename(yrString)
     
+
+    export.TempMean <- ee_image_to_drive(image=l8tempYrAvg, description=paste0(cityID, "_Landsat8_LST"), fileNamePrefix=paste0(cityID, "_Landsat8_LST"), folder=GoogleFolderSave, timePrefix=F, region=cityNow$geometry(), maxPixels=10e9, crs=projCRS, crsTransform=projTransform)
     export.TempMean$start()
-    # ee_monitoring(export.TempMean)
     
     
-    # tempYrDev <- yrList$map(ee_utils_pyfunc(function(j){
-    #   YR <- ee$Number(j);
-    #   START <- ee$Date$fromYMD(YR,1,1);
-    #   END <- ee$Date$fromYMD(YR,12,31);
-    #   lstYR <- tempCityAll$filter(ee$Filter$date(START, END))
-    #   tempDev <- lstYR$select('LST_Day_Dev')$reduce(ee$Reducer$mean())
-    #   tempAgg <- ee$Image(tempDev)
-    #   
-    #   ## ADD YEAR AS A PROPERTY!!
-    #   tempAgg <- tempAgg$set(ee$Dictionary(list(year=YR)))
-    #   tempAgg <- tempAgg$set(ee$Dictionary(list(`system:index`=YR$format("%03d"))))
-    #   # ee_print(tempAgg)
-    #   # Map$addLayer(tempAgg$select('LST_Day_1km_mean'), vizTempK, 'Mean Surface Temperature (K)');
-    #   # Map$addLayer(tempAgg$select('LST_Day_Dev_mean'), vizTempAnom, 'Mean Surface Temperature - Anomaly');
-    #   
-    #   return (tempAgg); # update to standardized once read
-    #   
-    # }))
-    # tempYrDev <- ee$ImageCollection$fromImages(tempYrDev) # go ahead and overwrite it since we're just changing form
-    # tempYrDev <- ee$ImageCollection$toBands(tempYrDev)$rename(yrString2)
-    # tempYrDev <- tempYrDev$setDefaultProjection(projLST)
-    # 
-    # export.TempDev <- ee_image_to_drive(image=tempYrDev, description=paste0(cityID, "_LST_Day_Tdev"), fileNamePrefix=paste0(cityID, "_LST_Day_Tdev"), folder=GoogleFolderSave, timePrefix=F, region=cityNow$geometry(), maxPixels=5e6)
-    # export.TempDev$start()
-    # ee_monitoring(export.TempDev)
-    ## ----------------
-  } # End Loop
-  
+    l8NDVIYrAvg <- yrList$map(ee_utils_pyfunc(function(j){
+      YR <- ee$Number(j);
+      START <- ee$Date$fromYMD(YR,1,1);
+      END <- ee$Date$fromYMD(YR,12,31);
+      ndviYR <- l8Here$filter(ee$Filter$date(START, END))
+      
+      # NDVIMedian <- lstYR$select('LST_K')$reduce(ee$Reducer$median())
+      NDVIMedian <- ndviYR$select('NDVI')$reduce(ee$Reducer$mean())
+      
+      NDVIAgg <- ee$Image(NDVIMedian)
+      
+      ## ADD YEAR AS A PROPERTY!!
+      NDVIAgg <- NDVIAgg$set(ee$Dictionary(list(year=YR)))
+      NDVIAgg <- NDVIAgg$set(ee$Dictionary(list(`system:index`=YR$format("%03d"))))
+      # ee_print(NDVIAgg)
+
+      return (NDVIAgg); # update to standardized once read
+    }))
+    
+    l8NDVIYrAvg <- ee$ImageCollection$fromImages(l8NDVIYrAvg) # go ahead and overwrite it since we're just changing form
+    # ee_print(l8NDVIYrAvg)
+    # Map$addLayer(l8NDVIYrAvg$first()$select('NDVI_mean'), ndviVis, "NDVI")
+    
+    l8NDVIYrAvg <- ee$ImageCollection$toBands(l8NDVIYrAvg)$rename(yrString)
+    
+    
+    export.NDVIMean <- ee_image_to_drive(image=l8NDVIYrAvg, description=paste0(cityID, "_Landsat8_NDVI"), fileNamePrefix=paste0(cityID, "_Landsat8_NDVI"), folder=GoogleFolderSave, timePrefix=F, region=cityNow$geometry(), maxPixels=10e9, crs=projCRS, crsTransform=projTransform)
+    export.NDVIMean$start()
+    
+  }
 }
 
 
@@ -318,7 +328,7 @@ length(cityIdS); length(cityIdN)
 
 if(!overwrite){
   ### Filter out sites that have been done!
-  tmean.done <- dir(file.path(path.google, GoogleFolderSave), "LST_Day_Tmean")
+  tmean.done <- dir(file.path(path.google, GoogleFolderSave), "LST")
 
   # Check to make sure a city has all three layers; if it doesn't do it again
   cityRemove <- unlist(lapply(strsplit(tmean.done, "_"), function(x){x[1]}))
@@ -340,12 +350,12 @@ length(cityIdN)
 
 # 
 if(length(cityIdS)>0){
-  extractTempEE(CitySP=citiesUse, CityNames = cityIdS, TEMPERATURE=tempJanFeb$select("LST_Day_1km"), GoogleFolderSave = GoogleFolderSave)
+  extractTempEE(CitySP=citiesUse, CityNames = cityIdS, GoogleFolderSave = GoogleFolderSave)
 }
 
 # 
 if(length(cityIdN)>0){
-  extractTempEE(CitySP=citiesUse, CityNames = cityIdN, TEMPERATURE=tempJulAug$select("LST_Day_1km"), GoogleFolderSave = GoogleFolderSave)
+  extractTempEE(CitySP=citiesUse, CityNames = cityIdN, GoogleFolderSave = GoogleFolderSave)
 }
 
 # # All except 3 were run successfully

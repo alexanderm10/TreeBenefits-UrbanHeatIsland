@@ -7,6 +7,8 @@ rgee::ee_Initialize(user = 'malexander@anl.gov', drive=T, project="nbs2023-malex
 path.google <- file.path("G:/My Drive/northstar2023/")
 GoogleFolderSave <- "vegetation"
 assetHome <- ee_get_assethome()
+
+
 ##################### 
 # 0. Set up some choices for data quality thresholds
 ##################### 
