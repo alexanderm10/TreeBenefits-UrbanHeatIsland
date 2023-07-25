@@ -52,9 +52,9 @@ vizTree <- list(
   palette=c('bbe029', '0a9501', '074b03')
 );
 
-modTree <- ee$Image(file.path(assetHome,'MOD44b_native_Percent_Tree_Cover'))
-modVeg <- ee$Image(file.path(assetHome,'MOD44b_native_Percent_NonTree_Vegetation'))
-modBare <- ee$Image(file.path(assetHome,'MOD44b_native_Percent_NonVegetated'))
+modTree <- ee$Image(file.path(assetHome,'MOD44b_250m_native_Percent_Tree_Cover'))
+modVeg <- ee$Image(file.path(assetHome,'MOD44b_250m_native_Percent_NonTree_Vegetation'))
+modBare <- ee$Image(file.path(assetHome,'MOD44b_250m_native_Percent_NonVegetated'))
 
 ee_print(modTree)
 # Map$addLayer(modTree$select("YR2020"), vizTree, "Tree Cover: 1km, Reproj")

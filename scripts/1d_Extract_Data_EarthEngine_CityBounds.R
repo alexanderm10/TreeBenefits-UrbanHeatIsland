@@ -43,7 +43,7 @@ citiesBuff <- citiesUse$map(function(f){f$buffer(10e3)})
 ##################### 
 # 2. Load in data layers  -- formatting in script 1!
 ####################
-vegMask <- ee$Image(file.path(assetHome,"MOD44b_1km_Reproj_VegMask"))
+vegMask <- ee$Image(file.path(assetHome,"MOD44b_250m_Reproj_VegMask"))
 # Map$addLayer(vegMask)
 
 projMask = vegMask$projection()

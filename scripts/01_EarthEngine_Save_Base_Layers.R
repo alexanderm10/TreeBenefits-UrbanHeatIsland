@@ -340,7 +340,7 @@ saveBare$start()
 # 
 # 
 # 
-# savetempYrMedian <- ee_image_to_asset(tempYrMedian, description="save_250km_median_LST", assetId=file.path(assetHome, "landsat8_medianLST_250km"), maxPixels = 10e12, scale=231.656, region = maskBBox, crs="SR-ORG:6974", crsTransform=projTransform, overwrite=T)
+# savetempYrMedian <- ee_image_to_asset(tempYrMedian, description="save_250km_median_LST", assetId=file.path(assetHome, "landsat8_medianLST_250km"), maxPixels = 10e12, scale=231.6564, region = maskBBox, crs="SR-ORG:6974", crsTransform=projTransform, overwrite=T)
 # savetempYrMedian$start()
 # #---------------------
 # # Trying to mosaic tiles from a single date into one layer

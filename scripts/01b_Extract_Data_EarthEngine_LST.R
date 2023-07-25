@@ -6,9 +6,10 @@
 library(rgee); library(raster); library(terra)
 ee_check() # For some reason, it's important to run this before initializing right now
 rgee::ee_Initialize(user = 'malexander@anl.gov', drive=T, project="nbs2023-malexander")
-user.google <- dir("~/Library/CloudStorage/")
-path.google <- file.path("~/Library/CloudStorage", user.google, "My Drive")
-GoogleFolderSave <- "UHI_Analysis_Output_Final_v2"
+path.google <- file.path("G:/My Drive/northstar2023/")
+GoogleFolderSave <- "lst"
+assetHome <- ee_get_assethome() # checking to see where in GEE things are saving for this project.
+assetHome
 
 ##################### 
 # 0. Set up some choices for data quality thresholds
@@ -100,15 +101,18 @@ addNDVI <- function(img){
 ##################### 
 # 1. Load and select cities
 #####################
-sdei.df <- data.frame(vect("../data_raw/sdei-global-uhi-2013-shp/shp/sdei-global-uhi-2013.shp"))
-sdei.df <- sdei.df[sdei.df$ES00POP>=100e3 & sdei.df$SQKM_FINAL>=1e2,]
+sdei.df <- data.frame(vect("input_data/sdei-global-uhi-2013-shp/shp/sdei-global-uhi-2013.shp"))
+# Subsetting the data to be just the US cities
+sdei.df2 <- sdei.df[sdei.df$ISO3=="USA",]
+sdei.df <- sdei.df2[sdei.df2$ES00POP>=50e3 & sdei.df2$SQKM_FINAL>=1e2,]
+
 cityIdAll <- sdei.df$ISOURBID
 
 sdei <- ee$FeatureCollection('users/crollinson/sdei-global-uhi-2013');
 # print(sdei.first())
 
 # Right now, just set all cities with >100k people in the metro area and at least 100 sq km in size
-citiesUse <- sdei$filter(ee$Filter$gte('ES00POP', 100e3))$filter(ee$Filter$gte('SQKM_FINAL', 1e2)) 
+citiesUse <- sdei$filter(ee$Filter$gte('ES00POP', 50e3))$filter(ee$Filter$gte('SQKM_FINAL', 1e2)) 
 # ee_print(citiesUse) # Thsi function gets the summary stats; this gives us 2,682 cities
 
 # Use map to go ahead and create the buffer around everything
@@ -159,7 +163,9 @@ ndviVis = list(
 # -----------
 # Vegetation mask for projection info
 # -----------
-vegMask <- ee$Image('users/crollinson/MOD44b_250m_native_Percent_Tree_Cover')
+# vegMask <- ee$Image('users/crollinson/MOD44b_250m_native_Percent_Tree_Cover')
+vegMask <- ee$Image(file.path(assetHome,"MOD44b_250m_native_Percent_Tree_Cover"))
+
 # vegMask <- ee$Image('users/crollinson/MERIT-DEM-v1_250m_Reproj')
 ee_print(vegMask)
 
