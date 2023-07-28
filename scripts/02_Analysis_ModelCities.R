@@ -8,10 +8,10 @@ overwrite=F
 # path.cities <- "../data_processed/data_cities_all"
 # user.google <- dir("~/Library/CloudStorage/")
 path.google <- file.path("G:/My Drive/northstar2023/")
-path.cities <- file.path("G:/My Drive/northstar2023/processed_cities/")
+path.cities <- file.path("U:/projects/NorthStar2023/processed_cities")
 
 if(!dir.exists(path.cities)) dir.create(path.cities, recursive=T, showWarnings = F)
-file.cityStatsRegion <- file.path(path.cities, "../city_stats_all.csv")
+file.cityStatsRegion <- file.path(path.google, "/city_stats_all.csv")
 
 # Path to where Earth Engine is saving the spatial extractions
 path.EEout <- file.path(path.google)
