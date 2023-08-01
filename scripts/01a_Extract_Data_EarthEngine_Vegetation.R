@@ -3,9 +3,11 @@
 library(rgee); library(raster); library(terra)
 ee_check() # For some reason, it's important to run this before initializing right now
 rgee::ee_Initialize(user = 'crollinson@mortonarb.org', drive=T)
-user.google <- dir("~/Library/CloudStorage/")
-path.google <- file.path("~/Library/CloudStorage", user.google, "My Drive")
-GoogleFolderSave <- "UHI_Analysis_Output_Final_v2"
+# user.google <- dir("~/Library/CloudStorage/")
+path.google <- file.path("U:/projects/NorthStar2023/1km_modis/")
+GoogleFolderSave <- "vegetation"
+
+
 
 ##################### 
 # 0. Set up some choices for data quality thresholds
@@ -21,14 +23,14 @@ overwrite=F
 # 1. Load and select cities
 #####################
 sdei.df <- data.frame(vect("../data_raw/sdei-global-uhi-2013-shp/shp/sdei-global-uhi-2013.shp"))
-sdei.df <- sdei.df[sdei.df$ES00POP>=100e3 & sdei.df$SQKM_FINAL>=1e2,]
+sdei.df <- sdei.df[sdei.df$ES00POP>=50e3 & sdei.df$SQKM_FINAL>=1e2,]
 cityIDsAll <- sdei.df$ISOURBID
 
 sdei <- ee$FeatureCollection('users/crollinson/sdei-global-uhi-2013');
 # print(sdei.first())
 
 # Right now, just set all cities with >100k people in the metro area and at least 100 sq km in size
-citiesUse <- sdei$filter(ee$Filter$gte('ES00POP', 100e3))$filter(ee$Filter$gte('SQKM_FINAL', 1e2)) 
+citiesUse <- sdei$filter(ee$Filter$gte('ES00POP', 50e3))$filter(ee$Filter$gte('SQKM_FINAL', 1e2)) 
 # ee_print(citiesUse) # Thsi function gets the summary stats; this gives us 2,682 cities
 
 # Use map to go ahead and create the buffer around everything
@@ -46,9 +48,9 @@ vizTree <- list(
   palette=c('bbe029', '0a9501', '074b03')
 );
 
-modTree <- ee$Image('users/crollinson/MOD44b_1km_Reproj_Percent_Tree_Cover')
-modVeg <- ee$Image('users/crollinson/MOD44b_1km_Reproj_Percent_NonTree_Vegetation')
-modBare <- ee$Image('users/crollinson/MOD44b_1km_Reproj_Percent_NonVegetated')
+modTree <- ee$Image('users/malexander/root/MOD44b_1km_Reproj_Percent_Tree_Cover')
+modVeg <- ee$Image('users/malexander/root/MOD44b_1km_Reproj_Percent_NonTree_Vegetation')
+modBare <- ee$Image('users/malexander/root/MOD44b_1km_Reproj_Percent_NonVegetated')
 
 ee_print(modTree)
 # Map$addLayer(modTree$select("YR2020"), vizTree, "Tree Cover: 1km, Reproj")
