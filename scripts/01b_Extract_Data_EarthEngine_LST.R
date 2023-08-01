@@ -5,10 +5,12 @@
 
 library(rgee); library(raster); library(terra)
 ee_check() # For some reason, it's important to run this before initializing right now
-rgee::ee_Initialize(user = 'crollinson@mortonarb.org', drive=T)
-user.google <- dir("~/Library/CloudStorage/")
-path.google <- file.path("~/Library/CloudStorage", user.google, "My Drive")
-GoogleFolderSave <- "UHI_Analysis_Output_Final_v2"
+rgee::ee_Initialize(user = 'malexander@anl.gov', drive=T, project="nbs2023-malexander")
+# user.google <- dir("~/Library/CloudStorage/")
+path.google <- file.path("G:/My Drive/northstar2023/1km_modis")
+GoogleFolderSave <- "lst"
+
+assetHome <- ee_get_assethome()
 
 ##################### 
 # 0. Set up some choices for data quality thresholds
@@ -36,15 +38,17 @@ setYear <- function(img){
 ##################### 
 # 1. Load and select cities
 #####################
-sdei.df <- data.frame(vect("../data_raw/sdei-global-uhi-2013-shp/shp/sdei-global-uhi-2013.shp"))
-sdei.df <- sdei.df[sdei.df$ES00POP>=100e3 & sdei.df$SQKM_FINAL>=1e2,]
-cityIdAll <- sdei.df$ISOURBID
+sdei.df <- data.frame(vect("input_data/sdei-global-uhi-2013-shp/shp/sdei-global-uhi-2013.shp"))
+sdei.df2 <- sdei.df[sdei.df$ISO3=="USA",]
+
+sdei.df <- sdei.df2[sdei.df2$ES00POP>=50e3 & sdei.df2$SQKM_FINAL>=1e2,] # changed the filter to be 50K people over 100Sq km
+cityIDsAll <- sdei.df$ISOURBID
 
 sdei <- ee$FeatureCollection('users/crollinson/sdei-global-uhi-2013');
 # print(sdei.first())
 
 # Right now, just set all cities with >100k people in the metro area and at least 100 sq km in size
-citiesUse <- sdei$filter(ee$Filter$gte('ES00POP', 100e3))$filter(ee$Filter$gte('SQKM_FINAL', 1e2)) 
+citiesUse <- sdei$filter(ee$Filter$gte('ES00POP', 50e3))$filter(ee$Filter$gte('SQKM_FINAL', 1e2)) 
 # ee_print(citiesUse) # Thsi function gets the summary stats; this gives us 2,682 cities
 
 # Use map to go ahead and create the buffer around everything
@@ -84,7 +88,7 @@ vizTempK <- list(
 # 2.a - Land Surface Temperature
 # -----------
 # 2.a.1 - Northern Hemisphere: July/August
-JulAugList <- ee_manage_assetlist(path_asset = "users/crollinson/LST_JulAug_Clean/")
+JulAugList <- ee_manage_assetlist(path_asset = "projects/nbs2023-malexander/assets/root/LST_JulAug_Clean/")
 tempJulAug <- ee$ImageCollection(JulAugList$ID)
 tempJulAug <- tempJulAug$map(setYear) # Note: This is needed here otherwise the format is weird and code doesn't work!
 # ee_print(tempJulAug)
@@ -94,9 +98,9 @@ tempJulAug <- tempJulAug$map(setYear) # Note: This is needed here otherwise the 
 # Map$addLayer(tempJulAug$first(), vizTempK, "Jul/Aug Temperature")
 
 # 2.a.2 - Southern Hemisphere: Jan/Feb
-JanFebList <- ee_manage_assetlist(path_asset = "users/crollinson/LST_JanFeb_Clean/")
-tempJanFeb <- ee$ImageCollection(JanFebList$ID);
-tempJanFeb <- tempJanFeb$map(setYear) # Note: This is needed here otherwise the format is weird and code doesn't work!
+# JanFebList <- ee_manage_assetlist(path_asset = "users/crollinson/LST_JanFeb_Clean/")
+# tempJanFeb <- ee$ImageCollection(JanFebList$ID);
+# tempJanFeb <- tempJanFeb$map(setYear) # Note: This is needed here otherwise the format is weird and code doesn't work!
 
 # ee_print(tempJanFeb)
 # Map$addLayer(tempJanFeb$first(), vizTempK, "Jan/Feb Temperature")
