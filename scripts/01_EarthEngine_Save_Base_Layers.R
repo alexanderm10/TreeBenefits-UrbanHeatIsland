@@ -2,9 +2,9 @@
 
 library(rgee); library(raster); library(terra)
 ee_check() # For some reason, it's important to run this before initializing right now
-rgee::ee_Initialize(user = 'crollinson@mortonarb.org', drive=T)
+rgee::ee_Initialize(user = 'malexander@anl.gov', drive=T, project="nbs2023-malexander")
 path.google <- "/Volumes/GoogleDrive/My Drive"
-GoogleFolderSave <- "UHI_Analysis_Output_Final_v2"
+GoogleFolderSave <- "northstar2023"
 assetHome <- ee_get_assethome()
 
 
@@ -309,14 +309,15 @@ for(i in 1:sizeNH-1){
   saveLSTNH$start()
 }
 
-for(i in 1:sizeSH-1){
-  img <- ee$Image(lstSHList$get(i))
-  imgID <- img$id()$getInfo()
-  # ee_print(img)
-  # Map$addLayer(img, vizTempK, "JanFeb Temperature")
-  saveLSTSH <- ee_image_to_asset(img, description=paste0("Save_LST_JanFeb_", imgID), assetId=file.path(assetHome, "LST_JanFeb_Clean", imgID), maxPixels = 10e9, scale=926.6, region = maskBBox, crs="SR-ORG:6974", crsTransform=c(926.625433056, 0, -20015109.354, 0, -926.625433055, 10007554.677), overwrite=T)
-  saveLSTSH$start()
-}
+# Don't need to do the southern hemisphere for the NorthStar2023
+# for(i in 1:sizeSH-1){
+#   img <- ee$Image(lstSHList$get(i))
+#   imgID <- img$id()$getInfo()
+#   # ee_print(img)
+#   # Map$addLayer(img, vizTempK, "JanFeb Temperature")
+#   saveLSTSH <- ee_image_to_asset(img, description=paste0("Save_LST_JanFeb_", imgID), assetId=file.path(assetHome, "LST_JanFeb_Clean", imgID), maxPixels = 10e9, scale=926.6, region = maskBBox, crs="SR-ORG:6974", crsTransform=c(926.625433056, 0, -20015109.354, 0, -926.625433055, 10007554.677), overwrite=T)
+#   saveLSTSH$start()
+# }
 
 # for (var i = 0; i < size; i++) {
 #   var img = ee.Image(listOfImage.get(i));
