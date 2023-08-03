@@ -6,15 +6,16 @@ overwrite=F
 
 # file paths for where to put the processed data
 # path.cities <- "../data_processed/data_cities_all"
-user.google <- dir("~/Library/CloudStorage/")
-path.google <- file.path("~/Library/CloudStorage", user.google)
-path.cities <- file.path(path.google, "Shared drives", "Urban Ecological Drought/Trees-UHI Manuscript/Analysis_v2/data_processed_final")
+# user.google <- dir("~/Library/CloudStorage/")
+path.google <- file.path("G:/My Drive/northstar2023/1km_modis")
+path.cities <- file.path("C:/Users/malexander/Documents/r_files/northstar2023/1km_modis/processed_cities")
+path.save <- file.path("C:/Users/malexander/Documents/r_files/northstar2023/1km_modis/processed_cities")
 
 if(!dir.exists(path.cities)) dir.create(path.cities, recursive=T, showWarnings = F)
-file.cityStatsRegion <- file.path(path.cities, "../city_stats_all.csv")
+file.cityStatsRegion <- file.path(path.cities, "city_stats_all.csv")
 
 # Path to where Earth Engine is saving the spatial extractions
-path.EEout <- file.path(path.google, "My Drive", "UHI_Analysis_Output_Final_v2")
+path.EEout <- file.path(path.google)
 
 # Some color palettes for later
 grad.temp <- c("#2c7bb6", "#abd9e9", "#ffffbf", "#fdae61", "#d7191c")
@@ -28,13 +29,13 @@ grad.bare <- c("#5e3c99", "#b2abd2", "#f7f7f7", "#fbd863", "#e66101") # Ends wit
 # Lets add the ecoregion for each city; accessed 27 Oct 2022 9:30 a.m.
 # SDEI shapefile: https://sedac.ciesin.columbia.edu/data/set/sdei-global-uhi-2013/data-download# # NOTE: REQUIRES LOGIN
 # ecoregion file: https://www.worldwildlife.org/publications/terrestrial-ecoregions-of-the-world
-sdei.urb <- read_sf("../data_raw/sdei-global-uhi-2013-shp/shp/sdei-global-uhi-2013.shp")
-sdei.urb <- sdei.urb[sdei.urb$ES00POP>100e3 & sdei.urb$SQKM_FINAL>100,]
+sdei.urb <- read_sf("input_data/sdei-global-uhi-2013-shp/shp/sdei-global-uhi-2013.shp")
+sdei.urb <- sdei.urb[sdei.urb$ES00POP>50e3 & sdei.urb$SQKM_FINAL>100 & sdei.urb$ISO3=="USA",]
 summary(sdei.urb)
 # plot(sdei.urb[1,])
 
 # ecoregions <- read_sf("../data_raw/wwf_biomes_official/wwf_terr_ecos.shp")
-ecoregions <- read_sf("../data_raw/wwf_biomes_official/wwf_terr_ecos.shp")
+ecoregions <- read_sf("input_data/wwf_ecoregions/wwf_terr_ecos.shp")
 ecoregions$biome.name <- car::recode(ecoregions$BIOME, "'1'='tropical moist broadleaf forest'; 
                                                              '2'='tropical dry broadleaf forest'; 
                                                              '3'='tropical coniferous forest';
@@ -100,11 +101,11 @@ summary(cityStatsRegion); dim(cityStatsRegion)
 
 # Get a list of the files that are done
 # # Note: Some cities (2-3) seems to have >1 file, which is weird.  Can do a spot check or just roll with the last file like I think I have coded in
-files.elev <- dir(path.EEout, "elevation")
-files.lst <- dir(path.EEout, "LST_Day_Tmean")
-files.tree <- dir(path.EEout, "PercentTree")
-files.veg <- dir(path.EEout, "PercentOtherVeg")
-files.mask <- dir(path.EEout, "CityMask")
+files.elev <- dir(file.path(path.EEout, "elevation"), "elevation")
+files.lst <- dir(file.path(path.EEout, "lst"), "LST_Day_Tmean")
+files.tree <- dir(file.path(path.EEout, "vegetation"), "PercentTree")
+files.veg <- dir(file.path(path.EEout, "vegetation"), "PercentOtherVeg")
+files.mask <- dir(file.path(path.EEout, "city_bounds"), "CityMask")
 length(files.elev); length(files.lst); length(files.tree); length(files.veg); length(files.mask)
 
 # Figure out which cities have all the layers needed ot be analyzed
@@ -124,6 +125,9 @@ length(citiesDone)
 citiesAnalyze <- citiesDone[citiesDone %in% cityStatsRegion$ISOURBID[is.na(cityStatsRegion$model.R2adj)]]
 length(citiesAnalyze)
 
+##############
+# Start Big loop----
+##############
 for(CITY in citiesAnalyze){
   # # Good Test Cities: Sydney (AUS66430)
   # CITY="AUS66430"; CITY="USA26687"
@@ -171,11 +175,11 @@ for(CITY in citiesAnalyze){
   fVEG <- files.veg[grep(CITY, files.veg)]
   
   # The length statements will grab the newest file if there's more than one
-  maskCity <- raster(file.path(path.EEout, fMASK[length(fMASK)]))
-  elevCity <- raster(file.path(path.EEout, fELEV[length(fELEV)]))
-  lstCity <- brick(file.path(path.EEout, fLST[length(fLST)]))-273.15
-  treeCity <- brick(file.path(path.EEout, fTREE[length(fTREE)]))
-  vegCity <- brick(file.path(path.EEout, fVEG[length(fVEG)]))
+  maskCity <- raster(file.path(path.EEout,"city_bounds", fMASK[length(fMASK)]))
+  elevCity <- raster(file.path(path.EEout,"elevation", fELEV[length(fELEV)]))
+  lstCity <- brick(file.path(path.EEout,"lst", fLST[length(fLST)]))-273.15
+  treeCity <- brick(file.path(path.EEout,"vegetation", fTREE[length(fTREE)]))
+  vegCity <- brick(file.path(path.EEout,"vegetation", fVEG[length(fVEG)]))
   
   # par(mfrow=c(1,2))
   # plot(elevCity); plot(maskCity)

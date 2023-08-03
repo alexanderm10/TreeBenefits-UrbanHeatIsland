@@ -1,18 +1,18 @@
 # Script to synthesize the results from all of the individual city models ----
-library(ggplot2); library(RColorBrewer); library(cowplot)
+library(ggplot2); library(RColorBrewer); library(cowplot); library(sp)
 # path.figs <- "../figures/v6_vegonly"
 
 
 ###########################################
 # Establish file paths etc ----
 ###########################################
-user.google <- dir("~/Library/CloudStorage/")
-path.google <- file.path("~/Library/CloudStorage", user.google, "Shared drives", "Urban Ecological Drought/Trees-UHI Manuscript/Analysis_v2")
-path.cities <- file.path(path.google)
+path.google <- file.path("G:/My Drive/northstar2023/1km_modis")
+path.cities <- file.path("C:/Users/malexander/Documents/r_files/northstar2023/1km_modis/processed_cities")
+path.save <- file.path("C:/Users/malexander/Documents/r_files/northstar2023/1km_modis/")
 
 file.cityAll.stats <- file.path(path.cities, "city_stats_all.csv")
 
-path.figs <- file.path(path.google, "figures_exploratory")
+path.figs <- file.path(path.save, "figures_exploratory")
 dir.create(path.figs, recursive=T, showWarnings=F)
 
 
@@ -32,7 +32,8 @@ biome.pall.all = c("Taiga"= "#2c5c74",
                    "Mangroves" = "#9c8c94")
 
 world <- map_data("world")
-# ##########################################
+us.map <- world[world$region=="USA",]
+us.map.sp <- sf::st_as_sf(us.map)
 
 
 # ##########################################
@@ -93,7 +94,7 @@ biome.hist <- ggplot(data=cityAll.stats[!is.na(cityAll.stats$biome),]) +
         plot.margin = margin(1, 2, 0.5, 1, "lines"))
 
 biome.map <- ggplot(data=cityAll.stats[!is.na(cityAll.stats$biome),]) +
-  coord_equal(expand=0, ylim=c(-65,80)) +
+  coord_equal(expand=0, ylim=c(15,80), xlim=c(-180, -50)) +
   geom_polygon(data=world, aes(x=long, y=lat, group=group), fill="gray50") +
   geom_point(aes(x=LONGITUDE, y=LATITUDE, color=biomeName), size=0.5) +
   scale_color_manual(name="biome", values=biome.pall.all) +
@@ -116,7 +117,51 @@ png(file.path(path.figs, "CityDistribution_Biomes.png"), height=8, width=8, unit
 plot_grid(biome.map, biome.hist, ncol=1, rel_heights = c(0.45, 0.55))
 dev.off()
 # ##########################################
+# ##########################################
+# ASSIGNING STATES----
 
+usa.assign <- geojsonio::geojson_read(
+  "http://eric.clst.org/assets/wiki/uploads/Stuff/gz_2010_us_040_00_500k.json", 
+  what = "sp"
+)
+
+head(cityAll.stats)
+cityAll.stats$state <- NA
+cityAll.stats$fema.region <- NA
+
+for (i in 1:nrow(cityAll.stats)) {
+  coords <- c(cityAll.stats$LONGITUDE[i], cityAll.stats$LATITUDE[i])
+  if(any(is.na(coords))) next
+  point <- sp::SpatialPoints(
+    matrix(
+      coords,
+      nrow = 1
+    )
+  )
+  sp::proj4string(point) <- sp::proj4string(usa.assign)
+  polygon_check <- sp::over(point, usa.assign)
+  cityAll.stats$state[i] <- as.character(polygon_check$NAME)
+}
+
+head(cityAll.stats)
+
+
+# Loading in FEMA-state crosswalk
+fema.dat <- read.csv("U:/r_files/fema_state_crosswalk.csv", header=T)
+head(fema.dat)
+
+# missing Virginia Beach and Corpus Christi states
+cityAll.stats[cityAll.stats$NAME=="Virginia Beach", "state" ] <- "Virginia"
+cityAll.stats[cityAll.stats$NAME=="Corpus Christi", "state" ] <- "Texas"
+
+cityAll.stats$state.abb <- as.factor(fema.dat$STATE[match(cityAll.stats$state, fema.dat$state.long)])
+cityAll.stats$fema.region <- as.factor(fema.dat$fema.region[match(cityAll.stats$state, fema.dat$state.long)])
+
+head(cityAll.stats)
+summary(cityAll.stats)
+
+cityAll.stats$fema.region <- factor(cityAll.stats$fema.region, levels = c("region1", "region2", "region3", "region4", "region5", "region6",
+                                                                          "region7", "region8", "region9", "region10"))
 
 # ##########################################
 # Exploratory of raw output ----
@@ -140,9 +185,9 @@ anova(mod.r2.biome)
 summary(mod.r2.biome)
 
 r2.map <- ggplot(data=cityAll.stats[!is.na(cityAll.stats$biome),]) +
-  coord_equal(expand=0, ylim=c(-65,80)) +
+  coord_equal(expand=0, ylim=c(15,80), xlim=c(-180, -50)) +
   geom_polygon(data=world, aes(x=long, y=lat, group=group), fill="gray50") +
-  geom_point(aes(x=LONGITUDE, y=LATITUDE, color=model.R2adj), size=0.5) +
+  geom_point(aes(x=LONGITUDE, y=LATITUDE, color=model.R2adj), size=0.95) +
   # scale_color_manual(name="Tree Effect\n(deg. C / % cover)", values=colors.cut) +
   # scale_color_gradient2(name="Tree Effect\n(deg. C / % cover)", low = "dodgerblue2", high = "red3", mid = "white", midpoint =0) +
   theme_bw() +
@@ -177,6 +222,21 @@ png(file.path(path.figs, "ModelFit_R2adj_histogram.png"), height=8, width=8, uni
 plot_grid(r2.map, r2.histo.biome, ncol=1, rel_heights = c(0.6, 0.4))
 dev.off()
 
+r2.histo.fema <- ggplot(data=cityAll.stats[!is.na(cityAll.stats$biome),])+ facet_wrap(fema.region~.) +
+  geom_histogram(aes(x=model.R2adj, fill=biomeName)) +
+  scale_fill_manual(name="biome", values=biome.pall.all) +
+  theme_bw() +
+  theme(legend.position="right",
+        legend.title=element_text(color="black", face="bold"),
+        legend.text=element_text(size=rel(0.8), color="black"),
+        legend.background=element_blank(),
+        panel.background = element_rect(fill="NA"),
+        panel.grid = element_blank())
+
+
+png(file.path(path.figs, "ModelFit_R2adj_histogram_femaRegions.png"), height=8, width=8, units="in", res=220)
+plot_grid(r2.histo.fema)
+dev.off()
 # ##########################
 
 hist(cityAll.stats$model.elev.slope)
@@ -192,9 +252,9 @@ colors.cut <- c("#084594", "#2171b5", "#4292c6", "#6baed6", "#9ecae1", "#c6dbef"
 
 
 cooling.map <- ggplot(data=cityAll.stats[!is.na(cityAll.stats$biome),]) +
-  coord_equal(expand=0, ylim=c(-65,80)) +
+  coord_equal(expand=0, ylim=c(15,80), xlim=c(-180, -50)) +
   geom_polygon(data=world, aes(x=long, y=lat, group=group), fill="gray50") +
-  geom_point(aes(x=LONGITUDE, y=LATITUDE, color=tree.slope.cut), size=0.5) +
+  geom_point(aes(x=LONGITUDE, y=LATITUDE, color=tree.slope.cut), size=0.65) +
   scale_color_manual(name="Tree Effect\n(deg. C / % cover)", values=colors.cut) +
   # scale_color_gradient2(name="Tree Effect\n(deg. C / % cover)", low = "dodgerblue2", high = "red3", mid = "white", midpoint =0) +
   theme_bw() +
@@ -209,13 +269,13 @@ cooling.map <- ggplot(data=cityAll.stats[!is.na(cityAll.stats$biome),]) +
         axis.title=element_blank(),
         plot.margin=margin(0,0.5,0,1, "lines"))
 
-TreeCoolingLat <- ggplot(data=cityAll.stats,) +
-  coord_flip(xlim=c(-65,80)) +
+TreeCoolingLon <- ggplot(data=cityAll.stats,) +
+  coord_cartesian(xlim=c(-180, -50)) +
   # coord_cartesian(, ylim=c(-65,80))
   # geom_point(aes(x=LATITUDE, y=exp(model.tree.slope), color=biomeName)) +
   geom_hline(yintercept=0, linetype="dashed") +
   # geom_vline(xintercept=0, linetype="dashed", size=0.5, color="red") +
-  stat_smooth(aes(x=LATITUDE, y=model.tree.slope), color="black") +
+  stat_smooth(aes(x=LONGITUDE, y=model.tree.slope), color="black") +
   scale_color_manual(values=biome.pall.all[]) +
   scale_fill_manual(values=biome.pall.all[]) +
   labs(y="Tree Effect\n(deg C / % cover)", x="Latitude") +
@@ -226,16 +286,16 @@ TreeCoolingLat <- ggplot(data=cityAll.stats,) +
         panel.grid=element_blank(),
         axis.text=element_text(color="black"),
         axis.title=element_text(color="black", face="bold"),
-        plot.margin=margin(8,1, 1.5, 0.5, "lines"))
+        plot.margin=margin(0,3.8,0,0.895, "lines"))
 
 
 
-png(file.path(path.figs, "TreeCooling_PercentEffect_LatitudeCombo.png"), height=6, width=12, units="in", res=220)
-plot_grid(cooling.map, TreeCoolingLat, nrow=1, rel_widths = c(0.8, 0.2))
+png(file.path(path.figs, "TreeCooling_PercentEffect_LatitudeCombo.png"), height=6, width=6, units="in", res=220)
+plot_grid(cooling.map, TreeCoolingLon, nrow=2, rel_widths = c(0.8, 0.2))
 dev.off()
 
 ggplot(data=cityAll.stats,) +
-  coord_flip(xlim=c(-65,80)) +
+  coord_flip(xlim=c(0,80)) +
   # coord_cartesian(, ylim=c(-65,80))
   geom_histogram(aes(x=LATITUDE)) +
   geom_hline(yintercept=0, linetype="dashed") +
@@ -256,7 +316,7 @@ ggplot(data=cityAll.stats,) +
 
 # TreeSlope.breaks <- c(-1, -0.5, -0.25, -0.1, -0.05, -0.025, 0, 0.025, 0.5)
 # TreeCoolingBiomeHist <- 
-ggplot(data=cityAll.stats[!is.na(cityAll.stats$biome),]) +
+ggplot(data=cityAll.stats[!is.na(cityAll.stats$biome),]) + facet_wrap(fema.region~.) +
   # geom_histogram(aes(x=model.tree.slope, fill=biomeName)) +
   geom_bar(aes(x=tree.slope.cut, fill=biomeName), stat="count") +
   geom_vline(xintercept=7.5, linetype="dashed") +
@@ -279,7 +339,7 @@ cityAll.stats$model.veg.slope2 <- cityAll.stats$model.veg.slope
 cityAll.stats$model.veg.slope2[cityAll.stats$model.veg.slope2 < -1] <- -1
 cityAll.stats$model.veg.slope2[cityAll.stats$model.veg.slope2 >0.25] <- 0.25
 
-TreeEffectBiomeHisto <- ggplot(data=cityAll.stats[!is.na(cityAll.stats$biome),]) +
+TreeEffectBiomeHisto <- ggplot(data=cityAll.stats[!is.na(cityAll.stats$biome),]) + facet_wrap(fema.region~.) +
   geom_histogram(aes(x=model.tree.slope2, fill=biomeName), breaks=seq(-1.1,0.3, by=0.05)) +
   geom_vline(xintercept=0,linetype="dashed") +
   # geom_bar(aes(x=tree.slope.cut, fill=biomeName), stat="count") +
@@ -295,7 +355,7 @@ TreeEffectBiomeHisto <- ggplot(data=cityAll.stats[!is.na(cityAll.stats$biome),])
         axis.text=element_text(color="black"),
         axis.title=element_text(color="black", face="bold"))
 
-VegEffectBiomeHisto <- ggplot(data=cityAll.stats[!is.na(cityAll.stats$biome),]) +
+VegEffectBiomeHisto <- ggplot(data=cityAll.stats[!is.na(cityAll.stats$biome),]) + facet_wrap(fema.region~.) +
   geom_histogram(aes(x=model.veg.slope2, fill=biomeName), breaks=seq(-1.1,0.3, by=0.05)) +
   geom_vline(xintercept=0,linetype="dashed") +
   # geom_bar(aes(x=tree.slope.cut, fill=biomeName), stat="count") +
@@ -625,8 +685,8 @@ grad.other <- c("#d01c8b", "#f1b6da", "#f7f7f7", "#b8e186", "#4dac26") # ends wi
 summary(cityAll.stats[,c("trend.LST.slope", "trend.tree.slope", "trend.veg.slope")])
 
 trendLST.map <- ggplot(data=cityAll.stats[!is.na(cityAll.stats$biome),]) +
-  coord_equal(expand=0, ylim=c(-65,80)) +
-  geom_polygon(data=world, aes(x=long, y=lat, group=group), fill="gray50") +
+  coord_equal(expand=0, ylim=c(15,80), xlim=c(-180, -50)) +
+  geom_polygon(data=us.map, aes(x=long, y=lat, group=group), fill="gray50") +
   geom_point(aes(x=LONGITUDE, y=LATITUDE, color=trend.LST.slope), size=0.5) +
   scale_color_gradientn(name="LST Trend\n(deg. C / yr)", colors=grad.lst, limits=c(-0.32, 0.32)) +
   theme_bw() +
@@ -642,8 +702,8 @@ trendLST.map <- ggplot(data=cityAll.stats[!is.na(cityAll.stats$biome),]) +
         plot.margin=margin(0,0.5,0,1, "lines"))
 
 trendTree.map <- ggplot(data=cityAll.stats[!is.na(cityAll.stats$biome),]) +
-  coord_equal(expand=0, ylim=c(-65,80)) +
-  geom_polygon(data=world, aes(x=long, y=lat, group=group), fill="gray50") +
+  coord_equal(expand=0, ylim=c(15,80), xlim=c(-180, -50)) +
+  geom_polygon(data=us.map, aes(x=long, y=lat, group=group), fill="gray50") +
   geom_point(aes(x=LONGITUDE, y=LATITUDE, color=trend.tree.slope), size=0.5) +
   scale_color_gradientn(name="Tree Trend\n(% cover / yr)", colors=grad.tree, limits=c(-1,1)) +
   theme_bw() +
@@ -659,8 +719,8 @@ trendTree.map <- ggplot(data=cityAll.stats[!is.na(cityAll.stats$biome),]) +
         plot.margin=margin(0,0.5,0,1, "lines"))
 
 trendVeg.map <- ggplot(data=cityAll.stats[!is.na(cityAll.stats$biome),]) +
-  coord_equal(expand=0, ylim=c(-65,80)) +
-  geom_polygon(data=world, aes(x=long, y=lat, group=group), fill="gray50") +
+  coord_equal(expand=0, ylim=c(-65,80),) +
+  geom_polygon(data=us.map, aes(x=long, y=lat, group=group), fill="gray50") +
   geom_point(aes(x=LONGITUDE, y=LATITUDE, color=trend.tree.slope), size=0.5) +
   scale_color_gradientn(name="Veg Trend\n(% cover / yr)", colors=grad.other, limits=c(-1.8,1.8)) +
   theme_bw() +
