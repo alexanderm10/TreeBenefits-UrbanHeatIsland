@@ -5,18 +5,18 @@ library(ggplot2); library(RColorBrewer); library(cowplot)
 ###########################################
 # Establish file paths etc ----
 ###########################################
-user.google <- dir("~/Library/CloudStorage/")
-path.google <- file.path("~/Library/CloudStorage", user.google, "Shared drives", "Urban Ecological Drought/Trees-UHI Manuscript/Analysis_v2")
-path.cities <- file.path(path.google, "data_processed_final")
+path.google <- file.path("G:/My Drive/northstar2023/1km_modis")
+path.cities <- file.path("C:/Users/malexander/Documents/r_files/northstar2023/1km_modis/processed_cities")
+path.save <- file.path("C:/Users/malexander/Documents/r_files/northstar2023/1km_modis/")
 
-path.figs <- file.path(path.google, "figures_exploratory")
+path.figs <- file.path(path.cities, "figures_exploratory")
 dir.create(path.figs, recursive=T, showWarnings=F)
 ###########################################
 
 ###########################################
 # Work with the cityAll.stats file to start re-building the core vs. buffer stats
 ###########################################
-cityAll.stats <- read.csv(file.path(path.cities, "..", "city_stats_all.csv"))
+cityAll.stats <- read.csv(file.path(path.cities, "city_stats_all2.csv"))
 head(cityAll.stats)
 
 # Chicago: USA26687; Vancouver: CAN16375; Berlin: DEU10109; Atlanta: USA40447; Sydney: AUS66430; Santiago (Chile): CHL66311; Cairo (AlQahirah): EGY44702; Beijing: CHN31890; Johannesburg (South Africa): ZAF64524; Rio de Janeiro: BRA63739
@@ -152,6 +152,7 @@ for(i in 1:nrow(cityAll.stats)){
   # CityBuff.stats[row.urbid,]
 
 }
+
 
 write.csv(CityBuff.stats, file.path(path.cities, "city_stats_core-buffer.csv"), row.names=F)
 

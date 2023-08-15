@@ -4,9 +4,9 @@ library(ggplot2); library(RColorBrewer); library(cowplot)
 ###########################################
 # Establish file paths etc ----
 ###########################################
-user.google <- dir("~/Library/CloudStorage/")
-path.google <- file.path("~/Library/CloudStorage", user.google, "Shared drives", "Urban Ecological Drought/Trees-UHI Manuscript/Analysis_v2")
-path.cities <- file.path(path.google, "data_processed_final")
+path.google <- file.path("G:/My Drive/northstar2023/1km_modis")
+path.cities <- file.path("C:/Users/malexander/Documents/r_files/northstar2023/1km_modis/processed_cities")
+path.save <- file.path("C:/Users/malexander/Documents/r_files/northstar2023/1km_modis/")
 
 path.figs <- file.path(path.google, "figures_exploratory")
 dir.create(path.figs, recursive=T, showWarnings=F)
@@ -39,7 +39,7 @@ world <- map_data("world")
 # Read in base datasets ----
 # ##########################################
 # Regional Sumary Stuff ----
-cityAll.stats <- read.csv(file.path(path.cities, "..", "city_stats_all.csv"))
+cityAll.stats <- read.csv(file.path(path.cities, "city_stats_all2.csv"))
 summary(cityAll.stats[!is.na(cityAll.stats$model.R2adj),])
 
 cityAll.stats$biome <- gsub("flodded", "flooded", cityAll.stats$biome) # Whoops, had a typo!  Not going to reprocess now.
@@ -64,7 +64,11 @@ cityAll.stats$biomeName <- car::recode(cityAll.stats$biome,
 biome.order <- aggregate(LST.mean ~ biomeName, data=cityAll.stats, FUN=mean)
 biome.order <- biome.order[order(biome.order$LST.mean),]
 
+fema.order <- aggregate(LST.mean ~ fema.region, data=cityAll.stats, FUN=mean)
+fema.order <- fema.order[order(fema.order$LST.mean),]
+
 cityAll.stats$biomeName <- factor(cityAll.stats$biomeName, levels=biome.order$biomeName)
+cityAll.stats$fema.region <- factor(cityAll.stats$fema.region, levels=fema.order$fema.region)
 # ##########################################
 
 
@@ -83,7 +87,7 @@ head(valMean2)
 valMean[,names(valMean2)[2:4]] <- valMean2[,2:4]
 
 # Merge in metadata
-valMean <- merge(valMean, cityAll.stats[,c("ISOURBID", "NAME",  "LATITUDE", "LONGITUDE", "ES00POP", "biomeName", "model.tree.slope", "model.veg.slope")], all=T)
+valMean <- merge(valMean, cityAll.stats[,c("ISOURBID", "NAME",  "LATITUDE", "LONGITUDE", "ES00POP", "biomeName", "model.tree.slope", "model.veg.slope", "fema.region")], all=T)
 summary(valMean)
 
 # Looking at the difference in tree cover between the metro core & buffer

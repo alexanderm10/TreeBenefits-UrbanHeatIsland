@@ -4,11 +4,11 @@ library(ggplot2); library(RColorBrewer); library(cowplot)
 ###########################################
 # Establish file paths etc ----
 ###########################################
-user.google <- dir("~/Library/CloudStorage/")
-path.google <- file.path("~/Library/CloudStorage", user.google, "Shared drives", "Urban Ecological Drought/Trees-UHI Manuscript/Analysis_v2")
-path.cities <- file.path(path.google, "data_processed_final")
+path.google <- file.path("G:/My Drive/northstar2023/1km_modis")
+path.cities <- file.path("C:/Users/malexander/Documents/r_files/northstar2023/1km_modis/processed_cities")
+path.save <- file.path("C:/Users/malexander/Documents/r_files/northstar2023/1km_modis/")
 
-path.figs <- file.path(path.google, "figures_exploratory")
+path.figs <- file.path(path.save, "figures_exploratory")
 dir.create(path.figs, recursive=T, showWarnings=F)
 
 grad.lst <- c("#2c7bb6", "#abd9e9", "#f7f7f7", "#fdae61", "#d7191c") # ends with red
@@ -39,7 +39,7 @@ world <- map_data("world")
 # Read in base datasets ----
 # ##########################################
 # Regional Sumary Stuff ----
-cityAll.stats <- read.csv(file.path(path.cities, "..", "city_stats_all.csv"))
+cityAll.stats <- read.csv(file.path(path.cities, "city_stats_all2.csv"))
 summary(cityAll.stats[!is.na(cityAll.stats$model.R2adj),])
 
 cityAll.stats$biome <- gsub("flodded", "flooded", cityAll.stats$biome) # Whoops, had a typo!  Not going to reprocess now.
@@ -76,7 +76,11 @@ summary(as.factor(cityAll.stats$biomeVeg))
 biome.order <- aggregate(LST.mean ~ biomeName, data=cityAll.stats, FUN=mean)
 biome.order <- biome.order[order(biome.order$LST.mean),]
 
+fema.order <- aggregate(LST.mean ~ fema.region, data=cityAll.stats, FUN=mean)
+fema.order <- fema.order[order(fema.order$LST.mean),]
+
 cityAll.stats$biomeName <- factor(cityAll.stats$biomeName, levels=biome.order$biomeName)
+cityAll.stats$fema.region <- factor(cityAll.stats$fema.region, levels=fema.order$fema.region)
 # ##########################################
 
 
@@ -84,24 +88,34 @@ cityAll.stats$biomeName <- factor(cityAll.stats$biomeName, levels=biome.order$bi
 # ##########################################
 # Exploring Core vs. Buffer data -----
 # ##########################################
+# (core - buffer)
+# LST differences----
+
 CityBuffStats <- read.csv(file.path(path.cities, "city_stats_core-buffer.csv"))
-CityBuffStats <- merge(CityBuffStats, cityAll.stats[,c("ISOURBID", "NAME",  "LATITUDE", "LONGITUDE", "ES00POP", "biomeName")], all=T)
+CityBuffStats <- merge(CityBuffStats, cityAll.stats[,c("ISOURBID", "NAME",  "LATITUDE", "LONGITUDE", "ES00POP", "biomeName", "fema.region")], all=T)
 summary(CityBuffStats)
 
+# percentage of cities with core warmer than buffer region
 nrow(CityBuffStats[CityBuffStats$factor=="LST" & CityBuffStats$value.mean.diff>0 & CityBuffStats$value.mean.diff.p<0.01,])/ nrow(CityBuffStats[CityBuffStats$factor=="LST",])
 
+# mean and SD of temperature difference between core and buffer region for significant cities
 mean(CityBuffStats$value.mean.diff[CityBuffStats$factor=="LST" & CityBuffStats$value.mean.diff>0 & CityBuffStats$value.mean.diff.p<0.01]); sd(CityBuffStats$value.mean.diff[CityBuffStats$factor=="LST" & CityBuffStats$value.mean.diff>0 & CityBuffStats$value.mean.diff.p<0.01])
 
+# percentage of cities with core warmer than buffer broken out by biome
 summary(CityBuffStats$biomeName[CityBuffStats$factor=="LST" & CityBuffStats$value.mean.diff>0 & CityBuffStats$value.mean.diff.p<0.01])/summary(CityBuffStats$biomeName[CityBuffStats$factor=="LST"])
 
+# Percentage of cities with core warmer than buffer broken out by fema region
+summary(CityBuffStats$fema.region[CityBuffStats$factor=="LST" & CityBuffStats$value.mean.diff>0 & CityBuffStats$value.mean.diff.p<0.01])/summary(CityBuffStats$fema.region[CityBuffStats$factor=="LST"])
 
-
+# mean and SD of LST difference between core and buffer region for all cities
 mean(CityBuffStats$value.mean.diff[CityBuffStats$factor=="LST"]); sd(CityBuffStats$value.mean.diff[CityBuffStats$factor=="LST"])
 
-
+# Looking at rows where LST is greater in the buffer than in the core
 nrow(CityBuffStats[CityBuffStats$factor=="LST" & CityBuffStats$value.mean.diff<0 & CityBuffStats$value.mean.diff.p<0.01,])
+# All in Mediterranean or desert
 nrow(CityBuffStats[CityBuffStats$factor=="LST" & CityBuffStats$value.mean.diff<0 & CityBuffStats$value.mean.diff.p<0.01 & (grepl("Grassland", CityBuffStats$biomeName) | CityBuffStats$biomeName %in% c("Mediterranean", "Desert")),])
 
+# percentage of cities wehre LST is sig. greater in the buffer than in teh core
 nrow(CityBuffStats[CityBuffStats$factor=="LST" & CityBuffStats$value.mean.diff<0 & CityBuffStats$value.mean.diff.p<0.01,])/nrow(CityBuffStats[CityBuffStats$factor=="LST",])
 
 
@@ -109,12 +123,14 @@ summary(CityBuffStats[CityBuffStats$factor=="LST" & CityBuffStats$value.mean.dif
 summary(CityBuffStats$biomeName[CityBuffStats$factor=="LST" & CityBuffStats$value.mean.diff<0 & CityBuffStats$value.mean.diff.p<0.01])
 
 
-# Comparing mean tree cover ----
+# Comparing mean tree cover (core - buffer)----
+# Looking at areas where mean tree cover is greater in the buffer than the metro core
 nrow(CityBuffStats[CityBuffStats$factor=="tree" & CityBuffStats$value.mean.diff<0 & CityBuffStats$value.mean.diff.p<0.01,])/nrow(CityBuffStats[CityBuffStats$factor=="tree",])
 
 nrow(CityBuffStats[CityBuffStats$factor=="tree" & CityBuffStats$value.mean.diff<0 & CityBuffStats$value.mean.diff.p<0.01,])/nrow(CityBuffStats[CityBuffStats$factor=="tree",])
 
-  
+
+# looking at areas where mean tree cover is greater in the core than in the buffer  
 nrow(CityBuffStats[CityBuffStats$factor=="tree" & CityBuffStats$value.mean.diff>0 & CityBuffStats$value.mean.diff.p<0.01,])
 summary(CityBuffStats[CityBuffStats$factor=="tree" & CityBuffStats$value.mean.diff>0 & CityBuffStats$value.mean.diff.p<0.01,])
 
@@ -179,7 +195,7 @@ dev.off()
 png(file.path(path.figs, "MetroCore_Trends_Map_Trees.png"), height=6, width=8, units="in", res=220)
 ggplot(data=CityBuffStats[CityBuffStats$factor=="tree",]) +
   # facet_wrap(~factor, ncol=1) +
-  coord_equal(expand=0, ylim=c(-65,80)) +
+  coord_equal(expand=0, ylim=c(15,80), xlim=c(-180, -50)) +
   geom_polygon(data=world, aes(x=long, y=lat, group=group), fill="gray50") +
   geom_point(aes(x=LONGITUDE, y=LATITUDE, color=trend.mean.core), size=0.5) +
   scale_color_gradientn(name="Metro Core Tree Trend\n(% cover / yr)", colors=grad.tree, limits=c(-0.4,0.4)) +
@@ -235,17 +251,17 @@ dev.off()
 
 
 CityBuffStats[CityBuffStats$factor=="LST" & CityBuffStats$value.mean.diff< -5,]
-# Outliers for city colder than buffer: TKM33404; US City with cooler city: USA21290
+# Outliers for city colder than buffer: TKM33404; US City with cooler city: USA21290; USA27924
 
-CityBuffStats[CityBuffStats$ISOURBID=="TKM33404",]
-CityBuffStats[CityBuffStats$ISOURBID=="USA21290",] # This is Yakima Washington
+CityBuffStats[CityBuffStats$ISOURBID=="USA27924",] # Twin Falls, Idaho
+CityBuffStats[CityBuffStats$ISOURBID=="USA21290",] # This is Yakima, Washington
 
 
 
 
 ggplot(data=CityBuffStats[CityBuffStats$factor=="LST",]) +
   # facet_wrap(~factor, ncol=1) +
-  coord_equal(expand=0, ylim=c(-65,80)) +
+  coord_equal(expand=0, ylim=c(15,80), xlim=c(-180, -50)) +
   geom_polygon(data=world, aes(x=long, y=lat, group=group), fill="gray50") +
   geom_point(aes(x=LONGITUDE, y=LATITUDE, color=trend.mean.diff), size=0.5) +
   scale_color_gradientn(name="Diff LST Trend\n(dec. C / yr)", colors=grad.lst, limits=c(-0.2,0.2)) +
@@ -259,7 +275,7 @@ ggplot(data=CityBuffStats[CityBuffStats$factor=="LST",]) +
 
 ggplot(data=CityBuffStats[CityBuffStats$factor=="tree",]) +
   # facet_wrap(~factor, ncol=1) +
-  coord_equal(expand=0, ylim=c(-65,80)) +
+  coord_equal(expand=0, ylim=c(15,80), xlim=c(-180, -50)) +
   geom_polygon(data=world, aes(x=long, y=lat, group=group), fill="gray50") +
   geom_point(aes(x=LONGITUDE, y=LATITUDE, color=trend.mean.diff), size=0.5) +
   scale_color_gradientn(name="Diff Tree Trend\n(% cover / yr)", colors=grad.tree, limits=c(-0.9,0.9)) +

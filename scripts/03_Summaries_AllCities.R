@@ -33,7 +33,7 @@ biome.pall.all = c("Taiga"= "#2c5c74",
 
 world <- map_data("world")
 us.map <- world[world$region=="USA",]
-us.map.sp <- sf::st_as_sf(us.map)
+# us.map.sp <- sf::st_as_sf(us.map)
 
 
 # ##########################################
@@ -163,6 +163,23 @@ summary(cityAll.stats)
 cityAll.stats$fema.region <- factor(cityAll.stats$fema.region, levels = c("region1", "region2", "region3", "region4", "region5", "region6",
                                                                           "region7", "region8", "region9", "region10"))
 
+# saving to keep state assignments
+write.csv(cityAll.stats, "C:/Users/malexander/Documents/r_files/northstar2023/1km_modis/processed_cities/city_stats_all2.csv", row.names = F)
+#############
+# Assigning colors to FEMA regions
+fema.cols <- c("region1" = "#725cfd",
+               "region2" = "#301fab",
+               "region3" = "#2537d5",
+               "region4" = "#0a6cdf",
+               "region5" = "#85c0f0",
+               "region6" = "#d7d148", 
+               "region7" = "#c8bf0c",
+               "region8" = "#f6d144",
+               "region9" = "#e1b329",
+               "region10" = "#976026")
+
+
+
 # ##########################################
 # Exploratory of raw output ----
 # ##########################################
@@ -183,6 +200,11 @@ hist(cityAll.stats$model.R2adj)
 mod.r2.biome <- lm(model.R2adj ~ biomeName-1, data=cityAll.stats)
 anova(mod.r2.biome)
 summary(mod.r2.biome)
+
+mod.r2.fema <- lm(model.R2adj ~ fema.region-1, data=cityAll.stats)
+anova(mod.r2.fema)
+summary(mod.r2.fema)
+
 
 r2.map <- ggplot(data=cityAll.stats[!is.na(cityAll.stats$biome),]) +
   coord_equal(expand=0, ylim=c(15,80), xlim=c(-180, -50)) +
@@ -217,9 +239,18 @@ r2.histo.biome <- ggplot(data=cityAll.stats[!is.na(cityAll.stats$biome),])+
         panel.background = element_rect(fill="NA"),
         panel.grid = element_blank())
 
-
-png(file.path(path.figs, "ModelFit_R2adj_histogram.png"), height=8, width=8, units="in", res=220)
-plot_grid(r2.map, r2.histo.biome, ncol=1, rel_heights = c(0.6, 0.4))
+r2.histo.fema<- ggplot(data=cityAll.stats[!is.na(cityAll.stats$biome),])+
+  geom_histogram(aes(x=model.R2adj, fill=fema.region)) +
+  scale_fill_manual(name="Fema Region", values=fema.cols) +
+  theme_bw() +
+  theme(legend.position="right",
+        legend.title=element_text(color="black", face="bold"),
+        legend.text=element_text(size=rel(0.8), color="black"),
+        legend.background=element_blank(),
+        panel.background = element_rect(fill="NA"),
+        panel.grid = element_blank())
+png(file.path(path.figs, "ModelFit_R2adj_histogram.png"), height=11, width=11, units="in", res=220)
+plot_grid(r2.map, r2.histo.biome, r2.histo.fema, ncol=1, rel_heights = c(0.6, 0.2, 0.2))
 dev.off()
 
 r2.histo.fema <- ggplot(data=cityAll.stats[!is.na(cityAll.stats$biome),])+ facet_wrap(fema.region~.) +

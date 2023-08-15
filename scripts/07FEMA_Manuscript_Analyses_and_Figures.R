@@ -22,7 +22,7 @@ library(ggalt); library(sf)
 ###########################################
 # Establish file paths etc ----
 ###########################################
-path.google <- file.path("G:/My Drive/northstar2023/1km_modis")
+path.google <- file.path("C:/Users/malexander/Documents/r_files/northstar2023/1km_modis/")
 path.cities <- file.path("C:/Users/malexander/Documents/r_files/northstar2023/1km_modis/processed_cities")
 path.save <- file.path("C:/Users/malexander/Documents/r_files/northstar2023/1km_modis/")
 
@@ -84,6 +84,17 @@ biomeCode.pall.all = c("Tai"= "#2c5c74",
                        "TrCF" = "#488458",
                        "TrMBF"= "#266240",
                        "Man" = "#9c8c94")
+
+fema.cols <- c("region1" = "#725cfd",
+               "region2" = "#301fab",
+               "region3" = "#2537d5",
+               "region4" = "#0a6cdf",
+               "region5" = "#85c0f0",
+               "region6" = "#d7d148", 
+               "region7" = "#c8bf0c",
+               "region8" = "#f6d144",
+               "region9" = "#e1b329",
+               "region10" = "#976026")
 
 library(sp); library(sf)
 library(rworldmap)
@@ -172,8 +183,17 @@ biome.order$biomeCode <- car::recode(biome.order$biomeName,
                                        'Mangroves'='Man'")
 biome.order
 
+fema.order <- aggregate(LST.mean ~ fema.region, data=cityAll.stats, FUN=mean)
+fema.order <- fema.order[order(fema.order$LST.mean),]
+
+
 cityAll.stats$biomeName <- factor(cityAll.stats$biomeName, levels=biome.order$biomeName)
 cityAll.stats$biomeCode <- factor(cityAll.stats$biomeCode, levels=biome.order$biomeCode)
+
+cityAll.stats$fema.region <- factor(cityAll.stats$fema.region, levels=fema.order$fema.region)
+
+
+
 summary(cityAll.stats)
 
 CityBuffStats <- read.csv(file.path(path.cities, "city_stats_core-buffer.csv"))
@@ -183,7 +203,7 @@ summary(CityBuffStats)
 
 
 CityBuffStats[CityBuffStats$value.mean.core==0,] # This is for tree cover, so VERY very low.
-summary(CityBuffStats[CityBuffStats$value.mean.core<1,]) # This is for tree cover, so VERY very low.
+summary(CityBuffStats[CityBuffStats$value.mean.core<1,]) # This is for tree cover, so VERY very low.# 9 cities
 
 
 # Doing a spatial transformation on our city coords
@@ -250,7 +270,7 @@ summary(cityAll.stats)
 
 citiesUse <- !is.na(cityAll.stats$trend.LST.slope) & 
   cityAll.stats$n.pixels>=1000 & 
-  cityAll.stats$biome.prop>=0.75 &
+  #cityAll.stats$biome.prop>=0.75 &
   # cityAll.stats$tree.max>10 & cityAll.stats$veg.max>10 &
   cityAll.stats$LST.sd >=1 & cityAll.stats$tree.sd >= 1 & cityAll.stats$veg.sd >= 1 & cityAll.stats$elev.sd >= 1 &
   !cityAll.stats$ISOURBID %in% c(cityDiffHOT, cityDiffCOLD, cityCoreHOT, cityCoreCOLD, citySDLo, citySDHi)
@@ -312,7 +332,7 @@ summary(StatsCombined)
 
 
 # Saving this combined & formatted dataset for collaborators or other sharing
-write.csv(StatsCombined, file.path(path.cities, "UHIs-FinalCityDataForAnalysis.csv"), row.names=F)
+write.csv(StatsCombined, file.path(path.cities, "UHIs-FinalCityDataForAnalysis_FEMA.csv"), row.names=F)
 # SUPPLEMENTAL TABLE ----
 # Global + Biome:
 # -- Cities Considered
@@ -471,7 +491,26 @@ UHIBiome <- ggplot(data=StatsCombined[,],) +
         axis.title=element_text(color="black", face="bold", size=unit(10, "pt")),
         plot.margin=margin(0.5,0.5, 0.5, 0.5, "lines"))
   
-
+UHIFema <- ggplot(data=StatsCombined[,],) +
+  coord_flip() +
+  geom_violin(aes(x=fema.region, y=value.LST.diff, fill=biomeCode), scale="width") +
+  #geom_point(data=StatsCombined[StatsCombined$biomeCodeRev=="Tun",], aes(x=biomeCodeRev, y=value.LST.diff, color=biomeCode)) +
+  geom_hline(yintercept=0, linetype="dashed") +
+  scale_fill_manual(values=biomeCode.pall.all) +
+  scale_color_manual(values=biomeCode.pall.all) +
+  labs(y="LST Difference (˚C)", x="Biome") +
+  guides(fill="none", color="none") +
+  theme(legend.title=element_blank(),
+        legend.key = element_rect(fill=NA),
+        panel.background = element_rect(fill=NA, color="black"),
+        panel.grid.major.x=element_blank(),
+        panel.grid.minor.x=element_blank(),
+        panel.grid.major.y=element_line(color="black", size=0.1),
+        axis.ticks.length = unit(-0.25, "lines"),
+        axis.text.y=element_text(color="black", size=unit(8, "pt")),
+        axis.text.x=element_text(color="black", size=unit(8, "pt")),
+        axis.title=element_text(color="black", face="bold", size=unit(10, "pt")),
+        plot.margin=margin(0.5,0.5, 0.5, 0.5, "lines"))
 
 treeSlopeBiome <- ggplot(data=StatsCombined[,],) +
   coord_flip() +
@@ -495,10 +534,32 @@ treeSlopeBiome <- ggplot(data=StatsCombined[,],) +
         axis.title=element_text(color="black", face="bold", size=unit(10, "pt")),
         plot.margin=margin(0.5,0.5, 0.5, 0.5, "lines"))
 
+treeSlopeFema <- ggplot(data=StatsCombined[,],) +
+  coord_flip() +
+  geom_violin(aes(x=fema.region, y=model.tree.slope, fill=biomeCode), scale="width") +
+  #geom_point(data=StatsCombined[StatsCombined$biomeCodeRev=="Tun",], aes(x=biomeCodeRev, y=model.tree.slope, color=biomeCode)) +
+  geom_hline(yintercept=0, linetype="dashed") +
+  scale_fill_manual(values=biomeCode.pall.all) +
+  scale_color_manual(values=biomeCode.pall.all) +
+  scale_y_continuous(limits=range(c(StatsCombined$model.tree.slope, StatsCombined$model.veg.slope))) +
+  labs(y="Tree Slope (˚C/% cover)", x="Biome") +
+  guides(fill="none", color="none") +
+  theme(legend.title=element_blank(),
+        legend.key = element_rect(fill=NA),
+        panel.background = element_rect(fill=NA, color="black"),
+        panel.grid.major.x=element_blank(),
+        panel.grid.minor.x=element_blank(),
+        panel.grid.major.y=element_line(color="black", size=0.1),
+        axis.ticks.length = unit(-0.25, "lines"),
+        axis.text.y=element_text(color="black", size=unit(8, "pt")),
+        axis.text.x=element_text(color="black", size=unit(8, "pt")),
+        axis.title=element_text(color="black", face="bold", size=unit(10, "pt")),
+        plot.margin=margin(0.5,0.5, 0.5, 0.5, "lines"))
+
 otherSlopeBiome <- ggplot(data=StatsCombined[,],) +
   coord_flip() +
   geom_violin(aes(x=biomeCodeRev, y=model.veg.slope, fill=biomeCode), scale="width") +
-  geom_point(data=StatsCombined[StatsCombined$biomeCodeRev=="Tun",], aes(x=biomeCodeRev, y=model.veg.slope, color=biomeCode)) +
+  #geom_point(data=StatsCombined[StatsCombined$biomeCodeRev=="Tun",], aes(x=biomeCodeRev, y=model.veg.slope, color=biomeCode)) +
   geom_hline(yintercept=0, linetype="dashed") +
   scale_fill_manual(values=biomeCode.pall.all) +
   scale_color_manual(values=biomeCode.pall.all) +
@@ -516,7 +577,27 @@ otherSlopeBiome <- ggplot(data=StatsCombined[,],) +
         axis.text.x=element_text(color="black", size=unit(8, "pt")),
         axis.title=element_text(color="black", face="bold", size=unit(10, "pt")),
         plot.margin=margin(0.5,0.5, 0.5, 0.5, "lines"))
-
+otherSlopeFema <- ggplot(data=StatsCombined[,],) +
+  coord_flip() +
+  geom_violin(aes(x=fema.region, y=model.veg.slope, fill=biomeCode), scale="width") +
+  #geom_point(data=StatsCombined[StatsCombined$biomeCodeRev=="Tun",], aes(x=biomeCodeRev, y=model.veg.slope, color=biomeCode)) +
+  geom_hline(yintercept=0, linetype="dashed") +
+  scale_fill_manual(values=biomeCode.pall.all) +
+  scale_color_manual(values=biomeCode.pall.all) +
+  scale_y_continuous(limits=range(c(StatsCombined$model.tree.slope, StatsCombined$model.veg.slope))) +
+  labs(y="Non-Tree Slope (˚C/% cover)", x="Biome") +
+  guides(fill="none", color="none") +
+  theme(legend.title=element_blank(),
+        legend.key = element_rect(fill=NA),
+        panel.background = element_rect(fill=NA, color="black"),
+        panel.grid.major.x=element_blank(),
+        panel.grid.minor.x=element_blank(),
+        panel.grid.major.y=element_line(color="black", size=0.1),
+        axis.ticks.length = unit(-0.25, "lines"),
+        axis.text.y=element_text(color="black", size=unit(8, "pt")),
+        axis.text.x=element_text(color="black", size=unit(8, "pt")),
+        axis.title=element_text(color="black", face="bold", size=unit(10, "pt")),
+        plot.margin=margin(0.5,0.5, 0.5, 0.5, "lines"))
 # mapLST
 # mapTree
 # mapOther
@@ -524,11 +605,11 @@ otherSlopeBiome <- ggplot(data=StatsCombined[,],) +
 # TreeSlopeLat
 # OtherSlopeLat
 
-png(file.path(path.figs, "Figure1_UHI_Veg_SlopesBiome.png"), height=8, width=8, units="in", res=320)
-plot_grid(mapLST, UHIBiome, mapTree, treeSlopeBiome, mapOther, otherSlopeBiome, nrow=3, rel_widths = c(0.6, 0.6), labels=c("A","B", "C", "D", "E", "F"))
+png(file.path(path.figs, "Figure1_UHI_Veg_SlopesFema.png"), height=8, width=8, units="in", res=320)
+plot_grid(mapLST, UHIFema, mapTree, treeSlopeFema, mapOther, otherSlopeFema, nrow=3, rel_widths = c(0.6, 0.6), labels=c("A","B", "C", "D", "E", "F"))
 dev.off() 
 
-tiff(file.path(path.figs, "Figure1_UHI_Veg_SlopesBiome.tiff"), height=8, width=8, units="in", res=320)
+tiff(file.path(path.figs, "Figure1_UHI_Veg_SlopesFema.tiff"), height=8, width=8, units="in", res=320)
 plot_grid(mapLST, UHIBiome, mapTree, treeSlopeBiome, mapOther, otherSlopeBiome, nrow=3, rel_widths = c(0.6, 0.6), labels=c("A","B", "C", "D", "E", "F"))
 dev.off() 
 
@@ -647,26 +728,32 @@ round(mean(StatsCombined$value.other.core),0); round(sd(StatsCombined$value.othe
 # On a per-percent cover basis, the cooling potential of trees is greatest in arid and semi-arid biomes where the natural landscape is dominated by grasses and shrubby vegetation (SUPPLEMENT FIG/TABLE)
 # SUPPELEMENTAL TABLE 2 BY BIOME---
 #  - Cities in analysis; Mean Core [LST/Tree/Veg]; Mean Diff [LST/Tree/Veg]; 
-ncitiesAll <- aggregate(ISOURBID ~ biomeName, data=cityAll.stats, FUN = length)
-names(ncitiesAll) <- c("Biome", "N.Total")
+ncitiesAll <- aggregate(ISOURBID ~ biomeName*fema.region, data=cityAll.stats, FUN = length)
+names(ncitiesAll) <- c("Biome", "FEMA_Region", "N.Total")
 
-nsigUHI <- aggregate(ISOURBID ~ biomeName, data=StatsCombined[StatsCombined$value.LST.diff>0 & StatsCombined$value.LST.diff.p<0.01, ], FUN = length)
-names(nsigUHI)[2] <- c("N.UHI")
+nsigUHI <- aggregate(ISOURBID ~ biomeName*fema.region, data=StatsCombined[StatsCombined$value.LST.diff>0 & StatsCombined$value.LST.diff.p<0.01, ], FUN = length)
+names(nsigUHI)[3] <- c("N.UHI")
 
 
-ncitiesAnaly <- aggregate(ISOURBID ~ biomeName, data=StatsCombined, FUN = length)
+ncitiesAnaly <- aggregate(ISOURBID ~ biomeName*fema.region, data=StatsCombined, FUN = length)
+#names(ncitiesAnaly)[3] <- c("N.Analyzed")
 ncitiesAnaly <- merge(ncitiesAnaly, nsigUHI, all=T)
 ncitiesAnaly$N.UHI[is.na(ncitiesAnaly$N.UHI)] <- 0
 
-ncitiesAnaly[,c("LST.mean", "Tree.mean", "Other.mean")] <- round(aggregate(cbind(value.LST.core, value.tree.core, value.other.core) ~ biomeName, data=StatsCombined, FUN = mean)[,c(2:4)], 2)
-ncitiesAnaly[,c("LST.sd", "Tree.sd", "Other.sd")] <- round(aggregate(cbind(value.LST.core, value.tree.core, value.other.core) ~ biomeName, data=StatsCombined, FUN = sd)[,c(2:4)], 2)
-ncitiesAnaly[,c("LSTDiff.mean", "TreeDiff.mean", "OtherDiff.mean")] <- round(aggregate(cbind(value.LST.diff, value.tree.diff, value.other.diff) ~ biomeName, data=StatsCombined, FUN = mean)[,c(2:4)], 2)
-ncitiesAnaly[,c("LSTDiff.sd", "TreeDiff.sd", "OtherDiff.sd")] <- round(aggregate(cbind(value.LST.diff, value.tree.diff, value.other.diff) ~ biomeName, data=StatsCombined, FUN = sd)[,c(2:4)], 2)
+summary(StatsCombined)
+test <- aggregate(cbind(value.LST.core, value.tree.core, value.other.core) ~ biomeName*fema.region, data=StatsCombined, FUN = mean)
+summary(test)
+
+ncitiesAnaly[,c("LST.mean", "Tree.mean", "Other.mean")] <- round(aggregate(cbind(value.LST.core, value.tree.core, value.other.core) ~ biomeName*fema.region, data=StatsCombined, FUN = mean)[,c(3:5)], 2)
+ncitiesAnaly[,c("LST.sd", "Tree.sd", "Other.sd")] <- round(aggregate(cbind(value.LST.core, value.tree.core, value.other.core) ~ biomeName*fema.region, data=StatsCombined, FUN = sd)[,c(3:5)], 2)
+ncitiesAnaly[,c("LSTDiff.mean", "TreeDiff.mean", "OtherDiff.mean")] <- round(aggregate(cbind(value.LST.diff, value.tree.diff, value.other.diff) ~ biomeName*fema.region, data=StatsCombined, FUN = mean)[,c(3:5)], 2)
+ncitiesAnaly[,c("LSTDiff.sd", "TreeDiff.sd", "OtherDiff.sd")] <- round(aggregate(cbind(value.LST.diff, value.tree.diff, value.other.diff) ~ biomeName*fema.region, data=StatsCombined, FUN = sd)[,c(3:5)], 2)
 # ncitiesAnaly[,c("LST.sd", "Tree.sd", "Other.sd")] <- round(aggregate(cbind(value.LST.core, value.tree.core, value.other.core) ~ biomeName, data=StatsCombined, FUN = sd)[,c(2:4)], 2)
 
 ncitiesAnaly
 
 TableCitySummary <- data.frame(Biome = ncitiesAnaly$biomeName,
+                               Fema.Region = ncitiesAnaly$fema.region,
                                N.Analyzed = ncitiesAnaly$ISOURBID, 
                                N.UHI = ncitiesAnaly$N.UHI, 
                                LST.mean = paste0(ncitiesAnaly$LST.mean, " (", ncitiesAnaly$LST.sd, ")"),
@@ -681,26 +768,36 @@ TableCitySummary <- TableCitySummary[order(TableCitySummary$Biome),]
 TableCitySummary
 
 
-write.csv(TableCitySummary, file.path(path.figs, "SuppTable1_Biome_CitySummaryStats.csv"), row.names=F)
+write.csv(TableCitySummary, file.path(path.figs, "SuppTable1_Biome_CitySummaryStats_fema.csv"), row.names=F)
 
 # SUPPELEMENTAL TABLE 3 BY BIOME---
 # - Tree/Veg Stats: slope, pSig, Cooling Contrib, UHI due to diff
-CoolStats <- aggregate(ISOURBID ~ biomeName, data=StatsCombined, FUN = length)
-CoolStats[,c("TreeSlope.mean", "OtherSlope.mean")] <- round(aggregate(cbind(model.tree.slope, model.veg.slope) ~ biomeName, data=StatsCombined, FUN = mean)[,c(2:3)], 2)
-CoolStats[,c("TreeSlope.sd", "OtherSlope.sd")] <- round(aggregate(cbind(model.tree.slope, model.veg.slope) ~ biomeName, data=StatsCombined, FUN = sd)[,c(2:3)], 2)
+CoolStats <- aggregate(ISOURBID ~ biomeName*fema.region, data=StatsCombined, FUN = length)
+CoolStats[,c("TreeSlope.mean", "OtherSlope.mean")] <- round(aggregate(cbind(model.tree.slope, model.veg.slope) ~ biomeName*fema.region, data=StatsCombined, FUN = mean)[,c(3:4)], 2)
+CoolStats[,c("TreeSlope.sd", "OtherSlope.sd")] <- round(aggregate(cbind(model.tree.slope, model.veg.slope) ~ biomeName*fema.region, data=StatsCombined, FUN = sd)[,c(3:4)], 2)
 
-CoolStats[,c("EffectLST.Tree.mean", "EffectLST.Other.mean")] <- round(aggregate(cbind(EffectLST.tree, EffectLST.other) ~ biomeName, data=StatsCombined, FUN = mean)[,c(2:3)], 2)
-CoolStats[,c("EffectLST.Tree.sd", "EffectLST.Other.sd")] <- round(aggregate(cbind(EffectLST.tree, EffectLST.other) ~ biomeName, data=StatsCombined, FUN = sd)[,c(2:3)], 2)
-CoolStats[,c("EffectUHI.Tree.mean", "EffectUHI.Other.mean")] <- round(aggregate(cbind(ContribUHI.tree, ContribUHI.other) ~ biomeName, data=StatsCombined, FUN = mean)[,c(2:3)], 2)
-CoolStats[,c("EffectUHI.Tree.sd", "EffectUHI.Other.sd")] <- round(aggregate(cbind(ContribUHI.tree, ContribUHI.other) ~ biomeName, data=StatsCombined, FUN = sd)[,c(2:3)], 2)
+CoolStats[,c("EffectLST.Tree.mean", "EffectLST.Other.mean")] <- round(aggregate(cbind(EffectLST.tree, EffectLST.other) ~ biomeName*fema.region, data=StatsCombined, FUN = mean)[,c(3:4)], 2)
+CoolStats[,c("EffectLST.Tree.sd", "EffectLST.Other.sd")] <- round(aggregate(cbind(EffectLST.tree, EffectLST.other) ~ biomeName*fema.region, data=StatsCombined, FUN = sd)[,c(3:4)], 2)
+CoolStats[,c("EffectUHI.Tree.mean", "EffectUHI.Other.mean")] <- round(aggregate(cbind(ContribUHI.tree, ContribUHI.other) ~ biomeName*fema.region, data=StatsCombined, FUN = mean)[,c(3:4)], 2)
+CoolStats[,c("EffectUHI.Tree.sd", "EffectUHI.Other.sd")] <- round(aggregate(cbind(ContribUHI.tree, ContribUHI.other) ~ biomeName*fema.region, data=StatsCombined, FUN = sd)[,c(3:4)], 2)
 
-CoolStats$TreeCool.sig <- round(aggregate(model.tree.slope ~ biomeName, data=StatsCombined[StatsCombined$model.tree.slope<0 & StatsCombined$model.tree.p<0.01,], FUN = length)[,2], 2)
-CoolStats$OtherCool.sig <- round(aggregate(model.veg.slope ~ biomeName, data=StatsCombined[StatsCombined$model.veg.slope<0 & StatsCombined$model.veg.p<0.01,], FUN = length)[,2], 2)
+meow <- aggregate(model.tree.slope ~ biomeName*fema.region, data=StatsCombined[StatsCombined$model.tree.slope<0 & StatsCombined$model.tree.p<0.01,], FUN = length)
+names(meow)[3] <- c("TreeCool.sig")
+
+CoolStats <- merge(CoolStats, meow, all.x=T)
+# CoolStats$TreeCool.sig <- round(aggregate(model.tree.slope ~ biomeName*fema.region, data=StatsCombined[StatsCombined$model.tree.slope<0 & StatsCombined$model.tree.p<0.01,], FUN = length)[,3], 2)
+
+meow2 <- aggregate(model.veg.slope ~ biomeName*fema.region, data=StatsCombined[StatsCombined$model.veg.slope<0 & StatsCombined$model.veg.p<0.01,], FUN = length)
+names(meow2)[3] <- c("OtherCool.sig")
+# CoolStats$OtherCool.sig <- round(aggregate(model.veg.slope ~ biomeName*fema.region, data=StatsCombined[StatsCombined$model.veg.slope<0 & StatsCombined$model.veg.p<0.01,], FUN = length)[,3], 2)
+CoolStats <- merge(CoolStats, meow2, all.x=T)
+
 CoolStats$TreeCool.sig.Percent <- round(CoolStats$TreeCool.sig/CoolStats$ISOURBID*100,0)
 CoolStats$OtherCool.sig.Percent <- round(CoolStats$OtherCool.sig/CoolStats$ISOURBID*100,0)
 CoolStats
 
 CoolStatsSummary <- data.frame(Biome = CoolStats$biomeName,
+                               Fema.Region = CoolStats$fema.region,
                                N.Analyzed = CoolStats$ISOURBID, 
                                TreeSlope = paste0(CoolStats$TreeSlope.mean, " (", CoolStats$TreeSlope.sd,")"),
                                PercentTreeCool = paste0(CoolStats$TreeCool.sig.Percent, "%"),
@@ -713,7 +810,7 @@ CoolStatsSummary <- data.frame(Biome = CoolStats$biomeName,
 
 CoolStatsSummary
 
-write.csv(CoolStatsSummary, file.path(path.figs, "SuppTable2_Biome_CoolingEffects.csv"), row.names=F)
+write.csv(CoolStatsSummary, file.path(path.figs, "SuppTable2_Biome_CoolingEffects_fema.csv"), row.names=F)
 
 # ##########################################
 
@@ -751,7 +848,7 @@ length(which(StatsCombined$value.tree.core>median(StatsCombined$TreeCoverTargetU
 
 install.packages("ungeviz")
 
-TreeCoverTarget <- ggplot(data=StatsCombined[citiesUHI,], aes(x=biomeCode, y=TreeCoverTargetUHI, fill="Biome Target", color="Biome Target")) +  
+TreeCoverTarget <- ggplot(data=StatsCombined[citiesUHI,], aes(x=biomeCode, y=TreeCoverTargetUHI, fill="Biome Target", color="Biome Target")) +  facet_grid(~ fema.region, scales = "free_x") +
   geom_bar(stat="summary", fun="median") +
   # geom_segment(yend=0, aes(xend=biomeCode), stat="summary", fun="median", size=2) +
   geom_violin(aes(x=biomeCode, y=value.tree.core, fill="Current", color="Current"), scale="width") +
@@ -781,6 +878,38 @@ tiff(file.path(path.figs, "Figure2_TempEffects_CoverTargets.tiff"), height=8, wi
 plot_grid(plotTempEffects, TreeCoverTarget, ncol=1, labels=c("A", "B"))
 dev.off()
 
+# fema regions only
+TreeCoverTarget_fema <- ggplot(data=StatsCombined[citiesUHI,], aes(x=fema.region, y=TreeCoverTargetUHI, fill="Region Target", color="Region Target")) +
+  geom_bar(stat="summary", fun="median") +
+  # geom_segment(yend=0, aes(xend=biomeCode), stat="summary", fun="median", size=2) +
+  geom_violin(aes(x=fema.region, y=value.tree.core, fill="Current", color="Current"), scale="width") +
+  # geom_point(stat="summary", fun="median", size=5) +
+  scale_fill_manual(name="Tree Cover", values=c("Current"="#005a32", "Region Target"=grad.tree[4])) +
+  scale_color_manual(name="Tree Cover", values=c("Current"="#005a32", "Region Target"=grad.tree[4])) +
+  labs(x="Fema Region", y="Tree Cover (%)") +
+  scale_y_continuous(limits=c(0,70), expand=c(0,0)) +
+  theme_bw()+
+  theme(legend.position="top",
+        legend.title=element_text(face='bold'),
+        panel.background = element_rect(fill=NA),
+        panel.grid=element_blank(),
+        axis.ticks.length = unit(-0.25, "lines"),
+        axis.text.y=element_text(color="black"),
+        axis.title=element_text(color="black", face="bold"),
+        axis.text.x=element_text(color="black", angle=-20, hjust=0),
+        # axis.text.x=element_blank(),
+        # axis.title.x=element_blank(),
+        plot.margin = unit(c(0.5, 0.5, 0.5, 0.5), "lines"))
+
+png(file.path(path.figs, "Figure2_TempEffects_CoverTargets_fema.png"), height=8, width=6, units="in", res=320)
+plot_grid(plotTempEffects_fema, TreeCoverTarget_fema, ncol=1, labels=c("A", "B"))
+dev.off()
+
+tiff(file.path(path.figs, "Figure2_TempEffects_CoverTargets_fema.tiff"), height=8, width=6, units="in", res=320)
+plot_grid(plotTempEffects_fema, TreeCoverTarget_fema, ncol=1, labels=c("A", "B"))
+dev.off()
+
+
 # Coming up with biome-specific targets
 biomeTargetStats <- aggregate(ISOURBID~biomeName, data=StatsCombined[citiesUHI,], FUN=length)
 # names(biomeTargetStats)
@@ -799,8 +928,30 @@ biomeTreeTarget <- biomeTreeTarget[order(biomeTreeTarget$Biome),]
 biomeTreeTarget
 write.csv(biomeTreeTarget, file.path(path.figs, "SuppTable3_Biome_TreeCoverTargets.csv"), row.names=F)
 
+# Coming up with region-biome-specific targets
+femaTargetStats <- aggregate(ISOURBID~fema.region, data=StatsCombined[citiesUHI,], FUN=length)
 
-# Cities in temperate conifer biomes have among the highest urban tree cover (XXX%, Table S3), but a tree-only solution for UHIs would require tree cover to be double that (XXX%) to offset the median observed UHI of 1.6˚C.This would require tree cover in all cities in this biome to be XX% higher than the tree cover seen in XX City, which has the highest tree cover (Table S3)
+# names(biomeTargetStats)
+femaTargetStats[,c("UHI", "CurrentTreeCover", "TargetTreeCover")] <- aggregate(cbind(value.LST.diff, value.tree.core, TreeCoverTargetUHI)~fema.region, data=StatsCombined[citiesUHI,], FUN=median)[,c("value.LST.diff", "value.tree.core", "TreeCoverTargetUHI")]
+femaTargetStats[,c("UHI.lo", "CurrentTreeCover.lo", "TargetTreeCover.lo")] <- aggregate(cbind(value.LST.diff, value.tree.core, TreeCoverTargetUHI)~fema.region, data=StatsCombined[citiesUHI,], FUN=quantile, 0.25)[,c("value.LST.diff", "value.tree.core", "TreeCoverTargetUHI")]
+femaTargetStats[,c("UHI.hi", "CurrentTreeCover.hi", "TargetTreeCover.hi")] <- aggregate(cbind(value.LST.diff, value.tree.core, TreeCoverTargetUHI)~fema.region, data=StatsCombined[citiesUHI,], FUN=quantile, 0.75)[,c("value.LST.diff", "value.tree.core", "TreeCoverTargetUHI")]
+femaTargetStats
+
+femaTreeTarget <- data.frame(#Biome=femaTargetStats$biomeName,
+                             Fema.Region = femaTargetStats$fema.region,
+                              N.Cities.UHI=femaTargetStats$ISOURBID,
+                              UHI=paste0(round(femaTargetStats$UHI, 1), " (", round(femaTargetStats$UHI.lo, 1), " - ", round(femaTargetStats$UHI.hi, 1), ")"),
+                              CurrentTreeCover=paste0(round(femaTargetStats$CurrentTreeCover, 0), " (", round(femaTargetStats$CurrentTreeCover.lo, 0), " - ", round(femaTargetStats$CurrentTreeCover.hi, 0), ")"),
+                              TargetTreeCover=paste0(round(femaTargetStats$TargetTreeCover, 0), " (", round(femaTargetStats$TargetTreeCover.lo, 0), " - ", round(femaTargetStats$TargetTreeCover.hi, 0), ")"))
+# femaTreeTarget$Biome <- factor(femaTreeTarget$Biome, levels=levels(StatsCombined$biomeName))
+femaTreeTarget$Fema.Region <- factor(femaTreeTarget$Fema.Region, levels=levels(StatsCombined$fema.region))
+femaTreeTarget <- femaTreeTarget[order(femaTreeTarget$Fema.Region),]
+femaTreeTarget
+write.csv(biomeTreeTarget, file.path(path.figs, "SuppTable3_Biome_TreeCoverTargets_fema.csv"), row.names=F)
+
+
+
+# Cities in temperate broadleaf biomes have among the highest urban tree cover (XXX%, Table S3), but a tree-only solution for UHIs would require tree cover to be double that (XXX%) to offset the median observed UHI of 1.6˚C.This would require tree cover in all cities in this biome to be XX% higher than the tree cover seen in XX City, which has the highest tree cover (Table S3)
 UHI.TBF <- which(StatsCombined$value.LST.diff>0 & StatsCombined$value.LST.diff.p<0.01 & StatsCombined$biomeCode=="TeBF")
 
 median(StatsCombined$value.tree.core[UHI.TBF])
@@ -817,7 +968,7 @@ StatsCombined[StatsCombined$value.tree.core==max(StatsCombined$value.tree.core[U
 # To achieve the same level of cooling using non-tree vegetation, median cover in global UHI cities would need to be XXX%. 
 round(median(StatsCombined$OtherCoverTargetUHI[UHI.TBF]), 0)
 
-# In temperate conifer biomes, non-tree vegetation would need to increase from XX% to XX% to offset that region’s UHI. <-- cut this sentence because TeCF is a place where non-tree vegetation 
+# In temperate broadleaf biomes, non-tree vegetation would need to increase from XX% to XX% to offset that region’s UHI. <-- cut this sentence because TeCF is a place where non-tree vegetation 
 round(median(StatsCombined$value.other.core[UHI.TBF]), 0)
 round(median(StatsCombined$OtherCoverTargetUHI[UHI.TBF]), 0)
 
@@ -984,16 +1135,16 @@ figTrends <- ggplot(data=TrendsTreeAll[TrendsTreeAll$N.Analyzed>=10,]) +
   facet_wrap(~biomeCode) +
   geom_segment(data=StatsCombined[StatsCombined$biomeName %in% TrendsTreeAll$biomeName[TrendsTreeAll$N.Analyzed>=10],], aes(x=2001, xend=2020, y=EstTree2001, yend=EstTree2020), size=0.1, alpha=0.7, color="gray80") +
   geom_segment(aes(x=2001, xend=2020, y=EstTree2001, yend=EstTree2020, color="Observed Trend"), size=2) +
-  geom_segment(aes(x=2001, xend=2020, y=EstTree2001, yend=YendUHI, color="Mitigate Intensifying UHI"), size=2, linetype="dashed") +
-  geom_segment(aes(x=2001, xend=2020, y=EstTree2001, yend=YendWarm, color="Mitigate Warming Trend"), size=2, linetype="dashed") +
+  geom_segment(aes(x=2001, xend=2020, y=EstTree2001, yend=YendUHI, color="Mitigate Development Warming"), size=2, linetype="dashed") +
+  geom_segment(aes(x=2001, xend=2020, y=EstTree2001, yend=YendWarm, color="Mitigate CC + Dev. Warming"), size=2, linetype="dashed") +
   geom_text(aes(x=2020, y=EstTree2020-1, label=paste0("+",round(20*TrendObsTreeMed, 1), "%"), color="Observed Trend"), hjust=0, show.legend=F, size=3 ) +
-  geom_text(aes(x=2020, y=YendUHI+1, label=paste0("+", round(20*TargetUHITreeMed, 1), "%"), color="Mitigate Intensifying UHI"), hjust=0, show.legend=F, size=3) +
-  geom_text(aes(x=2020, y=YendWarm+3, label=paste0("+", round(20*TargetWarmTreeMed, 1), "%"), color="Mitigate Warming Trend"), hjust=0, show.legend=F, size=3) +
-  scale_color_manual(name="Tree Cover Trends", values=c("Observed Trend" = "#005a32", "Mitigate Intensifying UHI"="#3FA242", "Mitigate Warming Trend"="#A3D16B"))+
+  geom_text(aes(x=2020, y=YendUHI+1, label=paste0("+", round(20*TargetUHITreeMed, 1), "%"), color="Mitigate Development Warming"), hjust=0, show.legend=F, size=3) +
+  geom_text(aes(x=2020, y=YendWarm+3, label=paste0("+", round(20*TargetWarmTreeMed, 1), "%"), color="Mitigate CC + Dev. Warming"), hjust=0, show.legend=F, size=3) +
+  scale_color_manual(name="Tree Cover Trends", values=c("Observed Trend" = "#005a32", "Mitigate Development Warming"="#3FA242", "Mitigate CC + Dev. Warming"="#A3D16B"))+
   scale_x_continuous(name="Year", breaks=c(2001, 2020), limits=c(1999, 2025)) +
   scale_y_continuous(name="Tree Cover (%)") +
   guides(label=NA) +
-  theme(legend.position=c(0.67, 0.15),
+  theme(legend.position="top",
         legend.title=element_text(face='bold'),
         legend.key = element_rect(fill=NA),
         panel.background = element_rect(fill=NA, color="black"),
@@ -1014,5 +1165,135 @@ dev.off()
 
 tiff(file.path(path.figs, "Figure3_TreeCover_ObservedTargets.tiff"), height=6, width=6, units="in", res=320)
 figTrends
+dev.off()
+
+
+#################
+# Making slope table and figures for Fema regions----
+# # # Making the table to go with the slopes (Fig. 3) ----
+# Want to show:  n cities; ;
+#                median tree cover trend (all cities); 
+#                n cities w/ intensifying UHI; 
+#                median tree cover trend (UHI Cities); 
+#                tree cover trend to hold UHI constant; 
+#                n cities w/ warming 
+#                median tree cover trend (warming Cities); 
+#                tree cover trend to offset warming
+StatsCombined$EstTree2001 <- StatsCombined$value.tree.core - StatsCombined$trend.tree.core*10
+StatsCombined$EstTree2020 <- StatsCombined$value.tree.core + StatsCombined$trend.tree.core*10
+StatsCombined$TargetTree2020UHI <- StatsCombined$EstTree2001 + StatsCombined$TargetConstantUHI*20
+StatsCombined$TargetTree2020Warming <- StatsCombined$EstTree2001 + StatsCombined$TargetOffsetWarming*20
+summary(StatsCombined)
+
+
+TrendTreesObsFema <- aggregate(ISOURBID ~ fema.region, data=StatsCombined, FUN=length)
+names(TrendTreesObsFema)[2] <- "N.Analyzed"
+TrendTreesObsFema$EstTree2001 <- aggregate(EstTree2001 ~ fema.region, data=StatsCombined, FUN=median, na.rm=T)[,2]
+TrendTreesObsFema$EstTree2020 <- aggregate(EstTree2020 ~ fema.region, data=StatsCombined, FUN=median, na.rm=T)[,2]
+TrendTreesObsFema$TrendObsTreeMed <- aggregate(trend.tree.core ~ fema.region, data=StatsCombined, FUN=median, na.rm=T)[,2]
+TrendTreesObsFema$TrendObsTreelo <- aggregate(trend.tree.core ~ fema.region, data=StatsCombined, FUN=quantile, 0.25)[,2]
+TrendTreesObsFema$TrendObsTreehi <- aggregate(trend.tree.core ~ fema.region, data=StatsCombined, FUN=quantile, 0.75)[,2]
+TrendTreesObsFema
+
+TrendTreesUHIFema <- aggregate(ISOURBID ~ fema.region, data=StatsCombined[intensifyUHI,], FUN=length)
+names(TrendTreesUHIFema)[2] <- "N.UHI"
+TrendTreesUHIFema$TrendUHIMed <- aggregate(trend.LST.diff ~ fema.region, data=StatsCombined[intensifyUHI,], FUN=median, na.rm=T)[,2]
+TrendTreesUHIFema$TrendUHIlo <- aggregate(trend.LST.diff ~ fema.region, data=StatsCombined[intensifyUHI,], FUN=quantile, 0.25)[,2]
+TrendTreesUHIFema$TrendUHIhi <- aggregate(trend.LST.diff ~ fema.region, data=StatsCombined[intensifyUHI,], FUN=quantile, 0.75)[,2]
+TrendTreesUHIFema$TrendUHITreeMed <- aggregate(trend.tree.core ~ fema.region, data=StatsCombined[intensifyUHI,], FUN=median, na.rm=T)[,2]
+TrendTreesUHIFema$TrendUHITreelo <- aggregate(trend.tree.core ~ fema.region, data=StatsCombined[intensifyUHI,], FUN=quantile, 0.25)[,2]
+TrendTreesUHIFema$TrendUHITreehi <- aggregate(trend.tree.core ~ fema.region, data=StatsCombined[intensifyUHI,], FUN=quantile, 0.75)[,2]
+TrendTreesUHIFema$TargetUHITreeMed <- aggregate(TargetConstantUHI ~ fema.region, data=StatsCombined[intensifyUHI,], FUN=median, na.rm=T)[,2]
+TrendTreesUHIFema$TargetUHITreelo <- aggregate(TargetConstantUHI ~ fema.region, data=StatsCombined[intensifyUHI,], FUN=quantile, 0.25)[,2]
+TrendTreesUHIFema$TargetUHITreehi <- aggregate(TargetConstantUHI ~ fema.region, data=StatsCombined[intensifyUHI,], FUN=quantile, 0.75)[,2]
+TrendTreesUHIFema <- merge(TrendTreesObsFema, TrendTreesUHIFema, all=T)
+TrendTreesUHIFema
+
+TableTrendsUHIFEMA <- data.frame(Fema.Region=TrendTreesUHIFema$fema.region,
+                             N.Analyzed = TrendTreesUHIFema$N.Analyzed,
+                             N.IntensifyUHI = TrendTreesUHIFema$N.UHI,
+                             UHITrend = paste0(round(TrendTreesUHIFema$TrendUHIMed, 2), " (", round(TrendTreesUHIFema$TrendUHIlo, 2), " - ", round(TrendTreesUHIFema$TrendUHIhi, 2),")"),
+                             UHITreeTrend = paste0(round(TrendTreesUHIFema$TrendUHITreeMed, 2), " (", round(TrendTreesUHIFema$TrendUHITreelo, 2), " - ", round(TrendTreesUHIFema$TrendUHITreehi, 2),")"),
+                             UHITreeTarget = paste0(round(TrendTreesUHIFema$TargetUHITreeMed, 2), " (", round(TrendTreesUHIFema$TargetUHITreelo, 2), " - ", round(TrendTreesUHIFema$TargetUHITreehi, 2),")"))
+TableTrendsUHIFEMA <- TableTrendsUHIFEMA[order(TableTrendsUHIFEMA$Fema.Region),]
+TableTrendsUHIFEMA
+
+write.csv(TableTrendsUHIFEMA, file.path(path.figs, "SuppTable4_Biome_TreeTrendTargets-UHI_FEMA.csv"), row.names=F)
+
+
+
+TrendTreesWarmFema <- aggregate(ISOURBID ~ fema.region, data=StatsCombined[citiesWarm,], FUN=length)
+names(TrendTreesWarmFema)[2] <- "N.Warm"
+TrendTreesWarmFema$TrendWarmMed <- aggregate(trend.LST.core ~ fema.region, data=StatsCombined[citiesWarm,], FUN=median, na.rm=T)[,2]
+TrendTreesWarmFema$TrendWarmlo <- aggregate(trend.LST.core ~ fema.region, data=StatsCombined[citiesWarm,], FUN=quantile, 0.25)[,2]
+TrendTreesWarmFema$TrendWarmhi <- aggregate(trend.LST.core ~ fema.region, data=StatsCombined[citiesWarm,], FUN=quantile, 0.75)[,2]
+TrendTreesWarmFema$TrendWarmTreeMed <- aggregate(trend.tree.core ~ fema.region, data=StatsCombined[citiesWarm,], FUN=median, na.rm=T)[,2]
+TrendTreesWarmFema$TrendWarmTreelo <- aggregate(trend.tree.core ~ fema.region, data=StatsCombined[citiesWarm,], FUN=quantile, 0.25)[,2]
+TrendTreesWarmFema$TrendWarmTreehi <- aggregate(trend.tree.core ~ fema.region, data=StatsCombined[citiesWarm,], FUN=quantile, 0.75)[,2]
+TrendTreesWarmFema$TargetWarmTreeMed <- aggregate(TargetOffsetWarming ~ fema.region, data=StatsCombined[citiesWarm,], FUN=median, na.rm=T)[,2]
+TrendTreesWarmFema$TargetWarmTreelo <- aggregate(TargetOffsetWarming ~ fema.region, data=StatsCombined[citiesWarm,], FUN=quantile, 0.25)[,2]
+TrendTreesWarmFema$TargetWarmTreehi <- aggregate(TargetOffsetWarming ~ fema.region, data=StatsCombined[citiesWarm,], FUN=quantile, 0.75)[,2]
+TrendTreesWarmFema <- merge(TrendTreesObsFema, TrendTreesWarmFema, all=T)
+TrendTreesWarmFema
+
+
+TableTrendsWarm <- data.frame(Fema.Region=TrendTreesWarmFema$fema.region,
+                              N.Analyzed = TrendTreesWarmFema$N.Analyzed,
+                              N.IntensifyWarm = TrendTreesWarmFema$N.Warm,
+                              WarmTrend = paste0(round(TrendTreesWarmFema$TrendWarmMed, 2), " (", round(TrendTreesWarmFema$TrendWarmlo, 2), " - ", round(TrendTreesWarmFema$TrendWarmhi, 2),")"),
+                              WarmTreeTrend = paste0(round(TrendTreesWarmFema$TrendWarmTreeMed, 2), " (", round(TrendTreesWarmFema$TrendWarmTreelo, 2), " - ", round(TrendTreesWarmFema$TrendWarmTreehi, 2),")"),
+                              WarmTreeTarget = paste0(round(TrendTreesWarmFema$TargetWarmTreeMed, 2), " (", round(TrendTreesWarmFema$TargetWarmTreelo, 2), " - ", round(TrendTreesWarmFema$TargetWarmTreehi, 2),")"))
+TableTrendsWarm <- TableTrendsWarm[order(TableTrendsWarm$Fema.Region),]
+TableTrendsWarm
+
+write.csv(TableTrendsWarm, file.path(path.figs, "SuppTable5_Biome_TreeTrendTargets-Warm_FEMA.csv"), row.names=F)
+
+
+
+# # # Making the slope figure (Fig. 3) ----
+TrendsTreeAllFema <- merge(TrendTreesUHIFema, TrendTreesWarmFema, all=T)
+TrendsTreeAllFema$YendUHI <- TrendsTreeAllFema$EstTree2001+20*TrendsTreeAllFema$TargetUHITreeMed
+TrendsTreeAllFema$YendWarm <- TrendsTreeAllFema$EstTree2001+20*TrendsTreeAllFema$TargetWarmTreeMed
+
+# Creating a vector to help annotate
+TrendsTreeAllFema$YlabUHI <-TrendsTreeAllFema$YendUHI
+TrendsTreeAllFema$YlabWarm <-TrendsTreeAllFema$YendWarm
+TrendsTreeAllFema
+summary(StatsCombined)
+
+figTrends_fema <- ggplot(data=TrendsTreeAllFema[TrendsTreeAllFema$N.Analyzed>=10,]) +
+  facet_wrap(~fema.region) +
+  geom_segment(data=StatsCombined[StatsCombined$fema.region %in% TrendsTreeAllFema$fema.region[TrendsTreeAllFema$N.Analyzed>=10],], aes(x=2001, xend=2020, y=EstTree2001, yend=EstTree2020), size=0.1, alpha=0.7, color="gray80") +
+  geom_segment(aes(x=2001, xend=2020, y=EstTree2001, yend=EstTree2020, color="Observed Trend"), size=2) +
+  geom_segment(aes(x=2001, xend=2020, y=EstTree2001, yend=YendUHI, color="Mitigate Development Warming"), size=2, linetype="dashed") +
+  geom_segment(aes(x=2001, xend=2020, y=EstTree2001, yend=YendWarm, color="Mitigate CC + Dev. Warming"), size=2, linetype="dashed") +
+  geom_text(aes(x=2020, y=EstTree2020-1, label=paste0("+",round(20*TrendObsTreeMed, 1), "%"), color="Observed Trend"), hjust=0, show.legend=F, size=3 ) +
+  geom_text(aes(x=2020, y=YendUHI+1, label=paste0("+", round(20*TargetUHITreeMed, 1), "%"), color="Mitigate Development Warming"), hjust=0, show.legend=F, size=3) +
+  geom_text(aes(x=2020, y=YendWarm+3, label=paste0("+", round(20*TargetWarmTreeMed, 1), "%"), color="Mitigate CC + Dev. Warming"), hjust=0, show.legend=F, size=3) +
+  scale_color_manual(name="Tree Cover Trends", values=c("Observed Trend" = "#005a32", "Mitigate Development Warming"="#3FA242", "Mitigate CC + Dev. Warming"="#A3D16B"))+
+  scale_x_continuous(name="Year", breaks=c(2001, 2020), limits=c(1999, 2025)) +
+  scale_y_continuous(name="Tree Cover (%)") +
+  guides(label=NA) +
+  theme(legend.position="top",
+        legend.title=element_text(face='bold'),
+        legend.key = element_rect(fill=NA),
+        panel.background = element_rect(fill=NA, color="black"),
+        panel.grid=element_blank(),
+        axis.ticks.length = unit(-0.25, "lines"),
+        axis.text=element_text(color="black"),
+        axis.title=element_text(color="black", face="bold"),
+        strip.text = element_text(color="black", face="bold"),
+        # axis.text.x=element_blank(),
+        # axis.title.x=element_blank(),
+        plot.margin = unit(c(0.5, 0.5, 0.5, 0.5), "lines"))
+figTrends_fema
+
+
+png(file.path(path.figs, "Figure3_TreeCover_ObservedTargets_fema.png"), height=6, width=6, units="in", res=320)
+figTrends_fema
+dev.off()
+
+tiff(file.path(path.figs, "Figure3_TreeCover_ObservedTargets_fema.tiff"), height=6, width=6, units="in", res=320)
+figTrends_fema
 dev.off()
 
