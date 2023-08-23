@@ -107,6 +107,105 @@ worldBBoxWinTri <- st_transform(worldBBox, CRS(projWinTri))
 StatsCombined <- read.csv(file.path(path.cities, "..", "UHIs-FinalCityDataForAnalysis.csv"))
 summary(StatsCombined)
 
+# Start by summarizing Patterns of UHI & Vegetation in Cities
+biomeSummary <- aggregate(ISOURBID ~ biomeName + biomeCode, data=StatsCombined[,], FUN=length)
+names(biomeSummary)[3] <- "Total.N"
+biomeSummary$LSTmed <- aggregate(value.LST.core ~ biomeName, data=StatsCombined[,], FUN=median, na.rm=T)[,2]
+biomeSummary$UHI.med <- aggregate(value.LST.diff ~ biomeName, data=StatsCombined[,], FUN=median, na.rm=T)[,2]
+biomeSummary$Tree.med <- aggregate(value.tree.core ~ biomeName, data=StatsCombined[,], FUN=median, na.rm=T)[,2]
+biomeSummary$TreeDiff.med <- aggregate(value.tree.diff ~ biomeName, data=StatsCombined[,], FUN=median, na.rm=T)[,2]
+biomeSummary$OtherVeg.med <- aggregate(value.other.core ~ biomeName, data=StatsCombined[,], FUN=median, na.rm=T)[,2]
+biomeSummary$OtherVegDiff.med <- aggregate(value.other.diff ~ biomeName, data=StatsCombined[,], FUN=median, na.rm=T)[,2]
+biomeSummary
+
+# Characterizing Cities with observed UHI UHI
+citiesUHI <- which(StatsCombined$value.LST.diff>0)
+length(citiesUHI); nrow(StatsCombined); length(citiesUHI)/nrow(StatsCombined)
+
+biomeUHISummary <- aggregate(ISOURBID ~ biomeName + biomeCode, data=StatsCombined[citiesUHI,], FUN=length)
+names(biomeUHISummary)[3] <- "citiesUHI.N"
+biomeUHISummary$citiesUHI.LSTmed <- aggregate(value.LST.core ~ biomeName, data=StatsCombined[citiesUHI,], FUN=median, na.rm=T)[,2]
+biomeUHISummary$UHI.UHI.med <- aggregate(value.LST.diff ~ biomeName, data=StatsCombined[citiesUHI,], FUN=median, na.rm=T)[,2]
+biomeUHISummary$UHI.Tree.med <- aggregate(value.tree.core ~ biomeName, data=StatsCombined[citiesUHI,], FUN=median, na.rm=T)[,2]
+biomeUHISummary$UHI.TreeDiff.med <- aggregate(value.tree.diff ~ biomeName, data=StatsCombined[citiesUHI,], FUN=median, na.rm=T)[,2]
+biomeUHISummary$UHI.OtherVeg.med <- aggregate(value.other.core ~ biomeName, data=StatsCombined[citiesUHI,], FUN=median, na.rm=T)[,2]
+biomeUHISummary$UHI.OtherVegDiff.med <- aggregate(value.other.diff ~ biomeName, data=StatsCombined[citiesUHI,], FUN=median, na.rm=T)[,2]
+biomeUHISummary <- merge(biomeSummary[c("biomeName", "biomeCode", "Total.N")], biomeUHISummary, all=T)
+biomeUHISummary$citiesUHI.p <- round(biomeUHISummary$citiesUHI.N/biomeUHISummary$Total.N, 2)
+biomeUHISummary
+
+# Characterizing Cities with UHI & Warming
+citiesWarmUHI <- which(StatsCombined$value.LST.diff>0 & StatsCombined$trend.LST.core>0)
+length(citiesWarmUHI); length(citiesUHI); nrow(StatsCombined); length(citiesWarmUHI)/length(citiesUHI); length(citiesWarmUHI)/nrow(StatsCombined)
+
+biomeWarmUHISummary <- aggregate(ISOURBID ~ biomeName + biomeCode, data=StatsCombined[citiesWarmUHI,], FUN=length)
+names(biomeWarmUHISummary)[3] <- "citiesWarmUHI.N"
+biomeWarmUHISummary$citiesWarmUHI.LSTmed <- aggregate(value.LST.core ~ biomeName, data=StatsCombined[citiesWarmUHI,], FUN=median, na.rm=T)[,2]
+biomeWarmUHISummary$WarmUHI.WarmUHI.med <- aggregate(value.LST.diff ~ biomeName, data=StatsCombined[citiesWarmUHI,], FUN=median, na.rm=T)[,2]
+biomeWarmUHISummary$WarmUHI.Tree.med <- aggregate(value.tree.core ~ biomeName, data=StatsCombined[citiesWarmUHI,], FUN=median, na.rm=T)[,2]
+biomeWarmUHISummary$WarmUHI.TreeDiff.med <- aggregate(value.tree.diff ~ biomeName, data=StatsCombined[citiesWarmUHI,], FUN=median, na.rm=T)[,2]
+biomeWarmUHISummary$WarmUHI.OtherVeg.med <- aggregate(value.other.core ~ biomeName, data=StatsCombined[citiesWarmUHI,], FUN=median, na.rm=T)[,2]
+biomeWarmUHISummary$WarmUHI.OtherVegDiff.med <- aggregate(value.other.diff ~ biomeName, data=StatsCombined[citiesWarmUHI,], FUN=median, na.rm=T)[,2]
+biomeWarmUHISummary <- merge(biomeSummary[c("biomeName", "biomeCode", "Total.N")], biomeWarmUHISummary, all=T)
+biomeWarmUHISummary$citiesWarmUHI.p <- round(biomeWarmUHISummary$citiesWarmUHI.N/biomeWarmUHISummary$Total.N, 2)
+biomeWarmUHISummary
+
+# Characterizing Cities with intensifying UHI
+citiesIntensifyUHI <- which(StatsCombined$value.LST.diff>0 & StatsCombined$trend.LST.diff>0)
+length(citiesIntensifyUHI); length(citiesUHI); nrow(StatsCombined); length(citiesIntensifyUHI)/length(citiesUHI); length(citiesIntensifyUHI)/nrow(StatsCombined)
+
+biomeIntensifyUHISummary <- aggregate(ISOURBID ~ biomeName + biomeCode, data=StatsCombined[citiesIntensifyUHI,], FUN=length)
+names(biomeIntensifyUHISummary)[3] <- "citiesIntensifyUHI.N"
+biomeIntensifyUHISummary$citiesIntensifyUHI.LSTmed <- aggregate(value.LST.core ~ biomeName, data=StatsCombined[citiesIntensifyUHI,], FUN=median, na.rm=T)[,2]
+biomeIntensifyUHISummary$IntensifyUHI.IntensifyUHI.med <- aggregate(value.LST.diff ~ biomeName, data=StatsCombined[citiesIntensifyUHI,], FUN=median, na.rm=T)[,2]
+biomeIntensifyUHISummary$IntensifyUHI.Tree.med <- aggregate(value.tree.core ~ biomeName, data=StatsCombined[citiesIntensifyUHI,], FUN=median, na.rm=T)[,2]
+biomeIntensifyUHISummary$IntensifyUHI.TreeDiff.med <- aggregate(value.tree.diff ~ biomeName, data=StatsCombined[citiesIntensifyUHI,], FUN=median, na.rm=T)[,2]
+biomeIntensifyUHISummary$IntensifyUHI.OtherVeg.med <- aggregate(value.other.core ~ biomeName, data=StatsCombined[citiesIntensifyUHI,], FUN=median, na.rm=T)[,2]
+biomeIntensifyUHISummary$IntensifyUHI.OtherVegDiff.med <- aggregate(value.other.diff ~ biomeName, data=StatsCombined[citiesIntensifyUHI,], FUN=median, na.rm=T)[,2]
+biomeIntensifyUHISummary <- merge(biomeSummary[c("biomeName", "biomeCode", "Total.N")], biomeIntensifyUHISummary, all=T)
+biomeIntensifyUHISummary$citiesIntensifyUHI.p <- round(biomeIntensifyUHISummary$citiesIntensifyUHI.N/biomeIntensifyUHISummary$Total.N, 2)
+biomeIntensifyUHISummary
+
+# Characterizing Cities with any Warming
+citiesWarm <- which(StatsCombined$trend.LST.core>0)
+length(citiesWarm); length(citiesUHI); nrow(StatsCombined); length(citiesWarm)/nrow(StatsCombined)
+
+biomeWarmSummary <- aggregate(ISOURBID ~ biomeName + biomeCode, data=StatsCombined[citiesWarm,], FUN=length)
+names(biomeWarmSummary)[3] <- "citiesWarm.N"
+biomeWarmSummary$citiesWarm.LSTmed <- aggregate(value.LST.core ~ biomeName, data=StatsCombined[citiesWarm,], FUN=median, na.rm=T)[,2]
+biomeWarmSummary$Warm.Warm.med <- aggregate(value.LST.diff ~ biomeName, data=StatsCombined[citiesWarm,], FUN=median, na.rm=T)[,2]
+biomeWarmSummary$Warm.Tree.med <- aggregate(value.tree.core ~ biomeName, data=StatsCombined[citiesWarm,], FUN=median, na.rm=T)[,2]
+biomeWarmSummary$Warm.TreeDiff.med <- aggregate(value.tree.diff ~ biomeName, data=StatsCombined[citiesWarm,], FUN=median, na.rm=T)[,2]
+biomeWarmSummary$Warm.OtherVeg.med <- aggregate(value.other.core ~ biomeName, data=StatsCombined[citiesWarm,], FUN=median, na.rm=T)[,2]
+biomeWarmSummary$Warm.OtherVegDiff.med <- aggregate(value.other.diff ~ biomeName, data=StatsCombined[citiesWarm,], FUN=median, na.rm=T)[,2]
+biomeWarmSummary <- merge(biomeSummary[c("biomeName", "biomeCode", "Total.N")], biomeWarmSummary, all=T)
+biomeWarmSummary$citiesWarm.p <- round(biomeWarmSummary$citiesWarm.N/biomeWarmSummary$Total.N, 2)
+biomeWarmSummary
+
+
+cbind(biomeWarmSummary[,c("biomeName", "biomeCode", "Total.N", "citiesWarm.N", "citiesWarm.p")],
+      biomeUHISummary[,c("citiesUHI.N", "citiesUHI.p")], 
+      biomeWarmUHISummary[,c("citiesWarmUHI.N", "citiesWarmUHI.p")],
+      biomeIntensifyUHISummary[,c("citiesIntensifyUHI.N", "citiesIntensifyUHI.p")])
+
+
+
+
+cbind(biomeUHISummary[,c("biomeName", "biomeCode", "Total.N", "citiesUHI.N", "citiesUHI.p")], 
+      biomeIntensifyUHISummary[,c("citiesIntensifyUHI.N", "citiesIntensifyUHI.p")],
+      biomeWarmSummary[,c("citiesWarm.N", "citiesWarm.p")],
+      biomeWarmUHISummary[,c("citiesWarmUHI.N", "citiesWarmUHI.p")]
+      )
+
+
+
+
+
+
+
+
+
+
 
 # StatsCombined$LSTTrend.Tree <- StatsCombined$trend.tree.core*StatsCombined$model.tree.slope 
 # StatsCombined$LSTTrend.Other <- StatsCombined$trend.other.core*StatsCombined$model.veg.slope 
@@ -141,15 +240,20 @@ ggplot(data=StatsCombined[citiesIntenseUHI,]) +
   theme_classic()
 
 
+# NTot <- aggregate(ISOURBID ~ biomeName + biomeCode, data=StatsCombined[,], FUN=length)
+# names(NTot)[3] <- "N.Total"
 
-TrendLSTsObs <- aggregate(ISOURBID ~ biomeName + biomeCode, data=StatsCombined[intensifyUHI,], FUN=length)
+
+TrendLSTsObs <- aggregate(ISOURBID ~ biomeName + biomeCode, data=StatsCombined[,], FUN=length)
 names(TrendLSTsObs)[3] <- "N.Analyzed"
-TrendLSTsObs$EstLST2001 <- aggregate(EstLST2001 ~ biomeName, data=StatsCombined[intensifyUHI,], FUN=median, na.rm=T)[,2]
-TrendLSTsObs$EstLST2020 <- aggregate(EstLST2020 ~ biomeName, data=StatsCombined[intensifyUHI,], FUN=median, na.rm=T)[,2]
-TrendLSTsObs$TrendObsLSTMed <- aggregate(trend.tree.core ~ biomeName, data=StatsCombined[intensifyUHI,], FUN=median, na.rm=T)[,2]
-TrendLSTsObs$TrendObsLSTlo <- aggregate(trend.tree.core ~ biomeName, data=StatsCombined[intensifyUHI,], FUN=quantile, 0.25)[,2]
-TrendLSTsObs$TrendObsLSThi <- aggregate(trend.tree.core ~ biomeName, data=StatsCombined[intensifyUHI,], FUN=quantile, 0.75)[,2]
+TrendLSTsObs$EstLST2001 <- aggregate(EstLST2001 ~ biomeName, data=StatsCombined[,], FUN=median, na.rm=T)[,2]
+TrendLSTsObs$EstLST2020 <- aggregate(EstLST2020 ~ biomeName, data=StatsCombined[,], FUN=median, na.rm=T)[,2]
+TrendLSTsObs$TrendObsLSTMed <- aggregate(trend.LST.core ~ biomeName, data=StatsCombined[,], FUN=median, na.rm=T)[,2]
+TrendLSTsObs$TrendObsLSTlo <- aggregate(trend.LST.core ~ biomeName, data=StatsCombined[,], FUN=quantile, 0.25)[,2]
+TrendLSTsObs$TrendObsLSThi <- aggregate(trend.LST.core ~ biomeName, data=StatsCombined[,], FUN=quantile, 0.75)[,2]
 TrendLSTsObs
+
+# TrendLSTsObs <- merge(NTot, TrendLSTsObs, all=T)
 
 # Removed subsetting Intensifying UHI from this # intensifyUHI
 # intensifyUHI <- StatsCombined$value.LST.diff>0 & StatsCombined$trend.LST.core>0 & StatsCombined$trend.LST.diff>0 & StatsCombined$trend.LST.diff.p<0.01
@@ -157,15 +261,12 @@ TrendLSTsObs
 
 TrendLSTsUHI <- aggregate(ISOURBID ~ biomeName, data=StatsCombined[intensifyUHI,], FUN=length)
 names(TrendLSTsUHI)[2] <- "N.UHI"
-TrendLSTsUHI$TrendUHIMed <- aggregate(trend.LST.diff ~ biomeName, data=StatsCombined[intensifyUHI,], FUN=median, na.rm=T)[,2]
-TrendLSTsUHI$TrendUHIlo <- aggregate(trend.LST.diff ~ biomeName, data=StatsCombined[intensifyUHI,], FUN=quantile, 0.25)[,2]
-TrendLSTsUHI$TrendUHIhi <- aggregate(trend.LST.diff ~ biomeName, data=StatsCombined[intensifyUHI,], FUN=quantile, 0.75)[,2]
-TrendLSTsUHI$TrendUHILSTMed <- aggregate(trend.tree.core ~ biomeName, data=StatsCombined[intensifyUHI,], FUN=median, na.rm=T)[,2]
-TrendLSTsUHI$TrendUHILSTlo <- aggregate(trend.tree.core ~ biomeName, data=StatsCombined[intensifyUHI,], FUN=quantile, 0.25)[,2]
-TrendLSTsUHI$TrendUHILSThi <- aggregate(trend.tree.core ~ biomeName, data=StatsCombined[intensifyUHI,], FUN=quantile, 0.75)[,2]
+TrendLSTsUHI$TrendUHIdiffMed <- aggregate(trend.LST.diff ~ biomeName, data=StatsCombined[intensifyUHI,], FUN=median, na.rm=T)[,2]
+TrendLSTsUHI$TrendUHIdiffLo <- aggregate(trend.LST.diff ~ biomeName, data=StatsCombined[intensifyUHI,], FUN=quantile, 0.25)[,2]
+TrendLSTsUHI$TrendUHIdiffHi <- aggregate(trend.LST.diff ~ biomeName, data=StatsCombined[intensifyUHI,], FUN=quantile, 0.75)[,2]
 TrendLSTsUHI$TargetUHILSTMed <- aggregate(TargetLST2020NoUHI ~ biomeName, data=StatsCombined[intensifyUHI,], FUN=median, na.rm=T)[,2]
-TrendLSTsUHI$TargetUHILSTlo <- aggregate(TargetLST2020NoUHI ~ biomeName, data=StatsCombined[intensifyUHI,], FUN=quantile, 0.25)[,2]
-TrendLSTsUHI$TargetUHILSThi <- aggregate(TargetLST2020NoUHI ~ biomeName, data=StatsCombined[intensifyUHI,], FUN=quantile, 0.75)[,2]
+TrendLSTsUHI$TargetUHILSTLo <- aggregate(TargetLST2020NoUHI ~ biomeName, data=StatsCombined[intensifyUHI,], FUN=quantile, 0.25)[,2]
+TrendLSTsUHI$TargetUHILSTHi <- aggregate(TargetLST2020NoUHI ~ biomeName, data=StatsCombined[intensifyUHI,], FUN=quantile, 0.75)[,2]
 TrendLSTsUHI <- merge(TrendLSTsObs, TrendLSTsUHI, all=T)
 TrendLSTsUHI
 
@@ -190,9 +291,9 @@ names(TrendLSTsWarm)[2] <- "N.Warm"
 TrendLSTsWarm$TrendWarmMed <- aggregate(trend.LST.core ~ biomeName, data=StatsCombined[intensifyUHI,], FUN=median, na.rm=T)[,2]
 TrendLSTsWarm$TrendWarmlo <- aggregate(trend.LST.core ~ biomeName, data=StatsCombined[intensifyUHI,], FUN=quantile, 0.25)[,2]
 TrendLSTsWarm$TrendWarmhi <- aggregate(trend.LST.core ~ biomeName, data=StatsCombined[intensifyUHI,], FUN=quantile, 0.75)[,2]
-TrendLSTsWarm$TrendWarmLSTMed <- aggregate(trend.tree.core ~ biomeName, data=StatsCombined[intensifyUHI,], FUN=median, na.rm=T)[,2]
-TrendLSTsWarm$TrendWarmLSTlo <- aggregate(trend.tree.core ~ biomeName, data=StatsCombined[intensifyUHI,], FUN=quantile, 0.25)[,2]
-TrendLSTsWarm$TrendWarmLSThi <- aggregate(trend.tree.core ~ biomeName, data=StatsCombined[intensifyUHI,], FUN=quantile, 0.75)[,2]
+# TrendLSTsWarm$TrendWarmLSTMed <- aggregate(trend.tree.core ~ biomeName, data=StatsCombined[intensifyUHI,], FUN=median, na.rm=T)[,2]
+# TrendLSTsWarm$TrendWarmLSTlo <- aggregate(trend.tree.core ~ biomeName, data=StatsCombined[intensifyUHI,], FUN=quantile, 0.25)[,2]
+# TrendLSTsWarm$TrendWarmLSThi <- aggregate(trend.tree.core ~ biomeName, data=StatsCombined[intensifyUHI,], FUN=quantile, 0.75)[,2]
 TrendLSTsWarm$TargetWarmLSTMed <- aggregate(TargetLST2020NoWarming ~ biomeName, data=StatsCombined[intensifyUHI,], FUN=median, na.rm=T)[,2]
 TrendLSTsWarm$TargetWarmLSTlo <- aggregate(TargetLST2020NoWarming ~ biomeName, data=StatsCombined[intensifyUHI,], FUN=quantile, 0.25)[,2]
 TrendLSTsWarm$TargetWarmLSThi <- aggregate(TargetLST2020NoWarming ~ biomeName, data=StatsCombined[intensifyUHI,], FUN=quantile, 0.75)[,2]
