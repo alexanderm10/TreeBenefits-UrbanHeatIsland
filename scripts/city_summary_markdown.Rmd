@@ -1,0 +1,48 @@
+---
+title: "Core v. Buffer"
+author: "M. Ross Alexander"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Core vs. Buffer Summary
+
+This document presents summary statistics for comparing metropolitan cores vs. the 10km reference region. The reference region is a developed area and should not be assumed to be pristine wilderness. Averages were computed for the full period of analysis (2001-2021).
+
+```{r echo=F}
+dat <- read.csv("C:/Users/malexander/Documents/r_files/northstar2023/1km_modis/core_v_buffer.csv")
+
+# needing to but in a filter that a user can interact with
+
+temp <- #filtered data
+
+
+```
+
+*City Name:* `r <paste0(temp$NAME, ", ", temp$state)>`\
+*Biome*: `r <temp$biome>`\
+*FEMA Region:* `r <temp$fema.region>`\
+
+## Temperature
+
+*Average core LST:* `r <temp$fema.region>`\
+*Average reference LST:* `r <temp$fema.region>`\
+*LST difference:* `r <temp$fema.region>`\
+
+## Tree Cover
+
+*Average core tree cover:* `r <temp$fema.region>`\
+*Average reference tree cover:* `r <temp$fema.region>`\
+*Tree cover difference:* `r <temp$fema.region>`\
+
+## Non-tree Cover
+
+*Average core non-tree cover:* `r <temp$fema.region>`\
+*Average reference non-tree cover:* `r <temp$fema.region>`\
+*Non-tree cover difference:* `r <temp$fema.region>`\
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.

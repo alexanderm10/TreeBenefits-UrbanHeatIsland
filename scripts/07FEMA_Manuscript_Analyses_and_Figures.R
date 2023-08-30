@@ -133,6 +133,12 @@ summary(cityAll.stats[!is.na(cityAll.stats$model.R2adj),])
 cityAll.stats$biome <- gsub("flodded", "flooded", cityAll.stats$biome) # Whoops, had a typo!  Not going to reprocess now.
 summary(as.factor(cityAll.stats$biome))
 
+cityAll.stats$fema.region <- car::recode(cityAll.stats$fema.region, "'region1'='Region 1';'region2'='Region 2';'region3'='Region 3';
+                                         'region4'='Region 4';'region5'='Region 5';'region6'='Region 6';'region7'='Region 7';'region8'='Region 8';
+                                         'region9'='Region 9';'region10'='Region 10'")
+
+
+
 cityAll.stats$biomeName <- car::recode(cityAll.stats$biome, 
                                        "'boreal forest/taiga'='Taiga';
                                        'tundra'='Tundra';
@@ -303,9 +309,13 @@ summary(cityStatsAnaly$biomeName)
 dim(cityStatsAnaly)
 
 # cityStatsAnaly[cityStatsAnaly$model.tree.slope < -1.0,]
-cityStatsAnaly[cityStatsAnaly$model.R2adj < 0.35,]
+cityStatsAnaly[cityStatsAnaly$model.R2adj < 0.5,]
 
 nrow(cityStatsAnaly)
+# saving significant city IDs
+sig.city.id <- cityStatsAnaly[, c("ISOURBID", "NAME","state")]
+head(sig.city.id)
+write.csv(sig.city.id, file.path(path.save, "sig_analyzed_cities.csv"), row.names=F)
 
 
 cityTree <- cityBuffAnaly[cityBuffAnaly$factor=="tree", c("ISOURBID", "value.mean.core", "value.mean.diff", "value.mean.diff.p", "trend.mean.core", "trend.p.core", "trend.mean.diff", "trend.mean.diff.p", "fema.region")]
@@ -649,6 +659,7 @@ effectsUHI$ind <- factor(effectsUHI$ind, levels=c("Tree", "Non-Tree Veg", "Remai
 effectsUHI[,c("ISOURBID", "biomeName", "biomeCode", "biomeCodeRev", "value.LST.diff.p", "femaRegion")] <- StatsCombined[citiesUHI,c("ISOURBID", "biomeName", "biomeCode", "biomeCodeRev", "value.LST.diff.p", "fema.region")]
 summary(effectsUHI)
 
+saveRDS(effectsUHI, file.path(path.save, "UHI_effects_fig_data.Rds"))
 # "#67001f" "#b2182b" "#d6604d" "#f4a582" "#fbbdc7" "#d1e5f0" "#92c5de" "#4393c3" "#2166ac" "#053061"
 # "#f03b20"    "#ef3b2c"
 plotTempEffects <- ggplot(data=effectsUHI, aes(x=biomeCode, y=values, fill=ind)) + 
@@ -740,14 +751,189 @@ ncitiesAnaly <- aggregate(ISOURBID ~ biomeName*fema.region, data=StatsCombined, 
 ncitiesAnaly <- merge(ncitiesAnaly, nsigUHI, all=T)
 ncitiesAnaly$N.UHI[is.na(ncitiesAnaly$N.UHI)] <- 0
 
+# ordering ncitiesAnaly
+ncitiesAnaly <- ncitiesAnaly[order(ncitiesAnaly$fema.region, decreasing = F),]
+
+# creating stats for biome only----
+ncitiesAll <- aggregate(ISOURBID ~ biomeName, data=cityAll.stats, FUN = length)
+names(ncitiesAll) <- c("Biome", "N.Total")
+
+nsigUHI <- aggregate(ISOURBID ~ biomeName, data=StatsCombined[StatsCombined$value.LST.diff>0 & StatsCombined$value.LST.diff.p<0.01, ], FUN = length)
+names(nsigUHI)[2] <- c("N.UHI")
+
+
+ncitiesAnaly <- aggregate(ISOURBID ~ biomeName, data=StatsCombined, FUN = length)
+#names(ncitiesAnaly)[3] <- c("N.Analyzed")
+ncitiesAnaly <- merge(ncitiesAnaly, nsigUHI, all=T)
+ncitiesAnaly$N.UHI[is.na(ncitiesAnaly$N.UHI)] <- 0
+
+# ordering ncitiesAnaly
+# ncitiesAnaly <- ncitiesAnaly[order(ncitiesAnaly$fema.region, decreasing = F),]
+
+summary(StatsCombined)
+test <- aggregate(cbind(value.LST.core, value.tree.core, value.other.core) ~ biomeName, data=StatsCombined, FUN = mean)
+summary(test)
+
+temp1 <- aggregate(cbind(value.LST.core, value.tree.core, value.other.core) ~ biomeName, data=StatsCombined, FUN = mean)
+names(temp1)[2:4] <- c("LST.mean", "Tree.mean", "Other.mean")
+ncitiesAnaly <- merge(ncitiesAnaly, temp1, all=T)
+
+
+temp2 <- aggregate(cbind(value.LST.core, value.tree.core, value.other.core) ~ biomeName, data=StatsCombined, FUN = sd)
+names(temp2)[2:4] <- c("LST.sd", "Tree.sd", "Other.sd")
+ncitiesAnaly <- merge(ncitiesAnaly, temp2, all=T)
+
+temp3 <- aggregate(cbind(value.LST.diff, value.tree.diff, value.other.diff) ~ biomeName, data=StatsCombined, FUN = mean)
+names(temp3)[2:4] <- c("LSTDiff.mean", "TreeDiff.mean", "OtherDiff.mean")
+ncitiesAnaly <- merge(ncitiesAnaly, temp3, all=T)
+
+temp4 <- aggregate(cbind(value.LST.diff, value.tree.diff, value.other.diff) ~ biomeName, data=StatsCombined, FUN = sd)
+names(temp4)[2:4] <- c("LSTDiff.sd", "TreeDiff.sd", "OtherDiff.sd")
+ncitiesAnaly <- merge(ncitiesAnaly, temp4, all=T)
+
+head(ncitiesAnaly)
+ncitiesAnaly[,2:ncol(ncitiesAnaly)] <- round(ncitiesAnaly[,2:ncol(ncitiesAnaly)], 2)
+# ncitiesAnaly[,c("LST.sd", "Tree.sd", "Other.sd")] <- round(aggregate(cbind(value.LST.core, value.tree.core, value.other.core) ~ biomeName, data=StatsCombined, FUN = sd)[,c(2:4)], 2)
+
+ncitiesAnaly
+
+TableCitySummary <- data.frame(Biome = ncitiesAnaly$biomeName,
+                               # Fema.Region = ncitiesAnaly$fema.region,
+                               N.Analyzed = ncitiesAnaly$ISOURBID, 
+                               N.UHI = ncitiesAnaly$N.UHI, 
+                               LST.mean = paste0(ncitiesAnaly$LST.mean, " (", ncitiesAnaly$LST.sd, ")"),
+                               Tree.mean = paste0(round(ncitiesAnaly$Tree.mean, 0), " (", round(ncitiesAnaly$Tree.sd, 0), ")"),
+                               OtherVeg.mean = paste0(round(ncitiesAnaly$Other.mean, 0), " (", round(ncitiesAnaly$Other.sd, 0), ")"),
+                               LST.diff = paste0(ncitiesAnaly$LSTDiff.mean, " (", ncitiesAnaly$LSTDiff.sd, ")"),
+                               Tree.diff = paste0(round(ncitiesAnaly$TreeDiff.mean, 0), " (", round(ncitiesAnaly$TreeDiff.sd, 0), ")"),
+                               OtherVeg.diff = paste0(round(ncitiesAnaly$OtherDiff.mean, 0), " (", round(ncitiesAnaly$OtherDiff.sd, 0), ")"))
+
+TableCitySummary <- merge(ncitiesAll, TableCitySummary, by.x=c("Biome"), by.y=c("Biome"),all=T)
+TableCitySummary <- TableCitySummary[order(TableCitySummary$Biome),]
+TableCitySummary
+
+
+write.csv(TableCitySummary, file.path(path.figs, "SuppTable1_Biome_CitySummaryStats_biome_only.csv"), row.names=F)
+
+# making region specific tables
+for(i in unique(TableCitySummary$Biome)){
+  temp <- TableCitySummary[TableCitySummary$Biome==i,]
+  
+  if(i %in% c("Temperate Grassland/Savanna", "Tropical Grassland/Savanna")) write.csv(temp, file.path(path.figs, "region_tables", "supp1","biome", paste0(sapply(strsplit(i, "/"), `[`, 1),"_SuppTable1_Biome_CitySummaryStats.csv")), row.names=F) else
+  write.csv(temp, file.path(path.figs, "region_tables", "supp1","biome", paste0(i,"_SuppTable1_Biome_CitySummaryStats.csv")), row.names=F)
+  
+}
+
+
+
+# Creating stats for region only----
+ncitiesAll <- aggregate(ISOURBID ~ fema.region, data=cityAll.stats, FUN = length)
+names(ncitiesAll) <- c("FEMA_Region", "N.Total")
+
+nsigUHI <- aggregate(ISOURBID ~ fema.region, data=StatsCombined[StatsCombined$value.LST.diff>0 & StatsCombined$value.LST.diff.p<0.01, ], FUN = length)
+names(nsigUHI)[2] <- c("N.UHI")
+
+
+ncitiesAnaly <- aggregate(ISOURBID ~ fema.region, data=StatsCombined, FUN = length)
+#names(ncitiesAnaly)[3] <- c("N.Analyzed")
+ncitiesAnaly <- merge(ncitiesAnaly, nsigUHI, all=T)
+ncitiesAnaly$N.UHI[is.na(ncitiesAnaly$N.UHI)] <- 0
+
+# ordering ncitiesAnaly
+ncitiesAnaly <- ncitiesAnaly[order(ncitiesAnaly$fema.region, decreasing = F),]
+
+summary(StatsCombined)
+test <- aggregate(cbind(value.LST.core, value.tree.core, value.other.core) ~ fema.region, data=StatsCombined, FUN = mean)
+summary(test)
+
+temp1 <- aggregate(cbind(value.LST.core, value.tree.core, value.other.core) ~ fema.region, data=StatsCombined, FUN = mean)
+names(temp1)[2:4] <- c("LST.mean", "Tree.mean", "Other.mean")
+ncitiesAnaly <- merge(ncitiesAnaly, temp1, all=T)
+
+
+temp2 <- aggregate(cbind(value.LST.core, value.tree.core, value.other.core) ~ fema.region, data=StatsCombined, FUN = sd)
+names(temp2)[2:4] <- c("LST.sd", "Tree.sd", "Other.sd")
+ncitiesAnaly <- merge(ncitiesAnaly, temp2, all=T)
+
+temp3 <- aggregate(cbind(value.LST.diff, value.tree.diff, value.other.diff) ~ fema.region, data=StatsCombined, FUN = mean)
+names(temp3)[2:4] <- c("LSTDiff.mean", "TreeDiff.mean", "OtherDiff.mean")
+ncitiesAnaly <- merge(ncitiesAnaly, temp3, all=T)
+
+temp4 <- aggregate(cbind(value.LST.diff, value.tree.diff, value.other.diff) ~ fema.region, data=StatsCombined, FUN = sd)
+names(temp4)[2:4] <- c("LSTDiff.sd", "TreeDiff.sd", "OtherDiff.sd")
+ncitiesAnaly <- merge(ncitiesAnaly, temp4, all=T)
+
+head(ncitiesAnaly)
+ncitiesAnaly[,4:ncol(ncitiesAnaly)] <- round(ncitiesAnaly[,4:ncol(ncitiesAnaly)], 2)
+# ncitiesAnaly[,c("LST.sd", "Tree.sd", "Other.sd")] <- round(aggregate(cbind(value.LST.core, value.tree.core, value.other.core) ~ biomeName, data=StatsCombined, FUN = sd)[,c(2:4)], 2)
+
+ncitiesAnaly
+
+TableCitySummary <- data.frame(# Biome = ncitiesAnaly$biomeName,
+                               Fema.Region = ncitiesAnaly$fema.region,
+                               N.Analyzed = ncitiesAnaly$ISOURBID, 
+                               N.UHI = ncitiesAnaly$N.UHI, 
+                               LST.mean = paste0(ncitiesAnaly$LST.mean, " (", ncitiesAnaly$LST.sd, ")"),
+                               Tree.mean = paste0(round(ncitiesAnaly$Tree.mean, 0), " (", round(ncitiesAnaly$Tree.sd, 0), ")"),
+                               OtherVeg.mean = paste0(round(ncitiesAnaly$Other.mean, 0), " (", round(ncitiesAnaly$Other.sd, 0), ")"),
+                               LST.diff = paste0(ncitiesAnaly$LSTDiff.mean, " (", ncitiesAnaly$LSTDiff.sd, ")"),
+                               Tree.diff = paste0(round(ncitiesAnaly$TreeDiff.mean, 0), " (", round(ncitiesAnaly$TreeDiff.sd, 0), ")"),
+                               OtherVeg.diff = paste0(round(ncitiesAnaly$OtherDiff.mean, 0), " (", round(ncitiesAnaly$OtherDiff.sd, 0), ")"))
+
+TableCitySummary <- merge(ncitiesAll, TableCitySummary, by.x=c("FEMA_Region"), by.y=c("Fema.Region"),all=T)
+TableCitySummary <- TableCitySummary[order(TableCitySummary$FEMA_Region),]
+TableCitySummary
+
+
+write.csv(TableCitySummary, file.path(path.figs, "SuppTable1_Biome_CitySummaryStats_fema_only.csv"), row.names=F)
+
+# making region specific tables
+for(i in unique(TableCitySummary$FEMA_Region)){
+  temp <- TableCitySummary[TableCitySummary$FEMA_Region==i,]
+  
+  write.csv(temp, file.path(path.figs, "region_tables", "supp1", "region", paste0(i,"_SuppTable1_Biome_CitySummaryStats_fema.csv")), row.names=F)
+  
+}
+
+# creating stats for biome by region----
+ncitiesAll <- aggregate(ISOURBID ~ biomeName*fema.region, data=cityAll.stats, FUN = length)
+names(ncitiesAll) <- c("Biome", "FEMA_Region", "N.Total")
+
+nsigUHI <- aggregate(ISOURBID ~ biomeName*fema.region, data=StatsCombined[StatsCombined$value.LST.diff>0 & StatsCombined$value.LST.diff.p<0.01, ], FUN = length)
+names(nsigUHI)[3] <- c("N.UHI")
+
+
+ncitiesAnaly <- aggregate(ISOURBID ~ biomeName*fema.region, data=StatsCombined, FUN = length)
+#names(ncitiesAnaly)[3] <- c("N.Analyzed")
+ncitiesAnaly <- merge(ncitiesAnaly, nsigUHI, all=T)
+ncitiesAnaly$N.UHI[is.na(ncitiesAnaly$N.UHI)] <- 0
+
+# ordering ncitiesAnaly
+ncitiesAnaly <- ncitiesAnaly[order(ncitiesAnaly$fema.region, decreasing = F),]
+
 summary(StatsCombined)
 test <- aggregate(cbind(value.LST.core, value.tree.core, value.other.core) ~ biomeName*fema.region, data=StatsCombined, FUN = mean)
 summary(test)
 
-ncitiesAnaly[,c("LST.mean", "Tree.mean", "Other.mean")] <- round(aggregate(cbind(value.LST.core, value.tree.core, value.other.core) ~ biomeName*fema.region, data=StatsCombined, FUN = mean)[,c(3:5)], 2)
-ncitiesAnaly[,c("LST.sd", "Tree.sd", "Other.sd")] <- round(aggregate(cbind(value.LST.core, value.tree.core, value.other.core) ~ biomeName*fema.region, data=StatsCombined, FUN = sd)[,c(3:5)], 2)
-ncitiesAnaly[,c("LSTDiff.mean", "TreeDiff.mean", "OtherDiff.mean")] <- round(aggregate(cbind(value.LST.diff, value.tree.diff, value.other.diff) ~ biomeName*fema.region, data=StatsCombined, FUN = mean)[,c(3:5)], 2)
-ncitiesAnaly[,c("LSTDiff.sd", "TreeDiff.sd", "OtherDiff.sd")] <- round(aggregate(cbind(value.LST.diff, value.tree.diff, value.other.diff) ~ biomeName*fema.region, data=StatsCombined, FUN = sd)[,c(3:5)], 2)
+temp1 <- aggregate(cbind(value.LST.core, value.tree.core, value.other.core) ~ biomeName*fema.region, data=StatsCombined, FUN = mean)
+names(temp1)[3:5] <- c("LST.mean", "Tree.mean", "Other.mean")
+ncitiesAnaly <- merge(ncitiesAnaly, temp1, all=T)
+
+
+temp2 <- aggregate(cbind(value.LST.core, value.tree.core, value.other.core) ~ biomeName*fema.region, data=StatsCombined, FUN = sd)
+names(temp2)[3:5] <- c("LST.sd", "Tree.sd", "Other.sd")
+ncitiesAnaly <- merge(ncitiesAnaly, temp2, all=T)
+
+temp3 <- aggregate(cbind(value.LST.diff, value.tree.diff, value.other.diff) ~ biomeName*fema.region, data=StatsCombined, FUN = mean)
+names(temp3)[3:5] <- c("LSTDiff.mean", "TreeDiff.mean", "OtherDiff.mean")
+ncitiesAnaly <- merge(ncitiesAnaly, temp3, all=T)
+
+temp4 <- aggregate(cbind(value.LST.diff, value.tree.diff, value.other.diff) ~ biomeName*fema.region, data=StatsCombined, FUN = sd)
+names(temp4)[3:5] <- c("LSTDiff.sd", "TreeDiff.sd", "OtherDiff.sd")
+ncitiesAnaly <- merge(ncitiesAnaly, temp4, all=T)
+
+head(ncitiesAnaly)
+ncitiesAnaly[,5:ncol(ncitiesAnaly)] <- round(ncitiesAnaly[,5:ncol(ncitiesAnaly)], 2)
 # ncitiesAnaly[,c("LST.sd", "Tree.sd", "Other.sd")] <- round(aggregate(cbind(value.LST.core, value.tree.core, value.other.core) ~ biomeName, data=StatsCombined, FUN = sd)[,c(2:4)], 2)
 
 ncitiesAnaly
@@ -763,16 +949,26 @@ TableCitySummary <- data.frame(Biome = ncitiesAnaly$biomeName,
                                Tree.diff = paste0(round(ncitiesAnaly$TreeDiff.mean, 0), " (", round(ncitiesAnaly$TreeDiff.sd, 0), ")"),
                                OtherVeg.diff = paste0(round(ncitiesAnaly$OtherDiff.mean, 0), " (", round(ncitiesAnaly$OtherDiff.sd, 0), ")"))
 
-TableCitySummary <- merge(ncitiesAll, TableCitySummary, all=T)
+TableCitySummary <- merge(ncitiesAll, TableCitySummary, by.x=c("Biome", "FEMA_Region"), by.y=c("Biome", "Fema.Region"),all=T)
 TableCitySummary <- TableCitySummary[order(TableCitySummary$Biome),]
 TableCitySummary
 
 
 write.csv(TableCitySummary, file.path(path.figs, "SuppTable1_Biome_CitySummaryStats_fema.csv"), row.names=F)
 
+# making region specific tables
+for(i in unique(TableCitySummary$FEMA_Region)){
+  temp <- TableCitySummary[TableCitySummary$FEMA_Region==i,]
+  
+  write.csv(temp, file.path(path.figs, "region_tables", "supp1", paste0(i,"_SuppTable1_Biome_CitySummaryStats_fema.csv")), row.names=F)
+  
+}
+
+
 # SUPPELEMENTAL TABLE 3 BY BIOME---
 # - Tree/Veg Stats: slope, pSig, Cooling Contrib, UHI due to diff
 CoolStats <- aggregate(ISOURBID ~ biomeName*fema.region, data=StatsCombined, FUN = length)
+
 CoolStats[,c("TreeSlope.mean", "OtherSlope.mean")] <- round(aggregate(cbind(model.tree.slope, model.veg.slope) ~ biomeName*fema.region, data=StatsCombined, FUN = mean)[,c(3:4)], 2)
 CoolStats[,c("TreeSlope.sd", "OtherSlope.sd")] <- round(aggregate(cbind(model.tree.slope, model.veg.slope) ~ biomeName*fema.region, data=StatsCombined, FUN = sd)[,c(3:4)], 2)
 
@@ -811,6 +1007,12 @@ CoolStatsSummary <- data.frame(Biome = CoolStats$biomeName,
 CoolStatsSummary
 
 write.csv(CoolStatsSummary, file.path(path.figs, "SuppTable2_Biome_CoolingEffects_fema.csv"), row.names=F)
+
+for(i in unique(CoolStatsSummary$Fema.Region)){
+  temp <- CoolStatsSummary[CoolStatsSummary$Fema.Region==i,]
+  write.csv(temp, file.path(path.figs, "region_tables", "supp2", paste0(i,"_SuppTable2_Biome_CoolingEffects_fema.csv")), row.names=F)
+  
+}
 
 # ##########################################
 
@@ -928,6 +1130,9 @@ biomeTreeTarget <- biomeTreeTarget[order(biomeTreeTarget$Biome),]
 biomeTreeTarget
 write.csv(biomeTreeTarget, file.path(path.figs, "SuppTable3_Biome_TreeCoverTargets.csv"), row.names=F)
 
+
+
+
 # Coming up with region-biome-specific targets
 femaTargetStats <- aggregate(ISOURBID~fema.region, data=StatsCombined[citiesUHI,], FUN=length)
 
@@ -947,7 +1152,7 @@ femaTreeTarget <- data.frame(#Biome=femaTargetStats$biomeName,
 femaTreeTarget$Fema.Region <- factor(femaTreeTarget$Fema.Region, levels=levels(StatsCombined$fema.region))
 femaTreeTarget <- femaTreeTarget[order(femaTreeTarget$Fema.Region),]
 femaTreeTarget
-write.csv(biomeTreeTarget, file.path(path.figs, "SuppTable3_Biome_TreeCoverTargets_fema.csv"), row.names=F)
+write.csv(femaTreeTarget, file.path(path.figs, "SuppTable3_Biome_TreeCoverTargets_fema.csv"), row.names=F)
 
 
 
@@ -1131,16 +1336,17 @@ TrendsTreeAll$YlabWarm <-TrendsTreeAll$YendWarm
 TrendsTreeAll
 summary(StatsCombined)
 
+saveRDS(TrendsTreeAll, file.path(path.save, "Tree_trends_data.RDS"))
 figTrends <- ggplot(data=TrendsTreeAll[TrendsTreeAll$N.Analyzed>=10,]) +
   facet_wrap(~biomeCode) +
   geom_segment(data=StatsCombined[StatsCombined$biomeName %in% TrendsTreeAll$biomeName[TrendsTreeAll$N.Analyzed>=10],], aes(x=2001, xend=2020, y=EstTree2001, yend=EstTree2020), size=0.1, alpha=0.7, color="gray80") +
   geom_segment(aes(x=2001, xend=2020, y=EstTree2001, yend=EstTree2020, color="Observed Trend"), size=2) +
   geom_segment(aes(x=2001, xend=2020, y=EstTree2001, yend=YendUHI, color="Mitigate Development Warming"), size=2, linetype="dashed") +
-  geom_segment(aes(x=2001, xend=2020, y=EstTree2001, yend=YendWarm, color="Mitigate CC + Dev. Warming"), size=2, linetype="dashed") +
+  geom_segment(aes(x=2001, xend=2020, y=EstTree2001, yend=YendWarm, color="Mitigate All Warming"), size=2, linetype="dashed") +
   geom_text(aes(x=2020, y=EstTree2020-1, label=paste0("+",round(20*TrendObsTreeMed, 1), "%"), color="Observed Trend"), hjust=0, show.legend=F, size=3 ) +
   geom_text(aes(x=2020, y=YendUHI+1, label=paste0("+", round(20*TargetUHITreeMed, 1), "%"), color="Mitigate Development Warming"), hjust=0, show.legend=F, size=3) +
-  geom_text(aes(x=2020, y=YendWarm+3, label=paste0("+", round(20*TargetWarmTreeMed, 1), "%"), color="Mitigate CC + Dev. Warming"), hjust=0, show.legend=F, size=3) +
-  scale_color_manual(name="Tree Cover Trends", values=c("Observed Trend" = "#005a32", "Mitigate Development Warming"="#3FA242", "Mitigate CC + Dev. Warming"="#A3D16B"))+
+  geom_text(aes(x=2020, y=YendWarm+3, label=paste0("+", round(20*TargetWarmTreeMed, 1), "%"), color="Mitigate All Warming"), hjust=0, show.legend=F, size=3) +
+  scale_color_manual(name="Tree Cover Trends", values=c("Observed Trend" = "#005a32", "Mitigate Development Warming"="#3FA242", "Mitigate All Warming"="#A3D16B"))+
   scale_x_continuous(name="Year", breaks=c(2001, 2020), limits=c(1999, 2025)) +
   scale_y_continuous(name="Tree Cover (%)") +
   guides(label=NA) +
@@ -1184,6 +1390,10 @@ StatsCombined$EstTree2020 <- StatsCombined$value.tree.core + StatsCombined$trend
 StatsCombined$TargetTree2020UHI <- StatsCombined$EstTree2001 + StatsCombined$TargetConstantUHI*20
 StatsCombined$TargetTree2020Warming <- StatsCombined$EstTree2001 + StatsCombined$TargetOffsetWarming*20
 summary(StatsCombined)
+
+# savign statsCombined
+StatsCombined2 <- StatsCombined[,!names(StatsCombined) %in% c("xRobin", "yRobin", "xWinTri", "yWinTri")]
+write.csv(StatsCombined2, file.path(path.save, "cities_analyzed_detailed_stats.csv"), row.names=F)
 
 
 TrendTreesObsFema <- aggregate(ISOURBID ~ fema.region, data=StatsCombined, FUN=length)
@@ -1266,11 +1476,11 @@ figTrends_fema <- ggplot(data=TrendsTreeAllFema[TrendsTreeAllFema$N.Analyzed>=10
   geom_segment(data=StatsCombined[StatsCombined$fema.region %in% TrendsTreeAllFema$fema.region[TrendsTreeAllFema$N.Analyzed>=10],], aes(x=2001, xend=2020, y=EstTree2001, yend=EstTree2020), size=0.1, alpha=0.7, color="gray80") +
   geom_segment(aes(x=2001, xend=2020, y=EstTree2001, yend=EstTree2020, color="Observed Trend"), size=2) +
   geom_segment(aes(x=2001, xend=2020, y=EstTree2001, yend=YendUHI, color="Mitigate Development Warming"), size=2, linetype="dashed") +
-  geom_segment(aes(x=2001, xend=2020, y=EstTree2001, yend=YendWarm, color="Mitigate CC + Dev. Warming"), size=2, linetype="dashed") +
+  geom_segment(aes(x=2001, xend=2020, y=EstTree2001, yend=YendWarm, color="Mitigate All Warming"), size=2, linetype="dashed") +
   geom_text(aes(x=2020, y=EstTree2020-1, label=paste0("+",round(20*TrendObsTreeMed, 1), "%"), color="Observed Trend"), hjust=0, show.legend=F, size=3 ) +
   geom_text(aes(x=2020, y=YendUHI+1, label=paste0("+", round(20*TargetUHITreeMed, 1), "%"), color="Mitigate Development Warming"), hjust=0, show.legend=F, size=3) +
-  geom_text(aes(x=2020, y=YendWarm+3, label=paste0("+", round(20*TargetWarmTreeMed, 1), "%"), color="Mitigate CC + Dev. Warming"), hjust=0, show.legend=F, size=3) +
-  scale_color_manual(name="Tree Cover Trends", values=c("Observed Trend" = "#005a32", "Mitigate Development Warming"="#3FA242", "Mitigate CC + Dev. Warming"="#A3D16B"))+
+  geom_text(aes(x=2020, y=YendWarm+3, label=paste0("+", round(20*TargetWarmTreeMed, 1), "%"), color="Mitigate All Warming"), hjust=0, show.legend=F, size=3) +
+  scale_color_manual(name="Tree Cover Trends", values=c("Observed Trend" = "#005a32", "Mitigate Development Warming"="#3FA242", "Mitigate All Warming"="#A3D16B"))+
   scale_x_continuous(name="Year", breaks=c(2001, 2020), limits=c(1999, 2025)) +
   scale_y_continuous(name="Tree Cover (%)") +
   guides(label=NA) +
@@ -1296,4 +1506,7 @@ dev.off()
 tiff(file.path(path.figs, "Figure3_TreeCover_ObservedTargets_fema.tiff"), height=6, width=6, units="in", res=320)
 figTrends_fema
 dev.off()
+
+
+saveRDS(StatsCombined, file.path(path.save, "Distribution_fig_data.Rds"))
 

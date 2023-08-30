@@ -108,6 +108,11 @@ valMean$percentTreeCool <- valMean$Tree.diff.degC/valMean$LST.diff
 
 mean(valMean$percentTreeCool); sd(valMean$percentTreeCool)
 
+# some general plots of valMean by fema region
+library(ggplot2)
+ggplot(data=valMean) +
+  geom_histogram(aes(x=Tree.diff, fill=fema.region))
+
 #### Exploring statements from our outline ----
 # https://docs.google.com/document/d/1jzRpgNR8pWvmhS0bCULx4iAG5QjX5b0GcW8YPAs01VI/edit?usp=sharing
 
@@ -156,7 +161,7 @@ mean(valMean$Tree.diff[valMean$LST.diff>0 & valMean$Tree.diff<0]); sd(valMean$Tr
 
 ### # Looking at temporal trends in the urban core ----
 valTrendCore <- reshape(CityBuffStats[,c("ISOURBID", "factor", "trend.mean.core")], idvar="ISOURBID", timevar="factor", direction="wide")
-valTrendCore <- merge(valTrendCore, cityAll.stats[,c("ISOURBID", "NAME",  "LATITUDE", "LONGITUDE", "ES00POP", "biomeName", "model.tree.slope", "model.veg.slope")], all=T)
+valTrendCore <- merge(valTrendCore, cityAll.stats[,c("ISOURBID", "NAME",  "LATITUDE", "LONGITUDE", "ES00POP", "biomeName", "model.tree.slope", "model.veg.slope", "fema.region", "state")], all=T)
 
 # Converting the tree trend to deg. C per year ----
 valTrendCore$LST.change.Tree <- valTrendCore$trend.mean.core.tree*valTrendCore$model.tree.slope
@@ -168,4 +173,29 @@ summary(valTrendCore$LST.change.NoTree/valTrendCore$LST.change.Tree)
 
 # hist(valTrendCore$LST.change.Tree/valTrendCore$LST.change.NoTree, xlim=-)
 
+# calculating the mean temperature without trees
+valMean$no.tree.LST <-  valMean$value.mean.core.LST - (valMean$model.tree.slope*valMean$value.mean.core.tree)
+valMean$no.tree.LST.diff <- valMean$no.tree.LST - valMean$value.mean.core.LST
+summary(valMean$no.tree.LST.diff)
 
+ggplot(data=valMean) +
+  geom_point(aes(y=no.tree.LST.diff, x = value.mean.core.tree))
+
+# plotting to check that it would go up
+ggplot(data=valMean) +
+  geom_violin(aes(x=1, y= value.mean.core.LST)) +
+  stat_summary(aes(x=1, y= value.mean.core.LST), fun.y=mean, geom="point", shape=23, size = 2) +
+  geom_violin(aes(x= 2, y = no.tree.LST), col="red") +
+  stat_summary(aes(x= 2, y = no.tree.LST), fun.y=mean, geom="point", shape=23, size = 2, col="red") +
+  geom_hline(yintercept=mean(valMean$value.mean.core.LST)) +
+  geom_hline(yintercept=mean(valMean$no.tree.LST), col="red")
+
+
+
+# saving some of the output to be used in the query tool
+write.csv(valTrendCore, file.path(path.save, "core_trends.csv"), row.names=F)
+
+# removing some columns before saving for the portal
+valMean3 <- valMean[,!names(valMean) %in% c("NAME", "LATITUDE", "LONGITUDE", "ES00POP")]
+
+write.csv(valMean, file.path(path.save, "core_v_buffer.csv"), row.names=F)
