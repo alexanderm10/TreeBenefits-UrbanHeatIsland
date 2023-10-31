@@ -407,8 +407,8 @@ ggplot(data=cityAll.stats[,]) +
 ggplot(data=cityAll.stats[,]) +
   geom_point(aes(x=trend.LST.slope, y=model.tree.slope))
 
-ggplot(data=cityAll.stats[,]) +
-  geom_point(aes(x=tree.veg.trend, y=model.tree.slope))
+# ggplot(data=cityAll.stats[,]) +
+#   geom_point(aes(x=tree.veg.trend, y=model.tree.slope))
 
 ggplot(data=cityAll.stats[,]) +
   geom_point(aes(x=veg.mean/tree.mean, y=model.tree.slope))
